@@ -9,6 +9,7 @@ import com.revenuecat.purchases.Purchases
 import com.revenuecat.purchases.PurchasesConfiguration
 import com.revenuecat.purchases.getCustomerInfoWith
 import com.revenuecat.purchases.getOfferingsWith
+import com.revenuecat.purchases.logInWith
 import com.revenuecat.purchases.purchaseWith
 import com.revenuecat.purchases.restorePurchasesWith
 import org.json.JSONObject
@@ -31,6 +32,25 @@ object SubscriptionService {
             PurchasesConfiguration.Builder(context.applicationContext, apiKey).build()
         )
         configured = true
+    }
+
+    fun identify(appUserID: String, callback: (PurchaseOutcome) -> Unit) {
+        if (!configured) {
+            callback(PurchaseOutcome.Failed("RevenueCat is not configured"))
+            return
+        }
+        if (appUserID.isBlank()) {
+            callback(PurchaseOutcome.Failed("Missing RevenueCat app user ID"))
+            return
+        }
+
+        Purchases.sharedInstance.logInWith(
+            appUserID,
+            onError = { error -> callback(PurchaseOutcome.Failed(error.message)) },
+            onSuccess = { customerInfo, _ ->
+                callback(PurchaseOutcome.Completed(statusPayload(customerInfo, "identify")))
+            }
+        )
     }
 
     fun checkAccess(callback: (JSONObject) -> Unit) {
@@ -113,6 +133,7 @@ object SubscriptionService {
         return JSONObject()
             .put("isSubscribed", entitlement?.isActive == true)
             .put("entitlement", AppConfig.REVENUECAT_ENTITLEMENT_ID)
+            .put("appUserID", customerInfo.originalAppUserId)
             .put("source", source)
     }
 }
