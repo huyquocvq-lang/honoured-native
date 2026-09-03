@@ -28,12 +28,17 @@ final class SubscriptionService {
         guard isConfigured else {
             return .failed("RevenueCat is not configured")
         }
-        guard !appUserID.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else {
+        let userID = appUserID.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !userID.isEmpty else {
             return .failed("Missing RevenueCat app user ID")
         }
 
+        if Purchases.shared.appUserID == userID {
+            return .completed(await accessStatus())
+        }
+
         return await withCheckedContinuation { continuation in
-            Purchases.shared.logIn(appUserID) { customerInfo, _, error in
+            Purchases.shared.logIn(userID) { customerInfo, _, error in
                 if let error {
                     continuation.resume(returning: .failed(error.localizedDescription))
                     return
@@ -44,6 +49,26 @@ final class SubscriptionService {
                 }
                 continuation.resume(returning: .completed(self.statusPayload(customerInfo: customerInfo, source: "identify")))
             }
+        }
+    }
+
+    func logout() async -> PurchaseOutcome {
+        guard isConfigured else {
+            return .failed("RevenueCat is not configured")
+        }
+
+        if Purchases.shared.appUserID.hasPrefix("$RCAnonymousID:") {
+            return .completed([
+                "isSubscribed": false,
+                "source": "already_anonymous"
+            ])
+        }
+
+        do {
+            let customerInfo = try await Purchases.shared.logOut()
+            return .completed(statusPayload(customerInfo: customerInfo, source: "logout"))
+        } catch {
+            return .failed(error.localizedDescription)
         }
     }
 
@@ -115,7 +140,7 @@ final class SubscriptionService {
         var payload: [String: Any] = [
             "isSubscribed": entitlement?.isActive == true,
             "entitlement": AppConfig.revenueCatEntitlementID,
-            "appUserID": customerInfo.originalAppUserId,
+            "appUserID": Purchases.shared.appUserID,
             "source": source
         ]
 
