@@ -53,9 +53,20 @@ final class NativeBridge: NSObject, WKScriptMessageHandler {
                 }
             }
         case "CHECK_ACCESS":
+            guard let userID = payload["userId"] as? String, !userID.isEmpty else {
+                send(type: "ACCESS_STATUS", payload: ["isSubscribed": false, "source": "missing_user_id"])
+                return
+            }
             Task { @MainActor [weak self] in
-                let status = await SubscriptionService.shared.accessStatus()
-                self?.send(type: "ACCESS_STATUS", payload: status)
+                switch await SubscriptionService.shared.identify(appUserID: userID) {
+                case .completed:
+                    let status = await SubscriptionService.shared.accessStatus()
+                    self?.send(type: "ACCESS_STATUS", payload: status)
+                case .cancelled:
+                    self?.send(type: "ACCESS_STATUS", payload: ["isSubscribed": false, "source": "identify_cancelled"])
+                case .failed(let message):
+                    self?.send(type: "ACCESS_STATUS", payload: ["isSubscribed": false, "source": "identify_failed", "message": message])
+                }
             }
         case "START_PURCHASE":
             guard let userID = payload["userId"] as? String, !userID.isEmpty else {
