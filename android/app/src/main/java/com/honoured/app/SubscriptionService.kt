@@ -10,6 +10,7 @@ import com.revenuecat.purchases.PurchasesConfiguration
 import com.revenuecat.purchases.getCustomerInfoWith
 import com.revenuecat.purchases.getOfferingsWith
 import com.revenuecat.purchases.logInWith
+import com.revenuecat.purchases.logOutWith
 import com.revenuecat.purchases.purchaseWith
 import com.revenuecat.purchases.restorePurchasesWith
 import org.json.JSONObject
@@ -39,16 +40,47 @@ object SubscriptionService {
             callback(PurchaseOutcome.Failed("RevenueCat is not configured"))
             return
         }
-        if (appUserID.isBlank()) {
+        val userId = appUserID.trim()
+        if (userId.isBlank()) {
             callback(PurchaseOutcome.Failed("Missing RevenueCat app user ID"))
             return
         }
 
+        if (Purchases.sharedInstance.appUserID == userId) {
+            checkAccess { callback(PurchaseOutcome.Completed(it)) }
+            return
+        }
+
         Purchases.sharedInstance.logInWith(
-            appUserID,
+            userId,
             onError = { error -> callback(PurchaseOutcome.Failed(error.message)) },
             onSuccess = { customerInfo, _ ->
                 callback(PurchaseOutcome.Completed(statusPayload(customerInfo, "identify")))
+            }
+        )
+    }
+
+    fun logout(callback: (PurchaseOutcome) -> Unit) {
+        if (!configured) {
+            callback(PurchaseOutcome.Failed("RevenueCat is not configured"))
+            return
+        }
+
+        if (Purchases.sharedInstance.appUserID.startsWith("$RCAnonymousID:")) {
+            callback(
+                PurchaseOutcome.Completed(
+                    JSONObject()
+                        .put("isSubscribed", false)
+                        .put("source", "already_anonymous")
+                )
+            )
+            return
+        }
+
+        Purchases.sharedInstance.logOutWith(
+            onError = { error -> callback(PurchaseOutcome.Failed(error.message)) },
+            onSuccess = { customerInfo ->
+                callback(PurchaseOutcome.Completed(statusPayload(customerInfo, "logout")))
             }
         )
     }
@@ -133,7 +165,7 @@ object SubscriptionService {
         return JSONObject()
             .put("isSubscribed", entitlement?.isActive == true)
             .put("entitlement", AppConfig.REVENUECAT_ENTITLEMENT_ID)
-            .put("appUserID", customerInfo.originalAppUserId)
+            .put("appUserID", Purchases.sharedInstance.appUserID)
             .put("source", source)
     }
 }
