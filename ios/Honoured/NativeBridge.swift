@@ -40,32 +40,66 @@ final class NativeBridge: NSObject, WKScriptMessageHandler {
                     self?.send(type: "IDENTIFY_FAILED", payload: ["message": message])
                 }
             }
+        case "LOGOUT_USER":
+            Task { @MainActor [weak self] in
+                switch await SubscriptionService.shared.logout() {
+                case .completed:
+                    self?.send(type: "LOGOUT_SUCCESS", payload: ["isSubscribed": false])
+                    self?.send(type: "ACCESS_STATUS", payload: ["isSubscribed": false, "source": "logout"])
+                case .cancelled:
+                    self?.send(type: "LOGOUT_FAILED", payload: ["message": "Unexpected cancellation"])
+                case .failed(let message):
+                    self?.send(type: "LOGOUT_FAILED", payload: ["message": message])
+                }
+            }
         case "CHECK_ACCESS":
             Task { @MainActor [weak self] in
                 let status = await SubscriptionService.shared.accessStatus()
                 self?.send(type: "ACCESS_STATUS", payload: status)
             }
         case "START_PURCHASE":
+            guard let userID = payload["userId"] as? String, !userID.isEmpty else {
+                send(type: "PURCHASE_FAILED", payload: ["message": "Missing userId"])
+                return
+            }
             let packageIdentifier = payload["packageIdentifier"] as? String
             Task { @MainActor [weak self] in
-                switch await SubscriptionService.shared.purchase(packageIdentifier: packageIdentifier) {
-                case .completed(let status):
-                    self?.send(type: "PURCHASE_SUCCESS", payload: status)
-                    self?.send(type: "ACCESS_STATUS", payload: status)
+                switch await SubscriptionService.shared.identify(appUserID: userID) {
+                case .completed:
+                    switch await SubscriptionService.shared.purchase(packageIdentifier: packageIdentifier) {
+                    case .completed(let status):
+                        self?.send(type: "PURCHASE_SUCCESS", payload: status)
+                        self?.send(type: "ACCESS_STATUS", payload: status)
+                    case .cancelled:
+                        self?.send(type: "PURCHASE_CANCELLED", payload: [:])
+                    case .failed(let message):
+                        self?.send(type: "PURCHASE_FAILED", payload: ["message": message])
+                    }
                 case .cancelled:
-                    self?.send(type: "PURCHASE_CANCELLED", payload: [:])
+                    self?.send(type: "PURCHASE_FAILED", payload: ["message": "Could not identify signed-in user"])
                 case .failed(let message):
                     self?.send(type: "PURCHASE_FAILED", payload: ["message": message])
                 }
             }
         case "RESTORE_PURCHASES":
+            guard let userID = payload["userId"] as? String, !userID.isEmpty else {
+                send(type: "RESTORE_FAILED", payload: ["message": "Missing userId"])
+                return
+            }
             Task { @MainActor [weak self] in
-                switch await SubscriptionService.shared.restore() {
-                case .completed(let status):
-                    self?.send(type: "RESTORE_SUCCESS", payload: status)
-                    self?.send(type: "ACCESS_STATUS", payload: status)
+                switch await SubscriptionService.shared.identify(appUserID: userID) {
+                case .completed:
+                    switch await SubscriptionService.shared.restore() {
+                    case .completed(let status):
+                        self?.send(type: "RESTORE_SUCCESS", payload: status)
+                        self?.send(type: "ACCESS_STATUS", payload: status)
+                    case .cancelled:
+                        self?.send(type: "RESTORE_SUCCESS", payload: ["isSubscribed": false])
+                    case .failed(let message):
+                        self?.send(type: "RESTORE_FAILED", payload: ["message": message])
+                    }
                 case .cancelled:
-                    self?.send(type: "RESTORE_SUCCESS", payload: ["isSubscribed": false])
+                    self?.send(type: "RESTORE_FAILED", payload: ["message": "Could not identify signed-in user"])
                 case .failed(let message):
                     self?.send(type: "RESTORE_FAILED", payload: ["message": message])
                 }
