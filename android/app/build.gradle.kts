@@ -3,6 +3,8 @@ plugins {
     id("org.jetbrains.kotlin.android")
 }
 
+val revenueCatApiKey = providers.gradleProperty("REVENUECAT_ANDROID_API_KEY").orElse("").get()
+
 android {
     namespace = "com.honoured.app"
     compileSdk = 35
@@ -13,6 +15,11 @@ android {
         targetSdk = 35
         versionCode = 1
         versionName = "1.0.0"
+        buildConfigField("String", "REVENUECAT_ANDROID_API_KEY", "\"$revenueCatApiKey\"")
+    }
+
+    buildFeatures {
+        buildConfig = true
     }
 
     compileOptions {
@@ -29,4 +36,5 @@ dependencies {
     implementation("androidx.core:core-ktx:1.15.0")
     implementation("androidx.appcompat:appcompat:1.7.0")
     implementation("androidx.activity:activity-ktx:1.10.0")
+    implementation("com.revenuecat.purchases:purchases:10.16.0")
 }
