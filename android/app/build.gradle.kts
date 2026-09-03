@@ -1,9 +1,19 @@
+import java.util.Properties
+
 plugins {
     id("com.android.application")
     id("org.jetbrains.kotlin.android")
 }
 
-val revenueCatApiKey = providers.gradleProperty("REVENUECAT_ANDROID_API_KEY").orElse("").get()
+val localProperties = Properties().apply {
+    val file = rootProject.file("local.properties")
+    if (file.exists()) file.inputStream().use(::load)
+}
+
+fun localConfig(name: String): String = localProperties.getProperty(name, "").trim()
+
+val revenueCatApiKey = localConfig("REVENUECAT_ANDROID_API_KEY")
+val honouredWebAppUrl = localConfig("HONOURED_WEB_APP_URL")
 
 android {
     namespace = "com.honoured.app"
@@ -16,6 +26,7 @@ android {
         versionCode = 1
         versionName = "1.0.0"
         buildConfigField("String", "REVENUECAT_ANDROID_API_KEY", "\"$revenueCatApiKey\"")
+        buildConfigField("String", "HONOURED_WEB_APP_URL", "\"$honouredWebAppUrl\"")
     }
 
     buildFeatures {
