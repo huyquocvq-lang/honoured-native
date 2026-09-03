@@ -16,6 +16,9 @@ targets:
     deploymentTarget: "16.0"
     sources:
       - Honoured
+    configFiles:
+      Debug: Config.xcconfig
+      Release: Config.xcconfig
     dependencies:
       - package: RevenueCat
         product: RevenueCat
@@ -25,6 +28,5 @@ targets:
         PRODUCT_NAME: Honoured
         TARGETED_DEVICE_FAMILY: "1"
         INFOPLIST_FILE: Honoured/Info.plist
-        REVENUECAT_IOS_API_KEY: ""
     scheme:
       testTargets: []
