@@ -1,6 +1,10 @@
 name: Honoured
 options:
   bundleIdPrefix: com.honoured
+packages:
+  RevenueCat:
+    url: https://github.com/RevenueCat/purchases-ios-spm.git
+    from: 5.83.2
 settings:
   base:
     IPHONEOS_DEPLOYMENT_TARGET: 16.0
@@ -12,11 +16,15 @@ targets:
     deploymentTarget: "16.0"
     sources:
       - Honoured
+    dependencies:
+      - package: RevenueCat
+        product: RevenueCat
     settings:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: com.honoured.app
         PRODUCT_NAME: Honoured
         TARGETED_DEVICE_FAMILY: "1"
         INFOPLIST_FILE: Honoured/Info.plist
+        REVENUECAT_IOS_API_KEY: ""
     scheme:
       testTargets: []
