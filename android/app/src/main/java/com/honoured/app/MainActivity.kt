@@ -17,6 +17,8 @@ class MainActivity : AppCompatActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
 
+        SubscriptionService.configureIfPossible(this)
+
         webView = WebView(this).apply {
             setBackgroundColor(Color.BLACK)
             settings.javaScriptEnabled = true
@@ -27,7 +29,7 @@ class MainActivity : AppCompatActivity() {
             webViewClient = HonouredWebViewClient()
         }
 
-        bridge = NativeBridge(webView)
+        bridge = NativeBridge(this, webView)
         webView.addJavascriptInterface(bridge, "HonouredNative")
         setContentView(webView)
 
