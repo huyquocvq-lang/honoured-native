@@ -71,8 +71,33 @@ class NativeBridge(
                     )
                 }
             }
-            "CHECK_ACCESS" -> SubscriptionService.checkAccess { status ->
-                send("ACCESS_STATUS", status)
+            "CHECK_ACCESS" -> {
+                val userId = payload.optString("userId")
+                if (userId.isBlank()) {
+                    send(
+                        "ACCESS_STATUS",
+                        JSONObject().put("isSubscribed", false).put("source", "missing_user_id")
+                    )
+                    return
+                }
+                SubscriptionService.identify(userId) { identifyOutcome ->
+                    when (identifyOutcome) {
+                        is PurchaseOutcome.Completed -> SubscriptionService.checkAccess { status ->
+                            send("ACCESS_STATUS", status)
+                        }
+                        PurchaseOutcome.Cancelled -> send(
+                            "ACCESS_STATUS",
+                            JSONObject().put("isSubscribed", false).put("source", "identify_cancelled")
+                        )
+                        is PurchaseOutcome.Failed -> send(
+                            "ACCESS_STATUS",
+                            JSONObject()
+                                .put("isSubscribed", false)
+                                .put("source", "identify_failed")
+                                .put("message", identifyOutcome.message)
+                        )
+                    }
+                }
             }
             "START_PURCHASE" -> {
                 val userId = payload.optString("userId")
