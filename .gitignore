@@ -1,0 +1,17 @@
+# Local environment/config
+.env
+.env.*
+!.env.example
+
+ios/Config.xcconfig
+android/local.properties
+
+# Xcode
+.DS_Store
+DerivedData/
+*.xcuserstate
+xcuserdata/
+
+# Android/Gradle
+.gradle/
+**/build/
