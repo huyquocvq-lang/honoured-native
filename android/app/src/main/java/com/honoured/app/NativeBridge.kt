@@ -52,41 +52,98 @@ class NativeBridge(
                     }
                 }
             }
+            "LOGOUT_USER" -> SubscriptionService.logout { outcome ->
+                when (outcome) {
+                    is PurchaseOutcome.Completed -> {
+                        send("LOGOUT_SUCCESS", JSONObject().put("isSubscribed", false))
+                        send(
+                            "ACCESS_STATUS",
+                            JSONObject().put("isSubscribed", false).put("source", "logout")
+                        )
+                    }
+                    PurchaseOutcome.Cancelled -> send(
+                        "LOGOUT_FAILED",
+                        JSONObject().put("message", "Unexpected cancellation")
+                    )
+                    is PurchaseOutcome.Failed -> send(
+                        "LOGOUT_FAILED",
+                        JSONObject().put("message", outcome.message)
+                    )
+                }
+            }
             "CHECK_ACCESS" -> SubscriptionService.checkAccess { status ->
                 send("ACCESS_STATUS", status)
             }
             "START_PURCHASE" -> {
+                val userId = payload.optString("userId")
                 val packageIdentifier = payload.optString("packageIdentifier").takeIf { it.isNotBlank() }
+                if (userId.isBlank()) {
+                    send("PURCHASE_FAILED", JSONObject().put("message", "Missing userId"))
+                    return
+                }
                 activity.runOnUiThread {
-                    SubscriptionService.purchase(activity, packageIdentifier) { outcome ->
-                        when (outcome) {
+                    SubscriptionService.identify(userId) { identifyOutcome ->
+                        when (identifyOutcome) {
                             is PurchaseOutcome.Completed -> {
-                                send("PURCHASE_SUCCESS", outcome.status)
-                                send("ACCESS_STATUS", outcome.status)
+                                SubscriptionService.purchase(activity, packageIdentifier) { outcome ->
+                                    when (outcome) {
+                                        is PurchaseOutcome.Completed -> {
+                                            send("PURCHASE_SUCCESS", outcome.status)
+                                            send("ACCESS_STATUS", outcome.status)
+                                        }
+                                        PurchaseOutcome.Cancelled -> send("PURCHASE_CANCELLED", JSONObject())
+                                        is PurchaseOutcome.Failed -> send(
+                                            "PURCHASE_FAILED",
+                                            JSONObject().put("message", outcome.message)
+                                        )
+                                    }
+                                }
                             }
-                            PurchaseOutcome.Cancelled -> send("PURCHASE_CANCELLED", JSONObject())
+                            PurchaseOutcome.Cancelled -> send(
+                                "PURCHASE_FAILED",
+                                JSONObject().put("message", "Could not identify signed-in user")
+                            )
                             is PurchaseOutcome.Failed -> send(
                                 "PURCHASE_FAILED",
-                                JSONObject().put("message", outcome.message)
+                                JSONObject().put("message", identifyOutcome.message)
                             )
                         }
                     }
                 }
             }
-            "RESTORE_PURCHASES" -> SubscriptionService.restore { outcome ->
-                when (outcome) {
-                    is PurchaseOutcome.Completed -> {
-                        send("RESTORE_SUCCESS", outcome.status)
-                        send("ACCESS_STATUS", outcome.status)
+            "RESTORE_PURCHASES" -> {
+                val userId = payload.optString("userId")
+                if (userId.isBlank()) {
+                    send("RESTORE_FAILED", JSONObject().put("message", "Missing userId"))
+                    return
+                }
+                SubscriptionService.identify(userId) { identifyOutcome ->
+                    when (identifyOutcome) {
+                        is PurchaseOutcome.Completed -> SubscriptionService.restore { outcome ->
+                            when (outcome) {
+                                is PurchaseOutcome.Completed -> {
+                                    send("RESTORE_SUCCESS", outcome.status)
+                                    send("ACCESS_STATUS", outcome.status)
+                                }
+                                PurchaseOutcome.Cancelled -> send(
+                                    "RESTORE_SUCCESS",
+                                    JSONObject().put("isSubscribed", false)
+                                )
+                                is PurchaseOutcome.Failed -> send(
+                                    "RESTORE_FAILED",
+                                    JSONObject().put("message", outcome.message)
+                                )
+                            }
+                        }
+                        PurchaseOutcome.Cancelled -> send(
+                            "RESTORE_FAILED",
+                            JSONObject().put("message", "Could not identify signed-in user")
+                        )
+                        is PurchaseOutcome.Failed -> send(
+                            "RESTORE_FAILED",
+                            JSONObject().put("message", identifyOutcome.message)
+                        )
                     }
-                    PurchaseOutcome.Cancelled -> send(
-                        "RESTORE_SUCCESS",
-                        JSONObject().put("isSubscribed", false)
-                    )
-                    is PurchaseOutcome.Failed -> send(
-                        "RESTORE_FAILED",
-                        JSONObject().put("message", outcome.message)
-                    )
                 }
             }
             "START_SESSION" -> send(
