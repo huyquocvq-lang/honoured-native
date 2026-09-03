@@ -1,0 +1,22 @@
+name: Honoured
+options:
+  bundleIdPrefix: com.honoured
+settings:
+  base:
+    IPHONEOS_DEPLOYMENT_TARGET: 16.0
+    SWIFT_VERSION: 5.9
+targets:
+  Honoured:
+    type: application
+    platform: iOS
+    deploymentTarget: "16.0"
+    sources:
+      - Honoured
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.honoured.app
+        PRODUCT_NAME: Honoured
+        TARGETED_DEVICE_FAMILY: "1"
+        INFOPLIST_FILE: Honoured/Info.plist
+    scheme:
+      testTargets: []
