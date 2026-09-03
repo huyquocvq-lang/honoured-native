@@ -29,6 +29,29 @@ class NativeBridge(
                     .put("platform", "android")
                     .put("bridgeVersion", AppConfig.BRIDGE_VERSION)
             )
+            "IDENTIFY_USER" -> {
+                val userId = payload.optString("userId")
+                if (userId.isBlank()) {
+                    send("IDENTIFY_FAILED", JSONObject().put("message", "Missing userId"))
+                } else {
+                    SubscriptionService.identify(userId) { outcome ->
+                        when (outcome) {
+                            is PurchaseOutcome.Completed -> {
+                                send("IDENTIFY_SUCCESS", outcome.status)
+                                send("ACCESS_STATUS", outcome.status)
+                            }
+                            PurchaseOutcome.Cancelled -> send(
+                                "IDENTIFY_FAILED",
+                                JSONObject().put("message", "Unexpected cancellation")
+                            )
+                            is PurchaseOutcome.Failed -> send(
+                                "IDENTIFY_FAILED",
+                                JSONObject().put("message", outcome.message)
+                            )
+                        }
+                    }
+                }
+            }
             "CHECK_ACCESS" -> SubscriptionService.checkAccess { status ->
                 send("ACCESS_STATUS", status)
             }
@@ -68,7 +91,10 @@ class NativeBridge(
             }
             "START_SESSION" -> send(
                 "ERROR",
-                JSONObject().put("message", "START_SESSION is reserved for the trial-engine step")
+                JSONObject().put(
+                    "message",
+                    "Trial sessions are enforced by Supabase RPC from the authenticated web app"
+                )
             )
             else -> send(
                 "ERROR",
