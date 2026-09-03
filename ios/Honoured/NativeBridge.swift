@@ -24,6 +24,22 @@ final class NativeBridge: NSObject, WKScriptMessageHandler {
                 "platform": "ios",
                 "bridgeVersion": AppConfig.bridgeVersion
             ])
+        case "IDENTIFY_USER":
+            guard let userID = payload["userId"] as? String, !userID.isEmpty else {
+                send(type: "IDENTIFY_FAILED", payload: ["message": "Missing userId"])
+                return
+            }
+            Task { @MainActor [weak self] in
+                switch await SubscriptionService.shared.identify(appUserID: userID) {
+                case .completed(let status):
+                    self?.send(type: "IDENTIFY_SUCCESS", payload: status)
+                    self?.send(type: "ACCESS_STATUS", payload: status)
+                case .cancelled:
+                    self?.send(type: "IDENTIFY_FAILED", payload: ["message": "Unexpected cancellation"])
+                case .failed(let message):
+                    self?.send(type: "IDENTIFY_FAILED", payload: ["message": message])
+                }
+            }
         case "CHECK_ACCESS":
             Task { @MainActor [weak self] in
                 let status = await SubscriptionService.shared.accessStatus()
@@ -56,7 +72,7 @@ final class NativeBridge: NSObject, WKScriptMessageHandler {
             }
         case "START_SESSION":
             send(type: "ERROR", payload: [
-                "message": "START_SESSION is reserved for the trial-engine step"
+                "message": "Trial sessions are enforced by Supabase RPC from the authenticated web app"
             ])
         default:
             send(type: "ERROR", payload: ["message": "Unsupported bridge message: \(type)"])
