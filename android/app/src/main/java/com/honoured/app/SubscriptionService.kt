@@ -66,7 +66,7 @@ object SubscriptionService {
             return
         }
 
-        if (Purchases.sharedInstance.appUserID.startsWith("$RCAnonymousID:")) {
+        if (Purchases.sharedInstance.appUserID.startsWith("\$RCAnonymousID:")) {
             callback(
                 PurchaseOutcome.Completed(
                     JSONObject()
