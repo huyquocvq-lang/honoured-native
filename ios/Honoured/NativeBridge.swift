@@ -11,6 +11,8 @@ final class NativeBridge: NSObject, WKScriptMessageHandler {
             return
         }
 
+        let payload = body["payload"] as? [String: Any] ?? [:]
+
         switch type {
         case "APP_READY":
             send(type: "NATIVE_READY", payload: [
@@ -23,14 +25,38 @@ final class NativeBridge: NSObject, WKScriptMessageHandler {
                 "bridgeVersion": AppConfig.bridgeVersion
             ])
         case "CHECK_ACCESS":
-            send(type: "ACCESS_STATUS", payload: [
-                "isSubscribed": false,
-                "trialActive": false,
-                "source": "foundation_stub"
-            ])
-        case "START_PURCHASE", "RESTORE_PURCHASES", "START_SESSION":
+            Task { @MainActor [weak self] in
+                let status = await SubscriptionService.shared.accessStatus()
+                self?.send(type: "ACCESS_STATUS", payload: status)
+            }
+        case "START_PURCHASE":
+            let packageIdentifier = payload["packageIdentifier"] as? String
+            Task { @MainActor [weak self] in
+                switch await SubscriptionService.shared.purchase(packageIdentifier: packageIdentifier) {
+                case .completed(let status):
+                    self?.send(type: "PURCHASE_SUCCESS", payload: status)
+                    self?.send(type: "ACCESS_STATUS", payload: status)
+                case .cancelled:
+                    self?.send(type: "PURCHASE_CANCELLED", payload: [:])
+                case .failed(let message):
+                    self?.send(type: "PURCHASE_FAILED", payload: ["message": message])
+                }
+            }
+        case "RESTORE_PURCHASES":
+            Task { @MainActor [weak self] in
+                switch await SubscriptionService.shared.restore() {
+                case .completed(let status):
+                    self?.send(type: "RESTORE_SUCCESS", payload: status)
+                    self?.send(type: "ACCESS_STATUS", payload: status)
+                case .cancelled:
+                    self?.send(type: "RESTORE_SUCCESS", payload: ["isSubscribed": false])
+                case .failed(let message):
+                    self?.send(type: "RESTORE_FAILED", payload: ["message": message])
+                }
+            }
+        case "START_SESSION":
             send(type: "ERROR", payload: [
-                "message": "\(type) is reserved for a later implementation step"
+                "message": "START_SESSION is reserved for the trial-engine step"
             ])
         default:
             send(type: "ERROR", payload: ["message": "Unsupported bridge message: \(type)"])
