@@ -24,6 +24,29 @@ final class SubscriptionService {
         isConfigured = true
     }
 
+    func identify(appUserID: String) async -> PurchaseOutcome {
+        guard isConfigured else {
+            return .failed("RevenueCat is not configured")
+        }
+        guard !appUserID.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else {
+            return .failed("Missing RevenueCat app user ID")
+        }
+
+        return await withCheckedContinuation { continuation in
+            Purchases.shared.logIn(appUserID) { customerInfo, _, error in
+                if let error {
+                    continuation.resume(returning: .failed(error.localizedDescription))
+                    return
+                }
+                guard let customerInfo else {
+                    continuation.resume(returning: .failed("RevenueCat login returned no customer info"))
+                    return
+                }
+                continuation.resume(returning: .completed(self.statusPayload(customerInfo: customerInfo, source: "identify")))
+            }
+        }
+    }
+
     func accessStatus() async -> [String: Any] {
         guard isConfigured else {
             return [
@@ -92,6 +115,7 @@ final class SubscriptionService {
         var payload: [String: Any] = [
             "isSubscribed": entitlement?.isActive == true,
             "entitlement": AppConfig.revenueCatEntitlementID,
+            "appUserID": customerInfo.originalAppUserId,
             "source": source
         ]
 
