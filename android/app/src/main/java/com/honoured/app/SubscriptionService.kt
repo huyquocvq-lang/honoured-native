@@ -47,7 +47,17 @@ object SubscriptionService {
         }
 
         if (Purchases.sharedInstance.appUserID == userId) {
-            checkAccess { callback(PurchaseOutcome.Completed(it)) }
+            // Identity is already bound. Avoid an unnecessary CustomerInfo
+            // request before every purchase; purchaseWith returns the
+            // authoritative CustomerInfo when the store finishes.
+            callback(
+                PurchaseOutcome.Completed(
+                    JSONObject()
+                        .put("identified", true)
+                        .put("appUserID", userId)
+                        .put("source", "already_identified")
+                )
+            )
             return
         }
 

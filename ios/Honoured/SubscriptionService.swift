@@ -34,7 +34,14 @@ final class SubscriptionService {
         }
 
         if Purchases.shared.appUserID == userID {
-            return .completed(await accessStatus())
+            // Identity is already bound. Do not make a CustomerInfo request on
+            // the critical path before every purchase; RevenueCat returns the
+            // authoritative CustomerInfo with the purchase result below.
+            return .completed([
+                "identified": true,
+                "appUserID": userID,
+                "source": "already_identified"
+            ])
         }
 
         return await withCheckedContinuation { continuation in
