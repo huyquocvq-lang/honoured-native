@@ -4,9 +4,9 @@ Honoured uses RevenueCat as the subscription state layer while Apple StoreKit 2 
 
 ## RevenueCat contract
 
-- Entitlement ID: `pro`
+- Entitlement ID: `honoured_plus`
 - Current offering: required
-- Purchase package: the bridge may pass `payload.packageIdentifier`; otherwise the first package in the current offering is used.
+- Purchase packages: the web app passes the exact RevenueCat identifiers `$rc_monthly` or `$rc_annual`. Native rejects an unknown identifier instead of silently purchasing a different package. The first package is used only for legacy callers that omit the identifier entirely.
 - Subscription source of truth: RevenueCat `CustomerInfo`
 
 ## Bridge messages
@@ -22,7 +22,7 @@ Web -> native:
 Native -> web:
 
 ```json
-{"type":"ACCESS_STATUS","payload":{"isSubscribed":true,"entitlement":"pro","source":"revenuecat"}}
+{"type":"ACCESS_STATUS","payload":{"isSubscribed":true,"entitlement":"honoured_plus","source":"revenuecat"}}
 ```
 
 ### Purchase
@@ -76,9 +76,10 @@ For local development this can live in the user's Gradle properties rather than 
 1. Add the Apple app using the final iOS bundle ID.
 2. Add the Google Play app using the final Android application ID.
 3. Configure each platform's public SDK key in the native build.
-4. Create entitlement `pro`.
+4. Create entitlement `honoured_plus`.
 5. Import/link the store subscription product(s).
-6. Attach the product(s) to `pro`.
+6. Attach the product(s) to `honoured_plus`.
 7. Create a current Offering and add at least one Package.
 
 Custom Honoured trial/session limits are intentionally not stored in RevenueCat; they will be implemented in the Supabase trial-engine step.
+Do not configure a separate App Store or Play introductory free trial; the Supabase 7-day/12-session policy is the single trial system.

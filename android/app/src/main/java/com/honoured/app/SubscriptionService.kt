@@ -123,9 +123,15 @@ object SubscriptionService {
                     return@getOfferingsWith
                 }
 
-                val selectedPackage = packageIdentifier
-                    ?.let { id -> offering.availablePackages.firstOrNull { it.identifier == id } }
-                    ?: offering.availablePackages.firstOrNull()
+                val selectedPackage = if (!packageIdentifier.isNullOrBlank()) {
+                    offering.availablePackages.firstOrNull { it.identifier == packageIdentifier }
+                        ?: run {
+                            callback(PurchaseOutcome.Failed("RevenueCat package not found: $packageIdentifier"))
+                            return@getOfferingsWith
+                        }
+                } else {
+                    offering.availablePackages.firstOrNull()
+                }
 
                 if (selectedPackage == null) {
                     callback(PurchaseOutcome.Failed("No purchasable RevenueCat package is available"))
@@ -162,11 +168,14 @@ object SubscriptionService {
 
     private fun statusPayload(customerInfo: CustomerInfo, source: String): JSONObject {
         val entitlement = customerInfo.entitlements[AppConfig.REVENUECAT_ENTITLEMENT_ID]
-        return JSONObject()
+        val payload = JSONObject()
             .put("isSubscribed", entitlement?.isActive == true)
             .put("entitlement", AppConfig.REVENUECAT_ENTITLEMENT_ID)
             .put("appUserID", Purchases.sharedInstance.appUserID)
             .put("source", source)
+        entitlement?.expirationDate?.let { payload.put("expiresAt", it.toInstant().toString()) }
+        entitlement?.productIdentifier?.let { payload.put("productId", it) }
+        return payload
     }
 }
 

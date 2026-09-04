@@ -103,9 +103,15 @@ final class SubscriptionService {
                 return .failed("No current RevenueCat offering is configured")
             }
 
-            let package = packageIdentifier.flatMap { id in
-                offering.availablePackages.first(where: { $0.identifier == id })
-            } ?? offering.availablePackages.first
+            let package: Package?
+            if let packageIdentifier, !packageIdentifier.isEmpty {
+                package = offering.availablePackages.first(where: { $0.identifier == packageIdentifier })
+                guard package != nil else {
+                    return .failed("RevenueCat package not found: \(packageIdentifier)")
+                }
+            } else {
+                package = offering.availablePackages.first
+            }
 
             guard let package else {
                 return .failed("No purchasable RevenueCat package is available")
@@ -145,7 +151,10 @@ final class SubscriptionService {
         ]
 
         if let expirationDate = entitlement?.expirationDate {
-            payload["expirationDate"] = ISO8601DateFormatter().string(from: expirationDate)
+            payload["expiresAt"] = ISO8601DateFormatter().string(from: expirationDate)
+        }
+        if let productIdentifier = entitlement?.productIdentifier {
+            payload["productId"] = productIdentifier
         }
 
         return payload

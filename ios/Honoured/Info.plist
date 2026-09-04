@@ -26,6 +26,8 @@
 	<true/>
 	<key>RevenueCatAPIKey</key>
 	<string>$(REVENUECAT_IOS_API_KEY)</string>
+	<key>NSMicrophoneUsageDescription</key>
+	<string>Record a private Voice of Change reflection.</string>
 	<key>UILaunchScreen</key>
 	<dict/>
 	<key>UIRequiresFullScreen</key>

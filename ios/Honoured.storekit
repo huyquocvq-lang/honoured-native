@@ -90,11 +90,7 @@
           "familyShareable" : false,
           "groupNumber" : 1,
           "internalID" : "6F02A9D1",
-          "introductoryOffer" : {
-            "internalID" : "9C3D5B70",
-            "paymentMode" : "free",
-            "subscriptionPeriod" : "P1W"
-          },
+          "introductoryOffer" : null,
           "localizations" : [
             {
               "description" : "Honoured Plus, billed monthly",

@@ -1,6 +1,8 @@
 package com.honoured.app
 
+import android.Manifest
 import android.content.Intent
+import android.content.pm.PackageManager
 import android.graphics.Color
 import android.net.Uri
 import android.os.Bundle
@@ -11,12 +13,16 @@ import android.view.ViewGroup
 import android.webkit.WebResourceError
 import android.webkit.WebResourceRequest
 import android.webkit.WebResourceResponse
+import android.webkit.PermissionRequest
 import android.webkit.WebView
+import android.webkit.WebChromeClient
 import android.webkit.WebViewClient
 import android.widget.Button
 import android.widget.ProgressBar
 import android.widget.TextView
 import androidx.activity.OnBackPressedCallback
+import androidx.activity.result.contract.ActivityResultContracts
+import androidx.core.content.ContextCompat
 import androidx.appcompat.app.AppCompatActivity
 
 class MainActivity : AppCompatActivity() {
@@ -25,6 +31,15 @@ class MainActivity : AppCompatActivity() {
     private lateinit var errorView: View
     private lateinit var errorMessage: TextView
     private lateinit var bridge: NativeBridge
+    private var pendingMicrophoneRequest: PermissionRequest? = null
+    private val microphonePermission = registerForActivityResult(
+        ActivityResultContracts.RequestPermission()
+    ) { granted ->
+        val request = pendingMicrophoneRequest
+        pendingMicrophoneRequest = null
+        if (granted) request?.grant(arrayOf(PermissionRequest.RESOURCE_AUDIO_CAPTURE))
+        else request?.deny()
+    }
 
     /**
      * Set when the main frame fails so [WebViewClient.onPageFinished], which still
@@ -68,6 +83,35 @@ class MainActivity : AppCompatActivity() {
             settings.allowContentAccess = false
             settings.setSupportMultipleWindows(false)
             webViewClient = HonouredWebViewClient()
+            webChromeClient = object : WebChromeClient() {
+                override fun onPermissionRequest(request: PermissionRequest) {
+                    runOnUiThread {
+                        val trustedOrigin = request.origin.host == AppConfig.WEB_APP_HOST
+                        val audioOnly = request.resources.contentEquals(
+                            arrayOf(PermissionRequest.RESOURCE_AUDIO_CAPTURE)
+                        )
+                        if (!trustedOrigin || !audioOnly) {
+                            request.deny()
+                            return@runOnUiThread
+                        }
+                        if (ContextCompat.checkSelfPermission(
+                                this@MainActivity,
+                                Manifest.permission.RECORD_AUDIO
+                            ) == PackageManager.PERMISSION_GRANTED
+                        ) {
+                            request.grant(arrayOf(PermissionRequest.RESOURCE_AUDIO_CAPTURE))
+                        } else {
+                            pendingMicrophoneRequest?.deny()
+                            pendingMicrophoneRequest = request
+                            microphonePermission.launch(Manifest.permission.RECORD_AUDIO)
+                        }
+                    }
+                }
+
+                override fun onPermissionRequestCanceled(request: PermissionRequest) {
+                    if (pendingMicrophoneRequest == request) pendingMicrophoneRequest = null
+                }
+            }
         }
 
         bridge = NativeBridge(this, webView)
@@ -126,6 +170,8 @@ class MainActivity : AppCompatActivity() {
 
     override fun onDestroy() {
         timeoutHandler.removeCallbacks(loadTimeout)
+        pendingMicrophoneRequest?.deny()
+        pendingMicrophoneRequest = null
         webView.removeJavascriptInterface("HonouredNative")
         (webView.parent as? ViewGroup)?.removeView(webView)
         webView.destroy()

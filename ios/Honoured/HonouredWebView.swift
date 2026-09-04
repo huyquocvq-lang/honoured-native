@@ -18,6 +18,7 @@ struct HonouredWebView: UIViewRepresentable {
 
         let webView = WKWebView(frame: .zero, configuration: configuration)
         webView.navigationDelegate = context.coordinator
+        webView.uiDelegate = context.coordinator
         webView.allowsBackForwardNavigationGestures = true
         webView.scrollView.contentInsetAdjustmentBehavior = .never
         webView.isOpaque = false
@@ -42,7 +43,7 @@ struct HonouredWebView: UIViewRepresentable {
         uiView.configuration.userContentController.removeScriptMessageHandler(forName: "honouredNative")
     }
 
-    final class Coordinator: NSObject, WKNavigationDelegate {
+    final class Coordinator: NSObject, WKNavigationDelegate, WKUIDelegate {
         let bridge = NativeBridge()
         private let state: WebViewLoadState
 
@@ -108,6 +109,18 @@ struct HonouredWebView: UIViewRepresentable {
             }
 
             decisionHandler(.allow)
+        }
+
+        @available(iOS 15.0, *)
+        func webView(
+            _ webView: WKWebView,
+            requestMediaCapturePermissionFor origin: WKSecurityOrigin,
+            initiatedByFrame frame: WKFrameInfo,
+            type: WKMediaCaptureType,
+            decisionHandler: @escaping (WKPermissionDecision) -> Void
+        ) {
+            let trustedHost = origin.host == AppConfig.webAppURL.host
+            decisionHandler(trustedHost && type == .microphone ? .grant : .deny)
         }
     }
 }
