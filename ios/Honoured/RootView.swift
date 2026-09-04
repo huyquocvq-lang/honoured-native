@@ -10,12 +10,16 @@ struct RootView: View {
         ZStack {
             Color.black.ignoresSafeArea()
 
+            // The web view keeps full opacity for its whole life. An opacity
+            // modifier would force it into an offscreen compositing pass, which
+            // costs a blend on every scrolled frame; an opaque cover on top of
+            // it hides the unpainted page just as well.
             HonouredWebView(state: state)
                 .ignoresSafeArea()
-                .opacity(state.phase == .loaded ? 1 : 0)
 
             switch state.phase {
             case .loading:
+                Color.black.ignoresSafeArea()
                 ProgressView()
                     .progressViewStyle(.circular)
                     .tint(Self.foreground)

@@ -15,13 +15,20 @@ struct HonouredWebView: UIViewRepresentable {
         let configuration = WKWebViewConfiguration()
         configuration.userContentController = contentController
         configuration.defaultWebpagePreferences.allowsContentJavaScript = true
+        // Paint partial frames instead of holding a blank view until the whole
+        // document is ready.
+        configuration.suppressesIncrementalRendering = false
 
         let webView = WKWebView(frame: .zero, configuration: configuration)
         webView.navigationDelegate = context.coordinator
         webView.uiDelegate = context.coordinator
         webView.allowsBackForwardNavigationGestures = true
         webView.scrollView.contentInsetAdjustmentBehavior = .never
-        webView.isOpaque = false
+
+        // An opaque view lets the compositor skip blending the web layer against
+        // what is behind it on every frame, which is the fast path for scrolling.
+        // The shell is solid black underneath, so transparency buys nothing.
+        webView.isOpaque = true
         webView.backgroundColor = .black
         webView.scrollView.backgroundColor = .black
 
