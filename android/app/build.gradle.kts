@@ -1,3 +1,4 @@
+import java.io.File
 import java.util.Properties
 
 plugins {
@@ -5,15 +6,22 @@ plugins {
     id("org.jetbrains.kotlin.android")
 }
 
-val localProperties = Properties().apply {
-    val file = rootProject.file("local.properties")
+// Machine-specific configuration. The repository-root .env is the shared
+// source of truth for both native shells; android/local.properties may
+// override any key for this machine only. Both files are gitignored.
+fun loadProperties(file: File): Properties = Properties().apply {
     if (file.exists()) file.inputStream().use(::load)
 }
 
-fun localConfig(name: String): String = localProperties.getProperty(name, "").trim()
+val envProperties = loadProperties(rootProject.file("../.env"))
+val localProperties = loadProperties(rootProject.file("local.properties"))
 
-val revenueCatApiKey = localConfig("REVENUECAT_ANDROID_API_KEY")
-val honouredWebAppUrl = localConfig("HONOURED_WEB_APP_URL")
+// local.properties wins: it is the narrower, Android-only scope.
+fun env(name: String): String =
+    (localProperties.getProperty(name) ?: envProperties.getProperty(name) ?: "").trim()
+
+val revenueCatApiKey = env("REVENUECAT_ANDROID_API_KEY")
+val honouredWebAppUrl = env("HONOURED_WEB_APP_URL")
 
 android {
     namespace = "com.honoured.app"

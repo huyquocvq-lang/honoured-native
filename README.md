@@ -13,50 +13,60 @@ Native iOS and Android shells for the Honoured Lovable web app.
 
 ## Local environment config
 
-Do not commit real API keys or environment-specific URLs.
-
-### iOS
-
-```bash
-cd ios
-cp Config.xcconfig.example Config.xcconfig
-```
-
-Then set:
-
-```text
-HONOURED_WEB_APP_URL = https://honour-your-word.lovable.app
-REVENUECAT_IOS_API_KEY = appl_xxxxxxxxxxxxxxxxx
-```
-
-`ios/Config.xcconfig` is gitignored and injected into `Info.plist` through Xcode build settings.
-
-### Android
+All machine-specific values live in a single gitignored `.env` at the repository
+root. Never commit real API keys.
 
 ```bash
-cd android
-cp local.properties.example local.properties
+cp .env.example .env
 ```
 
-Then set:
+Then fill in:
 
-```properties
+```dotenv
 HONOURED_WEB_APP_URL=https://honour-your-word.lovable.app
+REVENUECAT_IOS_API_KEY=appl_xxxxxxxxxxxxxxxxx
 REVENUECAT_ANDROID_API_KEY=goog_xxxxxxxxxxxxxxxxx
+IOS_BUNDLE_ID=com.honoured.app
+IOS_DEVELOPMENT_TEAM=XXXXXXXXXX
 ```
 
-`android/local.properties` is gitignored and injected into `BuildConfig`.
+- **Android** reads `.env` directly at Gradle configuration time and exposes the
+  values as `BuildConfig` fields. `android/local.properties` may override any
+  key for that machine only — it is read after `.env` and wins per key, so
+  overriding one value leaves the rest coming from `.env`:
+
+  ```properties
+  sdk.dir=/Users/you/Library/Android/sdk
+  REVENUECAT_ANDROID_API_KEY=goog_machine_specific_key
+  ```
+
+  `local.properties` is gitignored too, and Android Studio manages `sdk.dir`
+  in it.
+- **iOS** cannot read `.env`, so `scripts/sync-env.sh` projects it into the
+  gitignored `ios/Config.xcconfig`, which `ios/project.yml` applies to the
+  target. `xcodegen generate` runs the script automatically via `preGenCommand`;
+  run it by hand after editing `.env` without regenerating:
+
+```bash
+./scripts/sync-env.sh
+```
+
+`IOS_BUNDLE_ID` overrides the production bundle identifier declared in
+`ios/project.yml`, so a throwaway App ID can be used for testing without
+modifying tracked files. Leave it unset to build `com.honoured.app`.
 
 ## Repository layout
 
 ```text
 honoured-native/
+├── .env.example
+├── scripts/
+│   └── sync-env.sh
 ├── ios/
-│   ├── Config.xcconfig.example
 │   ├── project.yml
+│   ├── Honoured.storekit
 │   └── Honoured/
 ├── android/
-│   ├── local.properties.example
 │   └── app/
 └── docs/
     ├── bridge.md
@@ -68,10 +78,10 @@ honoured-native/
 The iOS project is defined with XcodeGen.
 
 ```bash
-cd ios
-cp Config.xcconfig.example Config.xcconfig
+cp .env.example .env   # then fill in the values
 brew install xcodegen
-xcodegen generate
+cd ios
+xcodegen generate      # also regenerates Config.xcconfig from .env
 open Honoured.xcodeproj
 ```
 
@@ -79,7 +89,7 @@ Before real billing tests:
 
 1. Select the Apple development team.
 2. Confirm the final App Store bundle identifier.
-3. Set `REVENUECAT_IOS_API_KEY` in `Config.xcconfig`.
+3. Set `REVENUECAT_IOS_API_KEY` in `.env` and run `./scripts/sync-env.sh`.
 4. Enable the In-App Purchase capability.
 
 RevenueCat iOS is integrated with Swift Package Manager.
@@ -94,13 +104,13 @@ Current requirements:
 - compileSdk / targetSdk 35
 - minSdk 26
 
-Before running, copy `local.properties.example` to `local.properties` and set the local values.
+Before running, create the root `.env` as described above.
 
 Command-line build (no Android Studio required, JDK 17 on `JAVA_HOME`):
 
 ```bash
+cp .env.example .env   # then fill in the values
 cd android
-cp local.properties.example local.properties
 ./gradlew assembleDebug
 ```
 

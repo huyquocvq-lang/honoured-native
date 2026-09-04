@@ -1,6 +1,7 @@
 name: Honoured
 options:
   bundleIdPrefix: com.honoured
+  preGenCommand: ../scripts/sync-env.sh
 packages:
   RevenueCat:
     url: https://github.com/RevenueCat/purchases-ios-spm.git
