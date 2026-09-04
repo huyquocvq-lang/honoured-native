@@ -17,3 +17,6 @@ xcuserdata/
 # Android/Gradle
 .gradle/
 **/build/
+
+# IDE
+.idea/
