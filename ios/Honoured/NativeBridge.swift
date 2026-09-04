@@ -12,65 +12,69 @@ final class NativeBridge: NSObject, WKScriptMessageHandler {
         }
 
         let payload = body["payload"] as? [String: Any] ?? [:]
+        let requestID = payload["requestId"] as? String
+        let reply: (String, [String: Any]) -> Void = { [weak self] replyType, replyPayload in
+            self?.send(type: replyType, payload: replyPayload, requestId: requestID)
+        }
 
         switch type {
         case "APP_READY":
-            send(type: "NATIVE_READY", payload: [
+            reply("NATIVE_READY", [
                 "platform": "ios",
                 "bridgeVersion": AppConfig.bridgeVersion
             ])
         case "GET_PLATFORM_INFO":
-            send(type: "PLATFORM_INFO", payload: [
+            reply("PLATFORM_INFO", [
                 "platform": "ios",
                 "bridgeVersion": AppConfig.bridgeVersion
             ])
         case "IDENTIFY_USER":
             guard let userID = payload["userId"] as? String, !userID.isEmpty else {
-                send(type: "IDENTIFY_FAILED", payload: ["message": "Missing userId"])
+                reply("IDENTIFY_FAILED", ["message": "Missing userId"])
                 return
             }
             Task { @MainActor [weak self] in
                 switch await SubscriptionService.shared.identify(appUserID: userID) {
                 case .completed(let status):
-                    self?.send(type: "IDENTIFY_SUCCESS", payload: status)
-                    self?.send(type: "ACCESS_STATUS", payload: status)
+                    reply("IDENTIFY_SUCCESS", status)
+                    reply("ACCESS_STATUS", status)
                 case .cancelled:
-                    self?.send(type: "IDENTIFY_FAILED", payload: ["message": "Unexpected cancellation"])
+                    reply("IDENTIFY_FAILED", ["message": "Unexpected cancellation"])
                 case .failed(let message):
-                    self?.send(type: "IDENTIFY_FAILED", payload: ["message": message])
+                    reply("IDENTIFY_FAILED", ["message": message])
                 }
             }
         case "LOGOUT_USER":
             Task { @MainActor [weak self] in
                 switch await SubscriptionService.shared.logout() {
                 case .completed:
-                    self?.send(type: "LOGOUT_SUCCESS", payload: ["isSubscribed": false])
-                    self?.send(type: "ACCESS_STATUS", payload: ["isSubscribed": false, "source": "logout"])
+                    reply("LOGOUT_SUCCESS", ["isSubscribed": false])
+                    reply("ACCESS_STATUS", ["isSubscribed": false, "source": "logout"])
                 case .cancelled:
-                    self?.send(type: "LOGOUT_FAILED", payload: ["message": "Unexpected cancellation"])
+                    reply("LOGOUT_FAILED", ["message": "Unexpected cancellation"])
                 case .failed(let message):
-                    self?.send(type: "LOGOUT_FAILED", payload: ["message": message])
+                    reply("LOGOUT_FAILED", ["message": message])
                 }
             }
         case "CHECK_ACCESS":
             guard let userID = payload["userId"] as? String, !userID.isEmpty else {
-                send(type: "ACCESS_STATUS", payload: ["isSubscribed": false, "source": "missing_user_id"])
+                reply("ACCESS_STATUS", ["isSubscribed": false, "source": "missing_user_id"])
                 return
             }
             Task { @MainActor [weak self] in
                 switch await SubscriptionService.shared.identify(appUserID: userID) {
                 case .completed:
                     let status = await SubscriptionService.shared.accessStatus()
-                    self?.send(type: "ACCESS_STATUS", payload: status)
+                    reply("ACCESS_STATUS", status)
                 case .cancelled:
-                    self?.send(type: "ACCESS_STATUS", payload: ["isSubscribed": false, "source": "identify_cancelled"])
+                    reply("ACCESS_STATUS", ["isSubscribed": false, "source": "identify_cancelled"])
                 case .failed(let message):
-                    self?.send(type: "ACCESS_STATUS", payload: ["isSubscribed": false, "source": "identify_failed", "message": message])
+                    reply("ACCESS_STATUS", ["isSubscribed": false, "source": "identify_failed", "message": message])
                 }
             }
         case "START_PURCHASE":
             guard let userID = payload["userId"] as? String, !userID.isEmpty else {
-                send(type: "PURCHASE_FAILED", payload: ["message": "Missing userId"])
+                reply("PURCHASE_FAILED", ["message": "Missing userId"])
                 return
             }
             let packageIdentifier = payload["packageIdentifier"] as? String
@@ -79,22 +83,22 @@ final class NativeBridge: NSObject, WKScriptMessageHandler {
                 case .completed:
                     switch await SubscriptionService.shared.purchase(packageIdentifier: packageIdentifier) {
                     case .completed(let status):
-                        self?.send(type: "PURCHASE_SUCCESS", payload: status)
-                        self?.send(type: "ACCESS_STATUS", payload: status)
+                        reply("PURCHASE_SUCCESS", status)
+                        reply("ACCESS_STATUS", status)
                     case .cancelled:
-                        self?.send(type: "PURCHASE_CANCELLED", payload: [:])
+                        reply("PURCHASE_CANCELLED", [:])
                     case .failed(let message):
-                        self?.send(type: "PURCHASE_FAILED", payload: ["message": message])
+                        reply("PURCHASE_FAILED", ["message": message])
                     }
                 case .cancelled:
-                    self?.send(type: "PURCHASE_FAILED", payload: ["message": "Could not identify signed-in user"])
+                    reply("PURCHASE_FAILED", ["message": "Could not identify signed-in user"])
                 case .failed(let message):
-                    self?.send(type: "PURCHASE_FAILED", payload: ["message": message])
+                    reply("PURCHASE_FAILED", ["message": message])
                 }
             }
         case "RESTORE_PURCHASES":
             guard let userID = payload["userId"] as? String, !userID.isEmpty else {
-                send(type: "RESTORE_FAILED", payload: ["message": "Missing userId"])
+                reply("RESTORE_FAILED", ["message": "Missing userId"])
                 return
             }
             Task { @MainActor [weak self] in
@@ -102,29 +106,34 @@ final class NativeBridge: NSObject, WKScriptMessageHandler {
                 case .completed:
                     switch await SubscriptionService.shared.restore() {
                     case .completed(let status):
-                        self?.send(type: "RESTORE_SUCCESS", payload: status)
-                        self?.send(type: "ACCESS_STATUS", payload: status)
+                        reply("RESTORE_SUCCESS", status)
+                        reply("ACCESS_STATUS", status)
                     case .cancelled:
-                        self?.send(type: "RESTORE_SUCCESS", payload: ["isSubscribed": false])
+                        reply("RESTORE_SUCCESS", ["isSubscribed": false])
                     case .failed(let message):
-                        self?.send(type: "RESTORE_FAILED", payload: ["message": message])
+                        reply("RESTORE_FAILED", ["message": message])
                     }
                 case .cancelled:
-                    self?.send(type: "RESTORE_FAILED", payload: ["message": "Could not identify signed-in user"])
+                    reply("RESTORE_FAILED", ["message": "Could not identify signed-in user"])
                 case .failed(let message):
-                    self?.send(type: "RESTORE_FAILED", payload: ["message": message])
+                    reply("RESTORE_FAILED", ["message": message])
                 }
             }
         case "START_SESSION":
-            send(type: "ERROR", payload: [
+            reply("ERROR", [
                 "message": "Trial sessions are enforced by Supabase RPC from the authenticated web app"
             ])
         default:
-            send(type: "ERROR", payload: ["message": "Unsupported bridge message: \(type)"])
+            reply("ERROR", ["message": "Unsupported bridge message: \(type)"])
         }
     }
 
-    func send(type: String, payload: [String: Any]) {
+    /// - Parameter requestId: echoed back from the inbound message that caused this
+    ///   reply. The web app uses its presence to tell a solicited reply from an
+    ///   unsolicited broadcast, so that answering a request cannot trigger another.
+    func send(type: String, payload: [String: Any], requestId: String? = nil) {
+        var payload = payload
+        if let requestId { payload["requestId"] = requestId }
         guard JSONSerialization.isValidJSONObject(payload),
               let payloadData = try? JSONSerialization.data(withJSONObject: payload),
               let payloadJSON = String(data: payloadData, encoding: .utf8) else { return }
