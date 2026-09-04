@@ -42,7 +42,12 @@ class NativeBridge(
                         when (outcome) {
                             is PurchaseOutcome.Completed -> {
                                 reply("IDENTIFY_SUCCESS", outcome.status)
-                                reply("ACCESS_STATUS", outcome.status)
+                                // The already-identified shortcut skips the CustomerInfo
+                                // fetch, so its payload carries no verdict. Broadcasting it
+                                // as a status would read as "not subscribed".
+                                if (outcome.status.has("isSubscribed")) {
+                                    reply("ACCESS_STATUS", outcome.status)
+                                }
                             }
                             PurchaseOutcome.Cancelled -> reply(
                                 "IDENTIFY_FAILED",

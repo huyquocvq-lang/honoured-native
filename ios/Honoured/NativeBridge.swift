@@ -37,7 +37,12 @@ final class NativeBridge: NSObject, WKScriptMessageHandler {
                 switch await SubscriptionService.shared.identify(appUserID: userID) {
                 case .completed(let status):
                     reply("IDENTIFY_SUCCESS", status)
-                    reply("ACCESS_STATUS", status)
+                    // The already-identified shortcut skips the CustomerInfo fetch, so
+                    // its payload carries no verdict. Broadcasting it as a status would
+                    // read as "not subscribed".
+                    if status["isSubscribed"] != nil {
+                        reply("ACCESS_STATUS", status)
+                    }
                 case .cancelled:
                     reply("IDENTIFY_FAILED", ["message": "Unexpected cancellation"])
                 case .failed(let message):
