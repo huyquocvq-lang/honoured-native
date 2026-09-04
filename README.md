@@ -96,6 +96,14 @@ Current requirements:
 
 Before running, copy `local.properties.example` to `local.properties` and set the local values.
 
+Command-line build (no Android Studio required, JDK 17 on `JAVA_HOME`):
+
+```bash
+cd android
+cp local.properties.example local.properties
+./gradlew assembleDebug
+```
+
 ## Foundation bridge
 
 ### iOS web call
