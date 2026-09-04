@@ -1,2 +1,6 @@
-HONOURED_WEB_APP_URL = https://honour-your-word.lovable.app
+// `//` starts a comment in xcconfig files, so the URL scheme separator
+// must be built from this helper variable.
+HONOURED_URL_SLASH = /
+
+HONOURED_WEB_APP_URL = https:$(HONOURED_URL_SLASH)$(HONOURED_URL_SLASH)honour-your-word.lovable.app
 REVENUECAT_IOS_API_KEY = 
