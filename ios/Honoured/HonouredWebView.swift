@@ -2,10 +2,10 @@ import SwiftUI
 import WebKit
 
 struct HonouredWebView: UIViewRepresentable {
-    let url: URL
+    @ObservedObject var state: WebViewLoadState
 
     func makeCoordinator() -> Coordinator {
-        Coordinator()
+        Coordinator(state: state)
     }
 
     func makeUIView(context: Context) -> WKWebView {
@@ -24,8 +24,15 @@ struct HonouredWebView: UIViewRepresentable {
         webView.backgroundColor = .black
         webView.scrollView.backgroundColor = .black
 
+        #if DEBUG
+        if #available(iOS 16.4, *) {
+            webView.isInspectable = true
+        }
+        #endif
+
         context.coordinator.bridge.webView = webView
-        webView.load(URLRequest(url: url, cachePolicy: .useProtocolCachePolicy, timeoutInterval: 30))
+        state.attach(webView)
+        state.load()
         return webView
     }
 
@@ -37,12 +44,50 @@ struct HonouredWebView: UIViewRepresentable {
 
     final class Coordinator: NSObject, WKNavigationDelegate {
         let bridge = NativeBridge()
+        private let state: WebViewLoadState
+
+        init(state: WebViewLoadState) {
+            self.state = state
+        }
 
         func webView(_ webView: WKWebView, didFinish navigation: WKNavigation!) {
+            Task { @MainActor in state.markLoaded() }
             bridge.send(type: "NATIVE_READY", payload: [
                 "platform": "ios",
                 "bridgeVersion": AppConfig.bridgeVersion
             ])
+        }
+
+        func webView(_ webView: WKWebView, didFail navigation: WKNavigation!, withError error: Error) {
+            report(error)
+        }
+
+        func webView(_ webView: WKWebView, didFailProvisionalNavigation navigation: WKNavigation!, withError error: Error) {
+            report(error)
+        }
+
+        func webView(
+            _ webView: WKWebView,
+            decidePolicyFor navigationResponse: WKNavigationResponse,
+            decisionHandler: @escaping (WKNavigationResponsePolicy) -> Void
+        ) {
+            guard navigationResponse.isForMainFrame,
+                  let response = navigationResponse.response as? HTTPURLResponse,
+                  response.statusCode >= 400 else {
+                decisionHandler(.allow)
+                return
+            }
+
+            Task { @MainActor in state.markFailed("HTTP \(response.statusCode)") }
+            decisionHandler(.cancel)
+        }
+
+        /// Ignores the cancellation that WebKit reports when a navigation is
+        /// superseded, which is not a user-visible failure.
+        private func report(_ error: Error) {
+            let nsError = error as NSError
+            guard !(nsError.domain == NSURLErrorDomain && nsError.code == NSURLErrorCancelled) else { return }
+            Task { @MainActor in state.markFailed(nsError.localizedDescription) }
         }
 
         func webView(_ webView: WKWebView, decidePolicyFor navigationAction: WKNavigationAction, decisionHandler: @escaping (WKNavigationActionPolicy) -> Void) {

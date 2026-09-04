@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <color name="honoured_background">#000000</color>
+    <color name="honoured_foreground">#EDE7DD</color>
+    <color name="honoured_muted">#8A8A8A</color>
+</resources>

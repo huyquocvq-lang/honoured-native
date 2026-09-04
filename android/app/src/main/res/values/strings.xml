@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">Honoured</string>
+    <string name="loading_description">Loading Honoured</string>
+    <string name="error_title">Can’t reach Honoured</string>
+    <string name="error_body">Check your connection and try again.</string>
+    <string name="error_timeout">The connection timed out.</string>
+    <string name="error_retry">Try again</string>
+</resources>
