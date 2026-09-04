@@ -14,6 +14,7 @@ import android.webkit.WebResourceError
 import android.webkit.WebResourceRequest
 import android.webkit.WebResourceResponse
 import android.webkit.PermissionRequest
+import android.webkit.WebSettings
 import android.webkit.WebView
 import android.webkit.WebChromeClient
 import android.webkit.WebViewClient
@@ -82,6 +83,9 @@ class MainActivity : AppCompatActivity() {
             settings.allowFileAccess = false
             settings.allowContentAccess = false
             settings.setSupportMultipleWindows(false)
+            // Serve repeat launches from the HTTP cache instead of revalidating
+            // every asset against the network.
+            settings.cacheMode = WebSettings.LOAD_DEFAULT
             webViewClient = HonouredWebViewClient()
             webChromeClient = object : WebChromeClient() {
                 override fun onPermissionRequest(request: PermissionRequest) {
@@ -161,6 +165,21 @@ class MainActivity : AppCompatActivity() {
         loadingIndicator.visibility = View.GONE
         errorView.visibility = View.VISIBLE
         errorMessage.text = getString(R.string.error_body) + "\n\n" + detail
+    }
+
+    /**
+     * Stops the compositor, animations and media the WebView would otherwise keep
+     * running while the app is not on screen. JavaScript timers keep ticking, so
+     * an in-flight restriction countdown is unaffected.
+     */
+    override fun onPause() {
+        webView.onPause()
+        super.onPause()
+    }
+
+    override fun onResume() {
+        super.onResume()
+        webView.onResume()
     }
 
     override fun onSaveInstanceState(outState: Bundle) {
