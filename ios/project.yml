@@ -27,6 +27,7 @@ targets:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: $(HONOURED_BUNDLE_ID:default=com.honoured.app)
         PRODUCT_NAME: Honoured
+        ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon
         TARGETED_DEVICE_FAMILY: "1"
         INFOPLIST_FILE: Honoured/Info.plist
     scheme:
