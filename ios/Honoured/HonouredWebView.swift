@@ -18,6 +18,10 @@ struct HonouredWebView: UIViewRepresentable {
         // Paint partial frames instead of holding a blank view until the whole
         // document is ready.
         configuration.suppressesIncrementalRendering = false
+        // Media the web app starts itself (the ambient restriction tone) should
+        // not need a second user gesture inside the shell.
+        configuration.allowsInlineMediaPlayback = true
+        configuration.mediaTypesRequiringUserActionForPlayback = []
 
         let webView = WKWebView(frame: .zero, configuration: configuration)
         webView.navigationDelegate = context.coordinator

@@ -86,6 +86,9 @@ class MainActivity : AppCompatActivity() {
             // Serve repeat launches from the HTTP cache instead of revalidating
             // every asset against the network.
             settings.cacheMode = WebSettings.LOAD_DEFAULT
+            // The ambient restriction tone starts from a timer rather than from
+            // a tap on the audio element, which WebView otherwise blocks.
+            settings.mediaPlaybackRequiresUserGesture = false
             webViewClient = HonouredWebViewClient()
             webChromeClient = object : WebChromeClient() {
                 override fun onPermissionRequest(request: PermissionRequest) {
