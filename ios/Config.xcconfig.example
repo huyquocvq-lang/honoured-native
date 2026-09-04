@@ -4,3 +4,13 @@ HONOURED_URL_SLASH = /
 
 HONOURED_WEB_APP_URL = https:$(HONOURED_URL_SLASH)$(HONOURED_URL_SLASH)honour-your-word.lovable.app
 REVENUECAT_IOS_API_KEY = 
+
+// Bundle identifier used for this machine's builds. Defaults to
+// com.honoured.app when unset. Override it here while testing against a
+// throwaway App ID so the production identifier stays in project.yml.
+HONOURED_BUNDLE_ID = com.honoured.app
+
+// Apple Developer Team ID used for code signing. Kept here (gitignored)
+// so each developer signs with their own team and `xcodegen generate`
+// cannot discard it.
+DEVELOPMENT_TEAM = 
