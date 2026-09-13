@@ -13,4 +13,9 @@ HONOURED_BUNDLE_ID = com.honoured.app
 // Apple Developer Team ID used for code signing. Kept here (gitignored)
 // so each developer signs with their own team and `xcodegen generate`
 // cannot discard it.
-DEVELOPMENT_TEAM = 
+DEVELOPMENT_TEAM =
+
+// Supabase project for native HealthKit sync. The URL needs the same
+// slash escaping as the web app URL above.
+SUPABASE_URL =
+SUPABASE_ANON_KEY =

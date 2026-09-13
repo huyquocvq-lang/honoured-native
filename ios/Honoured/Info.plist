@@ -28,6 +28,21 @@
 	<string>$(REVENUECAT_IOS_API_KEY)</string>
 	<key>NSMicrophoneUsageDescription</key>
 	<string>Record a private Voice of Change reflection.</string>
+	<key>NSHealthShareUsageDescription</key>
+	<string>Honoured reads your steps, distance, energy, heart rate, exercise minutes and sleep to check the contracts you sign with yourself. Nothing is written back to Health.</string>
+	<key>UIBackgroundModes</key>
+	<array>
+		<string>fetch</string>
+		<string>processing</string>
+	</array>
+	<key>BGTaskSchedulerPermittedIdentifiers</key>
+	<array>
+		<string>$(PRODUCT_BUNDLE_IDENTIFIER).healthsync</string>
+	</array>
+	<key>SupabaseURL</key>
+	<string>$(SUPABASE_URL)</string>
+	<key>SupabaseAnonKey</key>
+	<string>$(SUPABASE_ANON_KEY)</string>
 	<key>UILaunchScreen</key>
 	<dict/>
 	<key>UIRequiresFullScreen</key>
