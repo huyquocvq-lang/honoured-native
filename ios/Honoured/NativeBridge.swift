@@ -4,11 +4,13 @@ import WebKit
 final class NativeBridge: NSObject, WKScriptMessageHandler {
     weak var webView: WKWebView?
 
-    /// Broadcasts raised before the web app has sent APP_READY (a notification
-    /// tapped on cold start, a goal reached during a background sync) are held
-    /// here and flushed right after NATIVE_READY, so they cannot land on a page
-    /// that has no listener yet. Bounded so a stuck WebView cannot grow it forever.
-    private var pendingBroadcasts: [(type: String, payload: [String: Any])] = []
+    /// Broadcasts raised before the web app has sent APP_READY (a session
+    /// refreshed in the background, a health sync finishing) are held here and
+    /// flushed right after NATIVE_READY, so they cannot land on a page that has
+    /// no listener yet. Bounded so a stuck WebView cannot grow it forever. This
+    /// queue survives a reload only; events that must survive a relaunch go
+    /// through `NativeEventStore` and are merged in by `createdAt` on flush.
+    private var pendingBroadcasts: [(type: String, payload: [String: Any], createdAt: Date)] = []
     private var isWebReady = false
     private let pendingLimit = 50
 
@@ -18,6 +20,12 @@ final class NativeBridge: NSObject, WKScriptMessageHandler {
             self,
             selector: #selector(handleNativeEvent(_:)),
             name: NativeBridgeEvents.notification,
+            object: nil
+        )
+        NotificationCenter.default.addObserver(
+            self,
+            selector: #selector(handleStoredEventsChanged),
+            name: NativeEventStore.changed,
             object: nil
         )
     }
@@ -30,6 +38,13 @@ final class NativeBridge: NSObject, WKScriptMessageHandler {
         guard let type = notification.userInfo?["type"] as? String else { return }
         let payload = notification.userInfo?["payload"] as? [String: Any] ?? [:]
         send(type: type, payload: payload)
+    }
+
+    /// A durable event was appended while this bridge is alive. If the page is
+    /// ready it goes out now; otherwise it stays on disk until the ready flush.
+    @objc private func handleStoredEventsChanged() {
+        guard isWebReady else { return }
+        flushStoredEvents()
     }
 
     private static let v2MessageTypes: Set<String> = [
@@ -211,6 +226,8 @@ final class NativeBridge: NSObject, WKScriptMessageHandler {
                         try await HealthSyncCoordinator.shared.clear()
                         await HealthKitService.shared.resetSyncState()
                         await HealthSyncSettings.shared.reset()
+                        try await NativeEventStore.shared.clear()
+                        NotificationCoordinator.shared.cancelAll()
                     }
                     try await AuthSessionStore.shared.save(NativeAuthSession(
                         userId: userId,
@@ -233,6 +250,8 @@ final class NativeBridge: NSObject, WKScriptMessageHandler {
                     try await HealthSyncCoordinator.shared.clear()
                     await HealthKitService.shared.resetSyncState()
                     await HealthSyncSettings.shared.reset()
+                    try await NativeEventStore.shared.clear()
+                    NotificationCoordinator.shared.cancelAll()
                     HealthBackgroundObserver.shared.disableBackgroundDelivery()
                     HealthBackgroundRefresh.shared.cancel()
                     reply("AUTH_SESSION_CLEARED", [:])
@@ -302,6 +321,11 @@ final class NativeBridge: NSObject, WKScriptMessageHandler {
                     do {
                         try await HealthSyncSettings.shared.replaceGoals(goals)
                         reply("GOALS_ACCEPTED", ["count": goals.count])
+                        // First goal of the day is the agreed moment to ask; the
+                        // reply has already gone out so the sheet cannot time it out.
+                        if !goals.isEmpty {
+                            await NotificationCoordinator.shared.requestPermissionIfNeeded()
+                        }
                     } catch {
                         reply("ERROR", ["message": error.localizedDescription, "code": "goals_save_failed"])
                     }
@@ -394,22 +418,50 @@ final class NativeBridge: NSObject, WKScriptMessageHandler {
         // never wait in the queue behind itself.
         let isBroadcast = requestId == nil && type != "NATIVE_READY"
         if isBroadcast && !isWebReady {
-            if pendingBroadcasts.count >= pendingLimit {
-                pendingBroadcasts.removeFirst()
-            }
-            pendingBroadcasts.append((type, payload))
+            enqueuePending(type: type, payload: payload, createdAt: Date())
             return
         }
 
         dispatch(type: type, payload: payload)
     }
 
+    private func enqueuePending(type: String, payload: [String: Any], createdAt: Date) {
+        if pendingBroadcasts.count >= pendingLimit {
+            pendingBroadcasts.removeFirst()
+        }
+        pendingBroadcasts.append((type, payload, createdAt))
+    }
+
+    /// Flushes the in-memory queue together with anything persisted across a
+    /// relaunch, oldest first, so a `GOAL_REACHED` from last night still lands
+    /// before the `NOTIFICATION_OPENED` that launched the app this morning.
     private func markWebReadyAndFlush() {
         isWebReady = true
-        let queued = pendingBroadcasts
-        pendingBroadcasts.removeAll()
-        for event in queued {
-            dispatch(type: event.type, payload: event.payload)
+        flushStoredEvents()
+    }
+
+    private func flushStoredEvents() {
+        Task { @MainActor [weak self] in
+            let stored = await NativeEventStore.shared.drain()
+            guard let self else { return }
+
+            var queued = self.pendingBroadcasts
+            self.pendingBroadcasts.removeAll()
+            queued += stored.map { ($0.type, $0.payloadObject(), $0.createdAt) }
+            queued.sort { $0.createdAt < $1.createdAt }
+
+            // The page may have started reloading while the store was read. Keep
+            // the batch for the next ready flush rather than evaluating into a
+            // page that is going away.
+            guard self.isWebReady else {
+                for event in queued {
+                    self.enqueuePending(type: event.type, payload: event.payload, createdAt: event.createdAt)
+                }
+                return
+            }
+            for event in queued {
+                self.dispatch(type: event.type, payload: event.payload)
+            }
         }
     }
 
@@ -434,6 +486,10 @@ final class NativeBridge: NSObject, WKScriptMessageHandler {
 enum NativeBridgeEvents {
     static let notification = Notification.Name("HonouredNativeBridgeEvent")
 
+    /// In-memory delivery. Reaches a live bridge now or after the next reload,
+    /// but is lost if no WebView exists yet. Use for events the web app can
+    /// recover on its own (`HEALTH_DATA_UPDATED`) and for anything carrying a
+    /// token, which must never be written to disk.
     static func post(type: String, payload: [String: Any]) {
         DispatchQueue.main.async {
             NotificationCenter.default.post(
@@ -441,6 +497,15 @@ enum NativeBridgeEvents {
                 object: nil,
                 userInfo: ["type": type, "payload": payload]
             )
+        }
+    }
+
+    /// Persisted delivery for `NOTIFICATION_OPENED`, `GOAL_REACHED` and
+    /// `TIMER_COMPLETED`: survives a cold start and a background launch with no
+    /// scene. The store notifies any live bridge, which flushes it once ready.
+    static func postDurable(type: String, payload: [String: Any]) {
+        Task {
+            try? await NativeEventStore.shared.append(type: type, payload: payload)
         }
     }
 }

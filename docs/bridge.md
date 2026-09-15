@@ -28,7 +28,7 @@ window.addEventListener('honoured:native', event => {
 
 **Errors.** Any message can be answered with `ERROR { message, code? }`. Feature-specific failures use their own event (`PURCHASE_FAILED`, `APPLE_SIGN_IN_FAILED`, …) and always carry `message`.
 
-**Event queue.** Some events originate while the WebView is not ready — a notification tapped on cold start, a goal reached during a background sync, a session refreshed in the background. Native buffers these and flushes them in order right after it has replied to the **first message the web app sends after a page load** (`APP_READY` if the web sends it, otherwise whatever comes first — today that is `IDENTIFY_USER`). Any inbound message counts because it proves the bridge module is running. The buffer is bounded (last 50) and survives a WebView reload but not an app relaunch.
+**Event queue.** Some events originate while the WebView is not ready — a notification tapped on cold start, a goal reached during a background sync, a session refreshed in the background. Native buffers these and flushes them in order right after it has replied to the **first message the web app sends after a page load** (`APP_READY` if the web sends it, otherwise whatever comes first — today that is `IDENTIFY_USER`). Any inbound message counts because it proves the bridge module is running. The buffer is bounded (last 50). Events the user would notice losing — `NOTIFICATION_OPENED`, `GOAL_REACHED`, `TIMER_COMPLETED` — are also persisted on disk, so they survive an app relaunch and a background launch that never created a WebView; they are delivered exactly once, merged by time with the in-memory buffer. Everything else (including anything carrying a token) survives a reload only. Both buffers are cleared when the session is cleared or a different user signs in.
 
 **Integration notes for `src/lib/native-bridge.ts`.**
 
@@ -238,7 +238,9 @@ Rules:
 |---|---|
 | `NOTIFICATION_OPENED { kind, activityId }` | The user tapped a notification. `kind` is `"timer"` or `"goal"`. Queued on cold start and delivered after `NATIVE_READY`. The web app navigates to that activity. |
 
-Native asks for notification permission the first time `START_TIMER` or `SET_GOALS` with a non-empty list arrives, not at launch.
+Native asks for notification permission the first time `START_TIMER` or `SET_GOALS` with a non-empty list arrives, not at launch. The request is made after the reply to that message has gone out, so the web app's request timeout is not affected by how long the user looks at the sheet. Native never re-prompts: once the user has decided, a later denial can only be changed in Settings → Notifications.
+
+Notifications that fire while the app is in the foreground are not shown. The owning feature emits its bridge event (`TIMER_COMPLETED` / `GOAL_REACHED` with `notified: false`) and the web app runs the in-app celebration.
 
 ---
 

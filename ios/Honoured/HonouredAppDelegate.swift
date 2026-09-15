@@ -8,11 +8,14 @@ final class HonouredAppDelegate: NSObject, UIApplicationDelegate {
         _ application: UIApplication,
         didFinishLaunchingWithOptions launchOptions: [UIApplication.LaunchOptionsKey: Any]? = nil
     ) -> Bool {
-        // Both registrations must happen synchronously here: HealthKit delivers a
-        // launch-time observer update only to queries that already exist, and
-        // BGTaskScheduler refuses a launch handler registered after launch.
+        // These registrations must happen synchronously here: HealthKit delivers
+        // a launch-time observer update only to queries that already exist,
+        // BGTaskScheduler refuses a launch handler registered after launch, and a
+        // notification tap that launched the app is only delivered to a delegate
+        // that is already set.
         HealthBackgroundObserver.shared.start()
         HealthBackgroundRefresh.shared.register()
+        NotificationCoordinator.shared.install()
         observeLifecycle()
 
         Task {
