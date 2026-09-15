@@ -19,6 +19,7 @@ final class HonouredAppDelegate: NSObject, UIApplicationDelegate {
         observeLifecycle()
 
         Task {
+            await TestamentTimer.shared.reconcile()
             if await AuthSessionStore.shared.load() != nil {
                 HealthBackgroundObserver.shared.enableBackgroundDelivery()
                 HealthBackgroundRefresh.shared.schedule()
@@ -37,7 +38,10 @@ final class HonouredAppDelegate: NSObject, UIApplicationDelegate {
             center.addObserver(
                 forName: UIApplication.didBecomeActiveNotification, object: nil, queue: .main
             ) { _ in
-                Task { await HealthBackgroundDeliveryCoordinator.shared.retryPendingCollection() }
+                Task {
+                    await TestamentTimer.shared.reconcile()
+                    await HealthBackgroundDeliveryCoordinator.shared.retryPendingCollection()
+                }
             },
             center.addObserver(
                 forName: UIApplication.protectedDataDidBecomeAvailableNotification, object: nil, queue: .main

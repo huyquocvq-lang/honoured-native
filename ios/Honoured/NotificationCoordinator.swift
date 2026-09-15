@@ -64,6 +64,10 @@ final class NotificationCoordinator: NSObject, UNUserNotificationCenterDelegate 
         }
     }
 
+    func isUndetermined() async -> Bool {
+        await center.notificationSettings().authorizationStatus == .notDetermined
+    }
+
     // MARK: - Scheduling
 
     /// Schedules a one-shot notification. `identifier` is stable per activity
@@ -112,7 +116,14 @@ final class NotificationCoordinator: NSObject, UNUserNotificationCenterDelegate 
         willPresent notification: UNNotification,
         withCompletionHandler completionHandler: @escaping (UNNotificationPresentationOptions) -> Void
     ) {
-        completionHandler([])
+        defer { completionHandler([]) }
+        guard let (kind, activityId) = Self.target(of: notification.request.content.userInfo) else { return }
+        switch kind {
+        case .timer:
+            Task { await TestamentTimer.shared.notificationPresentedInForeground(activityId: activityId) }
+        case .goal:
+            break
+        }
     }
 
     /// Runs for a tap whether the app was in the background or launched cold. The
@@ -124,17 +135,27 @@ final class NotificationCoordinator: NSObject, UNUserNotificationCenterDelegate 
         withCompletionHandler completionHandler: @escaping () -> Void
     ) {
         defer { completionHandler() }
-        guard response.actionIdentifier == UNNotificationDefaultActionIdentifier else { return }
+        guard response.actionIdentifier == UNNotificationDefaultActionIdentifier,
+              let (kind, activityId) = Self.target(of: response.notification.request.content.userInfo) else { return }
 
-        let userInfo = response.notification.request.content.userInfo
-        guard let kind = userInfo[UserInfoKey.kind] as? String,
-              Kind(rawValue: kind) != nil,
+        Task {
+            // Settle the owning feature first so its completion event is stored
+            // ahead of the navigation event.
+            if kind == .timer {
+                await TestamentTimer.shared.reconcile()
+            }
+            NativeBridgeEvents.postDurable(type: "NOTIFICATION_OPENED", payload: [
+                "kind": kind.rawValue,
+                "activityId": activityId
+            ])
+        }
+    }
+
+    private static func target(of userInfo: [AnyHashable: Any]) -> (Kind, String)? {
+        guard let rawKind = userInfo[UserInfoKey.kind] as? String,
+              let kind = Kind(rawValue: rawKind),
               let activityId = userInfo[UserInfoKey.activityId] as? String,
-              !activityId.isEmpty else { return }
-
-        NativeBridgeEvents.postDurable(type: "NOTIFICATION_OPENED", payload: [
-            "kind": kind,
-            "activityId": activityId
-        ])
+              !activityId.isEmpty else { return nil }
+        return (kind, activityId)
     }
 }

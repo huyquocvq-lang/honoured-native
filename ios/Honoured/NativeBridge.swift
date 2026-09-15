@@ -227,6 +227,7 @@ final class NativeBridge: NSObject, WKScriptMessageHandler {
                         await HealthKitService.shared.resetSyncState()
                         await HealthSyncSettings.shared.reset()
                         try await NativeEventStore.shared.clear()
+                        await TestamentTimer.shared.clear()
                         NotificationCoordinator.shared.cancelAll()
                     }
                     try await AuthSessionStore.shared.save(NativeAuthSession(
@@ -251,6 +252,7 @@ final class NativeBridge: NSObject, WKScriptMessageHandler {
                     await HealthKitService.shared.resetSyncState()
                     await HealthSyncSettings.shared.reset()
                     try await NativeEventStore.shared.clear()
+                    await TestamentTimer.shared.clear()
                     NotificationCoordinator.shared.cancelAll()
                     HealthBackgroundObserver.shared.disableBackgroundDelivery()
                     HealthBackgroundRefresh.shared.cancel()
@@ -341,6 +343,60 @@ final class NativeBridge: NSObject, WKScriptMessageHandler {
             Task {
                 await HealthSyncSettings.shared.setDayResetHour(hour)
                 reply("DAY_RESET_HOUR_ACCEPTED", ["hour": hour])
+            }
+        case "START_TIMER":
+            guard let activityId = payload["activityId"] as? String, !activityId.isEmpty,
+                  let activityName = payload["activityName"] as? String, !activityName.isEmpty,
+                  let duration = Self.number(payload["durationSeconds"]), duration.isFinite, duration > 0 else {
+                reply("ERROR", ["message": "activityId, activityName and a positive durationSeconds are required", "code": "invalid_timer"])
+                return
+            }
+            Task {
+                let askPermission = await NotificationCoordinator.shared.isUndetermined()
+                let result = await TestamentTimer.shared.start(
+                    activityId: activityId, activityName: activityName, durationSeconds: duration
+                )
+                if let replaced = result.replaced {
+                    send(type: "TIMER_CANCELLED", payload: ["activityId": replaced.activityId])
+                }
+                reply("TIMER_STARTED", [
+                    "activityId": result.timer.activityId,
+                    "endsAt": TestamentTimer.iso8601.string(from: result.timer.endsAt)
+                ])
+                // First timer ever is the agreed moment to ask. The reply is already
+                // out, so the sheet cannot time the request out on the web side.
+                if askPermission, await NotificationCoordinator.shared.requestPermissionIfNeeded() {
+                    await TestamentTimer.shared.rescheduleNotificationIfRunning(activityId: activityId)
+                }
+            }
+        case "CANCEL_TIMER":
+            guard let activityId = payload["activityId"] as? String, !activityId.isEmpty else {
+                reply("ERROR", ["message": "activityId is required", "code": "invalid_timer"])
+                return
+            }
+            Task {
+                switch await TestamentTimer.shared.cancel(activityId: activityId) {
+                case .cancelled, .nothingRunning:
+                    reply("TIMER_CANCELLED", ["activityId": activityId])
+                case .differentTimerRunning(let running):
+                    reply("ERROR", [
+                        "message": "The running timer is for \(running.activityId)",
+                        "code": "timer_not_active"
+                    ])
+                }
+            }
+        case "GET_TIMER_STATE":
+            Task {
+                await TestamentTimer.shared.reconcile()
+                if let timer = await TestamentTimer.shared.current() {
+                    reply("TIMER_STATE", [
+                        "active": true,
+                        "activityId": timer.activityId,
+                        "endsAt": TestamentTimer.iso8601.string(from: timer.endsAt)
+                    ])
+                } else {
+                    reply("TIMER_STATE", ["active": false])
+                }
             }
         default:
             reply("ERROR", [
@@ -504,8 +560,9 @@ enum NativeBridgeEvents {
     /// `TIMER_COMPLETED`: survives a cold start and a background launch with no
     /// scene. The store notifies any live bridge, which flushes it once ready.
     static func postDurable(type: String, payload: [String: Any]) {
+        let createdAt = Date()
         Task {
-            try? await NativeEventStore.shared.append(type: type, payload: payload)
+            try? await NativeEventStore.shared.append(type: type, payload: payload, createdAt: createdAt)
         }
     }
 }

@@ -216,11 +216,13 @@ Timers must survive backgrounding, so native owns the countdown and the completi
 
 Rules:
 
-- One timer at a time. `START_TIMER` while one is running cancels the previous one and replies `TIMER_CANCELLED` for it first.
-- The 33-minute cap is enforced by the web app; native accepts any `durationSeconds > 0`.
+- One timer at a time. `START_TIMER` while one is running cancels the previous one and **broadcasts** `TIMER_CANCELLED { activityId }` for it (no `requestId`) before replying `TIMER_STARTED`, so the persistent listener sees the old timer go away and `request()` still resolves on `TIMER_STARTED`.
+- The 33-minute cap is enforced by the web app; native accepts any finite `durationSeconds > 0`. Missing `activityId`, `activityName` or a non-positive duration replies `ERROR { code: "invalid_timer" }`.
+- `CANCEL_TIMER` is idempotent: with no timer running it still replies `TIMER_CANCELLED`. If a *different* activity's timer is running it replies `ERROR { code: "timer_not_active" }` and leaves that timer alone.
 - `endsAt` is ISO 8601. The web app must derive its display from it rather than from its own `setInterval`, which stops when the app is backgrounded.
-- Web calls `GET_TIMER_STATE` after every `NATIVE_READY` so a reload mid-timer picks the countdown back up.
-- Native schedules a local notification at `endsAt` with identifier `timer-<activityId>`. When the app returns to the foreground before `endsAt`, the notification stays scheduled. When the app is active at `endsAt`, native cancels the notification and emits `TIMER_COMPLETED { notified: false }` so the web app runs the in-app celebration instead.
+- Web calls `GET_TIMER_STATE` after every `NATIVE_READY` so a reload mid-timer picks the countdown back up. The timer is persisted natively, so it also survives an app relaunch; a timer that expired while the app was not running completes on the next launch and `TIMER_COMPLETED` is delivered from the durable event queue before `TIMER_STATE { active: false }`.
+- Native schedules a local notification at `endsAt` with identifier `timer-<activityId>`. When the app returns to the foreground before `endsAt`, the notification stays scheduled. When the app is active at `endsAt`, native cancels the notification and emits `TIMER_COMPLETED { notified: false }` so the web app runs the in-app celebration instead. `notified: true` means the app was not in the foreground at `endsAt` and notifications are authorized, so the system showed the banner; if permission was denied it is `false` and the web app should still celebrate in-app.
+- The first `START_TIMER` ever triggers the notification permission prompt (after the reply). While that prompt — or any other system alert — is up the app counts as inactive, so a timer expiring underneath it completes on dismissal rather than in-app.
 
 ---
 
