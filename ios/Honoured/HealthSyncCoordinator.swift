@@ -68,6 +68,12 @@ actor HealthSyncCoordinator {
         if outcome.completedLocalProcessing {
             HealthBackgroundPendingState.clear()
         }
+        // New samples are the only thing that can push a total past its goal.
+        // This runs before any HealthKit completion handler is acknowledged, so
+        // a background wake is not suspended before the check.
+        if case .queued = outcome {
+            await GoalMonitor.shared.evaluate()
+        }
 
         let waiters = collectionWaiters
         collectionWaiters.removeAll()
@@ -291,11 +297,6 @@ actor HealthSyncCoordinator {
     }
 
     private func startOfHealthDay(containing date: Date) async -> Date {
-        let hour = await HealthSyncSettings.shared.dayResetHour()
-        let calendar = Calendar.current
-        let midnight = calendar.startOfDay(for: date)
-        let todayBoundary = calendar.date(byAdding: .hour, value: hour, to: midnight) ?? midnight
-        if date >= todayBoundary { return todayBoundary }
-        return calendar.date(byAdding: .day, value: -1, to: todayBoundary) ?? todayBoundary
+        await HealthSyncSettings.shared.healthDayStart(containing: date)
     }
 }

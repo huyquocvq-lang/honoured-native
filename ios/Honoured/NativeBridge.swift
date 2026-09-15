@@ -234,6 +234,7 @@ final class NativeBridge: NSObject, WKScriptMessageHandler {
                         await HealthSyncSettings.shared.reset()
                         try await NativeEventStore.shared.clear()
                         await TestamentTimer.shared.clear()
+                        await GoalMonitor.shared.clear()
                         NotificationCoordinator.shared.cancelAll()
                     }
                     try await AuthSessionStore.shared.save(NativeAuthSession(
@@ -259,6 +260,7 @@ final class NativeBridge: NSObject, WKScriptMessageHandler {
                     await HealthSyncSettings.shared.reset()
                     try await NativeEventStore.shared.clear()
                     await TestamentTimer.shared.clear()
+                    await GoalMonitor.shared.clear()
                     NotificationCoordinator.shared.cancelAll()
                     HealthBackgroundObserver.shared.disableBackgroundDelivery()
                     HealthBackgroundRefresh.shared.cancel()
@@ -333,6 +335,7 @@ final class NativeBridge: NSObject, WKScriptMessageHandler {
                         // reply has already gone out so the sheet cannot time it out.
                         if !goals.isEmpty {
                             await NotificationCoordinator.shared.requestPermissionIfNeeded()
+                            await GoalMonitor.shared.evaluate()
                         }
                     } catch {
                         reply("ERROR", ["message": error.localizedDescription, "code": "goals_save_failed"])
@@ -347,8 +350,27 @@ final class NativeBridge: NSObject, WKScriptMessageHandler {
                 return
             }
             Task {
+                let changed = await HealthSyncSettings.shared.dayResetHour() != hour
                 await HealthSyncSettings.shared.setDayResetHour(hour)
                 reply("DAY_RESET_HOUR_ACCEPTED", ["hour": hour])
+                if changed {
+                    await GoalMonitor.shared.clear()
+                    await GoalMonitor.shared.evaluate()
+                }
+            }
+        case "ACTIVITY_COMPLETED":
+            guard let activityId = payload["activityId"] as? String, !activityId.isEmpty,
+                  let source = payload["source"] as? String,
+                  Self.completionSources.contains(source) else {
+                reply("ERROR", [
+                    "message": "activityId and a source of timer, healthkit or manual are required",
+                    "code": "invalid_activity_completion"
+                ])
+                return
+            }
+            Task {
+                await GoalMonitor.shared.markCelebrated(activityId: activityId)
+                reply("ACTIVITY_COMPLETION_ACCEPTED", ["activityId": activityId, "source": source])
             }
         case "START_TIMER":
             guard let activityId = payload["activityId"] as? String, !activityId.isEmpty,
@@ -411,6 +433,8 @@ final class NativeBridge: NSObject, WKScriptMessageHandler {
             ])
         }
     }
+
+    private static let completionSources: Set<String> = ["timer", "healthkit", "manual"]
 
     private static func parseGoal(_ raw: [String: Any]) throws -> HealthGoal {
         guard let activityId = raw["activityId"] as? String, !activityId.isEmpty,

@@ -187,6 +187,15 @@ Native detects goal completion in the background, so it must know the targets an
 
 Web owns contract state: on `GOAL_REACHED` it marks the contract honoured and runs the in-app celebration if the app is in the foreground.
 
+How native decides:
+
+- Goals are checked against today's source-deduplicated totals (the same numbers as `health_daily`) right after `SET_GOALS`, after `SET_DAY_RESET_HOUR` changes the hour, and after every collection pass that read new samples — including background wakes, before HealthKit's completion handler is acknowledged.
+- "Once per activity per day" is a persisted marker keyed by `activityId` and the health day. Re-sending `SET_GOALS` with the same activity, or raising/lowering its target, never repeats the announcement for that day. A new `activityId` on the same metric is announced on its own.
+- `ACTIVITY_COMPLETED` sets the same marker, so a contract the web app already marked honoured (timer, manual) is never announced or notified by native that day, even if its metric later crosses the target.
+- The notification (`goal-<activityId>-<day>`) is posted only when the app is not active and permission is granted; `value` and `target` are in the metric's canonical unit. In the foreground only the event is sent.
+- Changing the reset hour discards the markers, because the day boundaries moved. The evaluation that follows runs while the app is active, so any goal still met is re-announced in-app with `notified: false` and never as a notification.
+- No goal for an activity today means no announcement — native never falls back to a previous day's list.
+
 ### Background sync
 
 Native does not need anything from the web app to sync in the background, but the web app should know what to expect:
