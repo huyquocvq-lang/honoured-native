@@ -16,6 +16,7 @@ final class HonouredAppDelegate: NSObject, UIApplicationDelegate {
         HealthBackgroundObserver.shared.start()
         HealthBackgroundRefresh.shared.register()
         NotificationCoordinator.shared.install()
+        NotificationSound.configureAudioSession()
         observeLifecycle()
 
         Task {

@@ -244,6 +244,10 @@ Rules:
 
 - `source` is `"timer"`, `"healthkit"` or `"manual"`. Web sends this whenever a contract is marked honoured from its side, so native can mark `(activityId, today)` as celebrated and skip its own background notification for it. In M3 this is also what drives the Live Activity blink.
 - `enabled` mirrors the "Completion sound" setting, default `false`. It decides whether the timer and goal notifications carry the gong sound. The in-app gong is played by the web app; native only sets the audio session to `.ambient` so the hardware silent switch is respected.
+- `enabled` must be a JSON boolean; a number or string replies `ERROR { code: "invalid_sound_state" }`. Native persists it, so send it on every change and once after `NATIVE_READY` so a reinstalled shell catches up with the account's setting.
+- `SOUND_STATE` also carries `gongBundled`: `false` means the approved gong asset is not in this build and an enabled setting falls back to the system default sound. Off means no sound and no vibration on the notification.
+- Toggling while a timer is counting down re-registers the pending notification with the new sound; `endsAt` does not change.
+- **Web-side gong must use Web Audio (`AudioContext`), not an `<audio>` element.** WebKit picks the iOS audio session category from what the page plays: Web Audio keeps the ambient category native set at launch, an audible `<audio>`/`<video>` element switches the session to playback, which ignores the silent switch. Create or resume the `AudioContext` in the tap that starts the timer (iOS requires a user gesture) and reuse it at completion.
 
 | Native → Web (broadcast) | When |
 |---|---|

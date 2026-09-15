@@ -45,7 +45,7 @@ actor GoalMonitor {
                     title: "Goal reached",
                     body: "\(goal.activityName) — \(Self.format(value, goal.metric)) of \(Self.format(goal.target, goal.metric)).",
                     at: now,
-                    sound: nil
+                    sound: NotificationSound.current
                 )) != nil
             }
 

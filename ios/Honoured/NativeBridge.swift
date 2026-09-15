@@ -358,6 +358,18 @@ final class NativeBridge: NSObject, WKScriptMessageHandler {
                     await GoalMonitor.shared.evaluate()
                 }
             }
+        case "SET_SOUND_ENABLED":
+            guard let enabled = Self.bool(payload["enabled"]) else {
+                reply("ERROR", ["message": "enabled must be a boolean", "code": "invalid_sound_state"])
+                return
+            }
+            NotificationSound.setEnabled(enabled)
+            reply("SOUND_STATE", ["enabled": enabled, "gongBundled": NotificationSound.isGongBundled])
+            Task {
+                // A timer already counting down keeps its pending notification;
+                // re-adding it under the same identifier swaps the sound in or out.
+                await TestamentTimer.shared.rescheduleNotificationIfRunning()
+            }
         case "ACTIVITY_COMPLETED":
             guard let activityId = payload["activityId"] as? String, !activityId.isEmpty,
                   let source = payload["source"] as? String,
@@ -481,6 +493,13 @@ final class NativeBridge: NSObject, WKScriptMessageHandler {
     private static func date(from raw: Any?) -> Date? {
         guard let string = raw as? String else { return nil }
         return iso8601.date(from: string) ?? iso8601NoFraction.date(from: string)
+    }
+
+    /// JSON `true`/`false` only. JavaScript numbers arrive as NSNumber too, so
+    /// the CoreFoundation type is checked rather than relying on `as? Bool`.
+    private static func bool(_ raw: Any?) -> Bool? {
+        guard let raw, CFGetTypeID(raw as CFTypeRef) == CFBooleanGetTypeID() else { return nil }
+        return raw as? Bool
     }
 
     private static func number(_ raw: Any?) -> Double? {

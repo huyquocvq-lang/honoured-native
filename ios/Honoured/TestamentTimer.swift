@@ -82,10 +82,12 @@ actor TestamentTimer {
         }
     }
 
-    /// Re-adds the notification request after permission was just granted, in
-    /// case the one added while undetermined is never delivered.
-    func rescheduleNotificationIfRunning(activityId: String) async {
-        guard let timer = current(), timer.activityId == activityId, timer.endsAt > Date() else { return }
+    /// Re-adds the notification request — after permission was just granted, in
+    /// case the one added while undetermined is never delivered, and after the
+    /// sound setting changes so the pending notification picks it up.
+    func rescheduleNotificationIfRunning(activityId: String? = nil) async {
+        guard let timer = current(), timer.endsAt > Date() else { return }
+        if let activityId, timer.activityId != activityId { return }
         await scheduleNotification(for: timer)
     }
 
@@ -151,8 +153,6 @@ actor TestamentTimer {
     }
 
     private func scheduleNotification(for timer: ActiveTimer) async {
-        // Sound is wired up with SET_SOUND_ENABLED (N-15); the setting defaults
-        // to off, so until then the notification is silent by contract.
         try? await NotificationCoordinator.shared.schedule(
             identifier: timer.notificationIdentifier,
             kind: .timer,
@@ -160,7 +160,7 @@ actor TestamentTimer {
             title: "Time's up",
             body: "\(timer.activityName) — \(Self.durationText(timer)) done.",
             at: timer.endsAt,
-            sound: nil
+            sound: NotificationSound.current
         )
     }
 
