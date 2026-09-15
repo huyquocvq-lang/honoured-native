@@ -28,7 +28,15 @@ window.addEventListener('honoured:native', event => {
 
 **Errors.** Any message can be answered with `ERROR { message, code? }`. Feature-specific failures use their own event (`PURCHASE_FAILED`, `APPLE_SIGN_IN_FAILED`, …) and always carry `message`.
 
-**Event queue.** Some events originate while the WebView is not ready — a notification tapped on cold start, a goal reached during a background sync, a session refreshed in the background. Native buffers these and flushes them in order immediately after replying `NATIVE_READY` to `APP_READY`. The buffer is bounded (last 50) and survives a WebView reload but not an app relaunch.
+**Event queue.** Some events originate while the WebView is not ready — a notification tapped on cold start, a goal reached during a background sync, a session refreshed in the background. Native buffers these and flushes them in order right after it has replied to the **first message the web app sends after a page load** (`APP_READY` if the web sends it, otherwise whatever comes first — today that is `IDENTIFY_USER`). Any inbound message counts because it proves the bridge module is running. The buffer is bounded (last 50) and survives a WebView reload but not an app relaunch.
+
+**Integration notes for `src/lib/native-bridge.ts`.**
+
+- Bump `BRIDGE_VERSION` to `2` and add the v2 types to `OutboundType`.
+- `request()` resolves on the first event whose type is in `expected` or is `ERROR`. Every v2 request below names exactly one success reply type, so the existing helper works unchanged.
+- The default 8 s timeout is too short for anything that shows system UI. Use a long timeout (the existing `PURCHASE_TIMEOUT_MS` is fine) for `REQUEST_HEALTH_PERMISSION` and `SIGN_IN_WITH_APPLE`; the user may sit on the sheet.
+- Broadcasts need a persistent `onNativeEvent` listener registered once at app start, not a per-call `request()`. Attach it before the first outbound message so nothing flushed from the queue is missed.
+- Send `APP_READY` from that same startup path. It is not required for the queue any more, but it gets `NATIVE_READY` back with `bridgeVersion`, which is the cleanest way to feature-detect.
 
 All platform-specific capabilities must be invoked through an explicit message type. Do not expose a generic native method executor to the WebView.
 
@@ -68,8 +76,12 @@ Native writes HealthKit data to Supabase under row-level security, so it needs t
 Rules:
 
 - Web sends `SET_AUTH_SESSION` on `SIGNED_IN`, `TOKEN_REFRESHED` and `INITIAL_SESSION` from supabase-js, including for anonymous users. This is the only way native learns who to sync for.
-- `expiresAt` is Unix seconds.
+- `expiresAt` is a positive, finite Unix-seconds number.
 - Native stores the pair in the Keychain and never logs it.
+- Receiving a session for a different `userId` clears the previous user's
+  offline queue, HealthKit anchors and goal settings before the new session is
+  stored. Every queued batch is also bound to its originating user as a second
+  account-isolation check.
 - Native refreshes only when the app is not active (background task, HealthKit observer wake). Supabase's refresh-token reuse window covers the rare overlap with a foreground refresh.
 - `CLEAR_AUTH_SESSION` wipes the Keychain entry, the offline sync queue and all HealthKit anchors, so a different user signing in on the same device starts from a clean read.
 - Native needs `SupabaseURL` and `SupabaseAnonKey` in `Info.plist`, injected through `Config.xcconfig` the same way as `RevenueCatAPIKey`.
@@ -174,6 +186,16 @@ Native detects goal completion in the background, so it must know the targets an
 | `HEALTH_DATA_UPDATED { syncedAt, metrics: [...] }` | A background sync finished. Web should re-query anything it displays. |
 
 Web owns contract state: on `GOAL_REACHED` it marks the contract honoured and runs the in-app celebration if the app is in the foreground.
+
+### Background sync
+
+Native does not need anything from the web app to sync in the background, but the web app should know what to expect:
+
+- Observer queries for all nine metrics are registered when the process launches. Hourly background delivery is enabled on `SET_AUTH_SESSION`, after `REQUEST_HEALTH_PERMISSION` completes, and at launch when a stored session exists; `CLEAR_AUTH_SESSION` disables it again.
+- Each wake reads new samples through the anchored queries, writes the batch to the offline queue, then acknowledges HealthKit. Only after that does native attempt **one** upload. If the upload fails, the batch stays queued and is retried on the next wake, on reconnect, or when the app comes to the foreground — so a slow or offline network never blocks HealthKit from waking the app again.
+- `.hourly` is a ceiling, not a schedule. iOS decides when to wake the app; a wake that arrives while the device is locked before first unlock is deferred until protected data is available.
+- `HEALTH_DATA_UPDATED` is broadcast after a batch is uploaded, whether the sync ran in the foreground or the background. It is queued if the WebView is not ready.
+- The simulator does not deliver background HealthKit updates. Only a signed build on a device with the background-delivery entitlement exercises this path.
 
 ---
 

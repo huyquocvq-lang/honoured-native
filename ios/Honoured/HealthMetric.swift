@@ -4,7 +4,7 @@ import HealthKit
 /// Canonical metric identifiers. The raw values are the strings used in bridge
 /// payloads and in the `metric` column of `health_samples` / `health_daily`,
 /// so renaming a case is a contract change on both sides.
-enum HealthMetric: String, CaseIterable {
+enum HealthMetric: String, CaseIterable, Codable {
     case steps
     case distanceWalkingRunning = "distance_walking_running"
     case distanceCycling = "distance_cycling"
