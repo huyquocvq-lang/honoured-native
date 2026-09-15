@@ -10,10 +10,7 @@ final class HealthBackgroundRefresh: @unchecked Sendable {
 
     /// Must match the entry in `BGTaskSchedulerPermittedIdentifiers`, which is
     /// `$(PRODUCT_BUNDLE_IDENTIFIER).healthsync` in `Info.plist`.
-    let taskIdentifier: String = {
-        let bundleID = Bundle.main.bundleIdentifier ?? "com.honoured.app"
-        return "\(bundleID).healthsync"
-    }()
+    let taskIdentifier = AppConfig.healthSyncTaskIdentifier
 
     /// Lower bound only. iOS decides when, if ever, the refresh actually runs.
     private let minimumInterval: TimeInterval = 60 * 60
