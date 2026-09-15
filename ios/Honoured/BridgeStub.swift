@@ -62,6 +62,8 @@ enum BridgeStub {
     <button onclick="req('SET_GOALS',{goals:[]},['GOALS_ACCEPTED'])">SET_GOALS · empty</button>
     <button onclick="req('ACTIVITY_COMPLETED',{activityId:'act-3',source:'manual'},['ACTIVITY_COMPLETION_ACCEPTED'])">ACTIVITY_COMPLETED act-3 manual</button>
     <button onclick="req('SET_DAY_RESET_HOUR',{hour:4},['DAY_RESET_HOUR_ACCEPTED'])">SET_DAY_RESET_HOUR 4</button>
+    <button onclick="req('SET_SOUND_ENABLED',{enabled:true},['SOUND_STATE'])">SET_SOUND_ENABLED true</button>
+    <button onclick="req('SET_SOUND_ENABLED',{enabled:false},['SOUND_STATE'])">SET_SOUND_ENABLED false</button>
     <button onclick="req('GET_HEALTH_STATUS',{},['HEALTH_PERMISSION_STATUS'])">GET_HEALTH_STATUS</button>
     <button onclick="req('REQUEST_HEALTH_PERMISSION',{},['HEALTH_PERMISSION_STATUS'],60000)">REQUEST_HEALTH_PERMISSION</button>
     <pre id="log"></pre>
@@ -163,6 +165,25 @@ enum BridgeStub {
       async 'timer-state'() {
         const r = await req('GET_TIMER_STATE', {}, ['TIMER_STATE']);
         log('STATE ' + JSON.stringify(r.payload));
+        log('SCENARIO DONE');
+      },
+      async 'sound'() {
+        let r = await req('SET_SOUND_ENABLED', { enabled: true }, ['SOUND_STATE']);
+        check('SOUND_STATE enabled:true', r.type === 'SOUND_STATE' && r.payload.enabled === true && typeof r.payload.gongBundled === 'boolean');
+        log('gongBundled=' + r.payload.gongBundled);
+        r = await req('SET_SOUND_ENABLED', { enabled: 1 }, ['SOUND_STATE']);
+        check('numeric enabled → ERROR invalid_sound_state', r.type === 'ERROR' && r.payload.code === 'invalid_sound_state');
+        r = await req('SET_SOUND_ENABLED', { enabled: 'yes' }, ['SOUND_STATE']);
+        check('string enabled → ERROR invalid_sound_state', r.type === 'ERROR' && r.payload.code === 'invalid_sound_state');
+        // A running timer must survive the toggle with the same endsAt.
+        r = await req('START_TIMER', { activityId: 'act-snd', activityName: 'Sound check', durationSeconds: 120 }, ['TIMER_STARTED']);
+        const endsAt = r.payload.endsAt;
+        r = await req('SET_SOUND_ENABLED', { enabled: false }, ['SOUND_STATE']);
+        check('SOUND_STATE enabled:false', r.type === 'SOUND_STATE' && r.payload.enabled === false);
+        await sleep(500);
+        r = await req('GET_TIMER_STATE', {}, ['TIMER_STATE']);
+        check('timer still running with the same endsAt after toggling sound', r.payload.active === true && r.payload.endsAt === endsAt);
+        r = await req('CANCEL_TIMER', { activityId: 'act-snd' }, ['TIMER_CANCELLED']);
         log('SCENARIO DONE');
       },
       // Launch with -HonouredFakeHealthTotals steps=9000,active_energy=250
