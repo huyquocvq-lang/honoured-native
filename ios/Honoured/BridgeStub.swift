@@ -29,6 +29,22 @@ enum BridgeStub {
         print("[bridge-stub] \(line)")
     }
 
+    /// `-HonouredFakeHealthTotals steps=9000,active_energy=300` (also settable
+    /// at runtime with `simctl spawn booted defaults write com.testho.app
+    /// HonouredFakeHealthTotals -string ...`) replaces the statistics query for
+    /// the listed metrics so goal detection can run without Health data.
+    static func fakeHealthTotal(for metric: HealthMetric) -> Double? {
+        guard isEnabled,
+              let spec = UserDefaults.standard.string(forKey: "HonouredFakeHealthTotals") else { return nil }
+        for pair in spec.split(separator: ",") {
+            let parts = pair.split(separator: "=", maxSplits: 1).map { $0.trimmingCharacters(in: .whitespaces) }
+            if parts.count == 2, parts[0] == metric.rawValue, let value = Double(parts[1]) {
+                return value
+            }
+        }
+        return nil
+    }
+
     private static let html = """
     <!doctype html>
     <html><head><meta name="viewport" content="width=device-width, initial-scale=1">
@@ -44,6 +60,8 @@ enum BridgeStub {
     <button onclick="req('GET_TIMER_STATE',{},['TIMER_STATE'])">GET_TIMER_STATE</button>
     <button onclick="req('SET_GOALS',{goals:[{activityId:'act-3',activityName:'Walk',metric:'steps',target:8000,unit:'count'}]},['GOALS_ACCEPTED'])">SET_GOALS · 1 goal</button>
     <button onclick="req('SET_GOALS',{goals:[]},['GOALS_ACCEPTED'])">SET_GOALS · empty</button>
+    <button onclick="req('ACTIVITY_COMPLETED',{activityId:'act-3',source:'manual'},['ACTIVITY_COMPLETION_ACCEPTED'])">ACTIVITY_COMPLETED act-3 manual</button>
+    <button onclick="req('SET_DAY_RESET_HOUR',{hour:4},['DAY_RESET_HOUR_ACCEPTED'])">SET_DAY_RESET_HOUR 4</button>
     <button onclick="req('GET_HEALTH_STATUS',{},['HEALTH_PERMISSION_STATUS'])">GET_HEALTH_STATUS</button>
     <button onclick="req('REQUEST_HEALTH_PERMISSION',{},['HEALTH_PERMISSION_STATUS'],60000)">REQUEST_HEALTH_PERMISSION</button>
     <pre id="log"></pre>
@@ -145,6 +163,61 @@ enum BridgeStub {
       async 'timer-state'() {
         const r = await req('GET_TIMER_STATE', {}, ['TIMER_STATE']);
         log('STATE ' + JSON.stringify(r.payload));
+        log('SCENARIO DONE');
+      },
+      // Launch with -HonouredFakeHealthTotals steps=9000,active_energy=250
+      async 'goals'() {
+        const walk = { activityId: 'act-walk', activityName: 'Walk', metric: 'steps', target: 8000, unit: 'count' };
+        const burn = { activityId: 'act-burn', activityName: 'Burn', metric: 'active_energy', target: 400, unit: 'kcal' };
+        const swim = { activityId: 'act-swim', activityName: 'Swim', metric: 'distance_swimming', target: 500, unit: 'meters' };
+
+        let reached = waitFor(['GOAL_REACHED'], 4000);
+        let r = await req('SET_GOALS', { goals: [walk, burn, swim] }, ['GOALS_ACCEPTED']);
+        check('GOALS_ACCEPTED count 3', r.type === 'GOALS_ACCEPTED' && r.payload.count === 3);
+        r = await reached;
+        check('GOAL_REACHED act-walk (9000 ≥ 8000) notified:false in-app', r.type === 'GOAL_REACHED' && r.payload.activityId === 'act-walk' && r.payload.value === 9000 && r.payload.target === 8000 && r.payload.metric === 'steps' && r.payload.notified === false && typeof r.payload.reachedAt === 'string');
+        let extra = await waitFor(['GOAL_REACHED'], 2500);
+        check('no GOAL_REACHED for act-burn (250 < 400) or act-swim (no data)', extra.type === 'TIMEOUT');
+
+        r = await req('SET_GOALS', { goals: [walk, burn, swim] }, ['GOALS_ACCEPTED']);
+        extra = await waitFor(['GOAL_REACHED'], 2500);
+        check('re-sending goals does not repeat GOAL_REACHED act-walk (marker)', extra.type === 'TIMEOUT');
+
+        r = await req('ACTIVITY_COMPLETED', { activityId: 'act-burn', source: 'manual' }, ['ACTIVITY_COMPLETION_ACCEPTED']);
+        check('ACTIVITY_COMPLETED act-burn accepted', r.type === 'ACTIVITY_COMPLETION_ACCEPTED' && r.payload.activityId === 'act-burn');
+        r = await req('ACTIVITY_COMPLETED', { activityId: 'act-x', source: 'bogus' }, ['ACTIVITY_COMPLETION_ACCEPTED']);
+        check('ACTIVITY_COMPLETED with unknown source → ERROR', r.type === 'ERROR' && r.payload.code === 'invalid_activity_completion');
+
+        // Lower the burn target below the fake total: act-burn is now met but was
+        // celebrated by the web already, so it must stay silent.
+        r = await req('SET_GOALS', { goals: [walk, { ...burn, target: 200 }, swim] }, ['GOALS_ACCEPTED']);
+        extra = await waitFor(['GOAL_REACHED'], 2500);
+        check('celebrated act-burn stays silent after target lowered', extra.type === 'TIMEOUT');
+
+        // A brand-new activity on the same metric fires immediately.
+        reached = waitFor(['GOAL_REACHED'], 4000);
+        r = await req('SET_GOALS', { goals: [walk, { activityId: 'act-burn-2', activityName: 'Burn 2', metric: 'active_energy', target: 200, unit: 'kcal' }] }, ['GOALS_ACCEPTED']);
+        r = await reached;
+        check('GOAL_REACHED act-burn-2 (250 ≥ 200)', r.type === 'GOAL_REACHED' && r.payload.activityId === 'act-burn-2' && r.payload.value === 250);
+
+        // Changing the reset hour clears markers and re-evaluates in-app.
+        const hour = (new Date().getHours() + 2) % 24;
+        const reannounced = [];
+        const collector = (e) => { if (e.detail.type === 'GOAL_REACHED') reannounced.push(e.detail.payload); };
+        window.addEventListener('honoured:native', collector);
+        r = await req('SET_DAY_RESET_HOUR', { hour }, ['DAY_RESET_HOUR_ACCEPTED']);
+        check('DAY_RESET_HOUR_ACCEPTED', r.type === 'DAY_RESET_HOUR_ACCEPTED' && r.payload.hour === hour);
+        await sleep(3000);
+        window.removeEventListener('honoured:native', collector);
+        const ids = reannounced.map((p) => p.activityId).sort().join(',');
+        check('after reset-hour change both met goals are re-announced in-app once (act-burn-2, act-walk; notified:false)', ids === 'act-burn-2,act-walk' && reannounced.every((p) => p.notified === false));
+        r = await req('SET_DAY_RESET_HOUR', { hour }, ['DAY_RESET_HOUR_ACCEPTED']);
+        extra = await waitFor(['GOAL_REACHED'], 2500);
+        check('same reset hour again does not re-announce', extra.type === 'TIMEOUT');
+
+        r = await req('SET_GOALS', { goals: [] }, ['GOALS_ACCEPTED']);
+        check('empty goals accepted', r.type === 'GOALS_ACCEPTED' && r.payload.count === 0);
+        r = await req('SET_DAY_RESET_HOUR', { hour: 0 }, ['DAY_RESET_HOUR_ACCEPTED']);
         log('SCENARIO DONE');
       },
     };

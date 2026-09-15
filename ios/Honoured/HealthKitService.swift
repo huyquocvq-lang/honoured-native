@@ -69,6 +69,9 @@ actor HealthKitService {
     /// way the Health app reports it. Raw samples from an iPhone and a Watch
     /// overlap, so summing them by hand would double count.
     func total(for metric: HealthMetric, from: Date, to: Date) async -> Double? {
+        #if DEBUG
+        if let fake = BridgeStub.fakeHealthTotal(for: metric) { return fake }
+        #endif
         guard let unit = metric.quantityUnit, let type = metric.objectType as? HKQuantityType else {
             return await sleepMinutes(from: from, to: to)
         }
