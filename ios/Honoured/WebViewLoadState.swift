@@ -41,6 +41,13 @@ final class WebViewLoadState: ObservableObject {
         if phase != .loading {
             phase = .loading
         }
+        #if DEBUG
+        if BridgeStub.isEnabled, let webView {
+            BridgeStub.load(into: webView)
+            startTimeout()
+            return
+        }
+        #endif
         webView?.load(request)
         startTimeout()
     }

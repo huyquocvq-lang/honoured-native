@@ -70,6 +70,12 @@ final class NativeBridge: NSObject, WKScriptMessageHandler {
         }
 
         let payload = body["payload"] as? [String: Any] ?? [:]
+        #if DEBUG
+        if type == "STUB_LOG" {
+            BridgeStub.log(payload["line"] as? String ?? "")
+            return
+        }
+        #endif
         let requestID = payload["requestId"] as? String
         let reply: (String, [String: Any]) -> Void = { [weak self] replyType, replyPayload in
             self?.send(type: replyType, payload: replyPayload, requestId: requestID)
