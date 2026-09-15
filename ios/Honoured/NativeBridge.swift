@@ -220,6 +220,7 @@ final class NativeBridge: NSObject, WKScriptMessageHandler {
                     ))
                     reply("AUTH_SESSION_ACCEPTED", ["userId": userId])
                     HealthBackgroundObserver.shared.enableBackgroundDelivery()
+                    HealthBackgroundRefresh.shared.schedule()
                     await HealthSyncCoordinator.shared.syncNow()
                 } catch {
                     reply("ERROR", ["message": error.localizedDescription, "code": "auth_session_store_failed"])
@@ -233,6 +234,7 @@ final class NativeBridge: NSObject, WKScriptMessageHandler {
                     await HealthKitService.shared.resetSyncState()
                     await HealthSyncSettings.shared.reset()
                     HealthBackgroundObserver.shared.disableBackgroundDelivery()
+                    HealthBackgroundRefresh.shared.cancel()
                     reply("AUTH_SESSION_CLEARED", [:])
                 } catch {
                     reply("ERROR", ["message": error.localizedDescription, "code": "auth_session_clear_failed"])
