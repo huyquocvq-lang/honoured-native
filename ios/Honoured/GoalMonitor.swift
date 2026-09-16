@@ -63,12 +63,19 @@ actor GoalMonitor {
     // MARK: - Markers
 
     /// The web app marked the contract honoured itself (timer, manual, or its own
-    /// HealthKit read), so native must not notify for it again today.
+    /// HealthKit read), so native must not notify for it again today. Timer and
+    /// manual completions name the contract id while goals are addressed per
+    /// slot (`<id>:primary`), so every current goal under that contract is
+    /// marked as well.
     func markCelebrated(activityId: String) async {
         let dayStart = await HealthSyncSettings.shared.healthDayStart(containing: Date())
         let day = HealthSyncSettings.dayString(dayStart)
         var markers = prunedMarkers(keeping: day)
         markers.insert(Self.marker(activityId, day))
+        let slotPrefix = activityId + ":"
+        for goal in await HealthSyncSettings.shared.currentGoals() where goal.activityId.hasPrefix(slotPrefix) {
+            markers.insert(Self.marker(goal.activityId, day))
+        }
         save(markers)
     }
 
