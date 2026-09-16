@@ -206,6 +206,13 @@ enum BridgeStub {
 
         r = await req('ACTIVITY_COMPLETED', { activityId: 'act-burn', source: 'manual' }, ['ACTIVITY_COMPLETION_ACCEPTED']);
         check('ACTIVITY_COMPLETED act-burn accepted', r.type === 'ACTIVITY_COMPLETION_ACCEPTED' && r.payload.activityId === 'act-burn');
+        // A timer completion names the contract id; its goal slots must go quiet too.
+        r = await req('SET_GOALS', { goals: [walk, burn, swim, { activityId: 'ctr-7:primary', activityName: 'Row', metric: 'steps', target: 100000, unit: 'count' }] }, ['GOALS_ACCEPTED']);
+        r = await req('ACTIVITY_COMPLETED', { activityId: 'ctr-7', source: 'timer' }, ['ACTIVITY_COMPLETION_ACCEPTED']);
+        r = await req('SET_GOALS', { goals: [walk, burn, swim, { activityId: 'ctr-7:primary', activityName: 'Row', metric: 'steps', target: 10, unit: 'count' }] }, ['GOALS_ACCEPTED']);
+        extra = await waitFor(['GOAL_REACHED'], 2500);
+        check('slot goal ctr-7:primary stays silent after ACTIVITY_COMPLETED for ctr-7', extra.type === 'TIMEOUT');
+        r = await req('SET_GOALS', { goals: [walk, burn, swim] }, ['GOALS_ACCEPTED']);
         r = await req('ACTIVITY_COMPLETED', { activityId: 'act-x', source: 'bogus' }, ['ACTIVITY_COMPLETION_ACCEPTED']);
         check('ACTIVITY_COMPLETED with unknown source → ERROR', r.type === 'ERROR' && r.payload.code === 'invalid_activity_completion');
 
