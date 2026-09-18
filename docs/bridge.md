@@ -277,10 +277,17 @@ Notifications that fire while the app is in the foreground are not shown. The ow
 }
 ```
 
-- `email` and `fullName` are only present on the very first authorization for this Apple ID; store them then or never.
-- `code` in the failure event is `"cancelled"` or `"failed"`.
-- Native generates the nonce, hashes it with SHA-256 for the Apple request and returns the raw value. The web app passes `identityToken` and `rawNonce` to Supabase.
-- **Linking must preserve the anonymous user.** The web app calls `supabase.auth.linkIdentity` for the current anonymous session, not `signInWithIdToken`, otherwise Supabase creates a new user and every synced HealthKit row becomes orphaned. After linking, send `SET_AUTH_SESSION` again with the new tokens.
+- `email` and `fullName` are only present on the very first authorization for this Apple ID; store them then or never. Absent keys mean "not provided" — native never sends empty strings. `authorizationCode` is present whenever Apple returns one.
+- `code` in the failure event is `"cancelled"` (the person dismissed the sheet) or `"failed"` (anything else, including a device with no Apple Account signed in, or a second `SIGN_IN_WITH_APPLE` sent while the sheet is already up — one request at a time). `message` is Apple's localized description and is safe to show.
+- Native generates a 32-byte random nonce (64 hex characters), sends its SHA-256 hex digest to Apple and returns the raw value as `rawNonce`. The web app passes `identityToken` and `rawNonce` to Supabase unchanged.
+- **Linking must preserve the anonymous user.** The web app calls `supabase.auth.linkIdentity({ provider: "apple", token: identityToken, nonce: rawNonce })` for the current anonymous session, not `signInWithIdToken`, otherwise Supabase creates a new user and every synced HealthKit row becomes orphaned. This ID-token form of `linkIdentity` requires **Manual linking** to be enabled under Auth → Providers in the Supabase project. After linking, send `SET_AUTH_SESSION` again with the new tokens.
+- Use a long request timeout (the purchase timeout is fine): the person may sit on the sheet.
+
+| Native → Web (broadcast) | When |
+|---|---|
+| `APPLE_CREDENTIAL_REVOKED { userId, reason }` | Apple reports the stored Apple user as `revoked` or `not_found`, checked at every launch and via `credentialRevokedNotification` while running. `userId` is the Apple user identifier (`user.id` from the success payload), not the Supabase user. The web app decides what this means for the account (typically sign out and show the sign-in wall); native only forgets the Apple user. Not persisted across relaunches. |
+
+Native remembers the Apple user identifier after a successful authorization so it can perform that check; `CLEAR_AUTH_SESSION` and a `SET_AUTH_SESSION` for a different user forget it.
 
 ---
 
@@ -288,4 +295,4 @@ Notifications that fire while the app is in the foreground are not shown. The ow
 
 Web → Native: `APP_READY` `GET_PLATFORM_INFO` `IDENTIFY_USER` `LOGOUT_USER` `CHECK_ACCESS` `START_PURCHASE` `RESTORE_PURCHASES` `START_SESSION` `SET_AUTH_SESSION` `CLEAR_AUTH_SESSION` `REQUEST_HEALTH_PERMISSION` `GET_HEALTH_STATUS` `QUERY_HEALTH_METRICS` `SET_GOALS` `SET_DAY_RESET_HOUR` `START_TIMER` `CANCEL_TIMER` `GET_TIMER_STATE` `ACTIVITY_COMPLETED` `SET_SOUND_ENABLED` `SIGN_IN_WITH_APPLE`
 
-Native → Web: `NATIVE_READY` `PLATFORM_INFO` `ERROR` `IDENTIFY_SUCCESS` `IDENTIFY_FAILED` `LOGOUT_SUCCESS` `LOGOUT_FAILED` `ACCESS_STATUS` `PURCHASE_SUCCESS` `PURCHASE_CANCELLED` `PURCHASE_FAILED` `RESTORE_SUCCESS` `RESTORE_FAILED` `AUTH_SESSION_ACCEPTED` `AUTH_SESSION_CLEARED` `AUTH_SESSION_UPDATED` `AUTH_SESSION_INVALID` `HEALTH_PERMISSION_STATUS` `HEALTH_METRICS` `GOALS_ACCEPTED` `DAY_RESET_HOUR_ACCEPTED` `GOAL_REACHED` `HEALTH_DATA_UPDATED` `TIMER_STARTED` `TIMER_CANCELLED` `TIMER_STATE` `TIMER_COMPLETED` `ACTIVITY_COMPLETION_ACCEPTED` `SOUND_STATE` `NOTIFICATION_OPENED` `APPLE_SIGN_IN_SUCCESS` `APPLE_SIGN_IN_FAILED`
+Native → Web: `NATIVE_READY` `PLATFORM_INFO` `ERROR` `IDENTIFY_SUCCESS` `IDENTIFY_FAILED` `LOGOUT_SUCCESS` `LOGOUT_FAILED` `ACCESS_STATUS` `PURCHASE_SUCCESS` `PURCHASE_CANCELLED` `PURCHASE_FAILED` `RESTORE_SUCCESS` `RESTORE_FAILED` `AUTH_SESSION_ACCEPTED` `AUTH_SESSION_CLEARED` `AUTH_SESSION_UPDATED` `AUTH_SESSION_INVALID` `HEALTH_PERMISSION_STATUS` `HEALTH_METRICS` `GOALS_ACCEPTED` `DAY_RESET_HOUR_ACCEPTED` `GOAL_REACHED` `HEALTH_DATA_UPDATED` `TIMER_STARTED` `TIMER_CANCELLED` `TIMER_STATE` `TIMER_COMPLETED` `ACTIVITY_COMPLETION_ACCEPTED` `SOUND_STATE` `NOTIFICATION_OPENED` `APPLE_SIGN_IN_SUCCESS` `APPLE_SIGN_IN_FAILED` `APPLE_CREDENTIAL_REVOKED`

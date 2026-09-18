@@ -235,6 +235,7 @@ final class NativeBridge: NSObject, WKScriptMessageHandler {
                         try await NativeEventStore.shared.clear()
                         await TestamentTimer.shared.clear()
                         await GoalMonitor.shared.clear()
+                        AppleSignInCoordinator.shared.clear()
                         NotificationCoordinator.shared.cancelAll()
                     }
                     try await AuthSessionStore.shared.save(NativeAuthSession(
@@ -261,6 +262,7 @@ final class NativeBridge: NSObject, WKScriptMessageHandler {
                     try await NativeEventStore.shared.clear()
                     await TestamentTimer.shared.clear()
                     await GoalMonitor.shared.clear()
+                    AppleSignInCoordinator.shared.clear()
                     NotificationCoordinator.shared.cancelAll()
                     HealthBackgroundObserver.shared.disableBackgroundDelivery()
                     HealthBackgroundRefresh.shared.cancel()
@@ -356,6 +358,17 @@ final class NativeBridge: NSObject, WKScriptMessageHandler {
                 if changed {
                     await GoalMonitor.shared.clear()
                     await GoalMonitor.shared.evaluate()
+                }
+            }
+        case "SIGN_IN_WITH_APPLE":
+            Task { @MainActor in
+                switch await AppleSignInCoordinator.shared.signIn() {
+                case .success(let payload):
+                    reply("APPLE_SIGN_IN_SUCCESS", payload)
+                case .cancelled:
+                    reply("APPLE_SIGN_IN_FAILED", ["code": "cancelled", "message": "Sign in with Apple was cancelled"])
+                case .failed(let message):
+                    reply("APPLE_SIGN_IN_FAILED", ["code": "failed", "message": message])
                 }
             }
         case "SET_SOUND_ENABLED":
