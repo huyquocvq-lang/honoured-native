@@ -64,6 +64,7 @@ enum BridgeStub {
     <button onclick="req('SET_DAY_RESET_HOUR',{hour:4},['DAY_RESET_HOUR_ACCEPTED'])">SET_DAY_RESET_HOUR 4</button>
     <button onclick="req('SET_SOUND_ENABLED',{enabled:true},['SOUND_STATE'])">SET_SOUND_ENABLED true</button>
     <button onclick="req('SET_SOUND_ENABLED',{enabled:false},['SOUND_STATE'])">SET_SOUND_ENABLED false</button>
+    <button onclick="req('SIGN_IN_WITH_APPLE',{},['APPLE_SIGN_IN_SUCCESS','APPLE_SIGN_IN_FAILED'],120000)">SIGN_IN_WITH_APPLE</button>
     <button onclick="req('GET_HEALTH_STATUS',{},['HEALTH_PERMISSION_STATUS'])">GET_HEALTH_STATUS</button>
     <button onclick="req('REQUEST_HEALTH_PERMISSION',{},['HEALTH_PERMISSION_STATUS'],60000)">REQUEST_HEALTH_PERMISSION</button>
     <pre id="log"></pre>
@@ -77,9 +78,17 @@ enum BridgeStub {
     };
     const pending = new Map();
     const waiters = [];
+    const redact = (type, payload) => {
+      if (type !== 'APPLE_SIGN_IN_SUCCESS' || !payload) return payload;
+      const out = { ...payload };
+      for (const k of ['identityToken', 'authorizationCode', 'rawNonce']) {
+        if (typeof out[k] === 'string') out[k] = `<${k} ${out[k].length} chars>`;
+      }
+      return out;
+    };
     window.addEventListener('honoured:native', (e) => {
       const { type, payload } = e.detail;
-      log('◀ ' + type + ' ' + JSON.stringify(payload));
+      log('◀ ' + type + ' ' + JSON.stringify(redact(type, payload)));
       if (payload && payload.requestId && pending.has(payload.requestId)) {
         const p = pending.get(payload.requestId);
         if (p.expected.includes(type) || type === 'ERROR') { pending.delete(payload.requestId); p.resolve({ type, payload }); }
@@ -165,6 +174,26 @@ enum BridgeStub {
       async 'timer-state'() {
         const r = await req('GET_TIMER_STATE', {}, ['TIMER_STATE']);
         log('STATE ' + JSON.stringify(r.payload));
+        log('SCENARIO DONE');
+      },
+      // Needs a human on the simulator: the Apple sheet must be completed or
+      // cancelled by hand. Logs never contain the token, code or nonce.
+      async 'apple'() {
+        const first = req('SIGN_IN_WITH_APPLE', {}, ['APPLE_SIGN_IN_SUCCESS', 'APPLE_SIGN_IN_FAILED'], 120000);
+        await sleep(300);
+        const second = await req('SIGN_IN_WITH_APPLE', {}, ['APPLE_SIGN_IN_SUCCESS', 'APPLE_SIGN_IN_FAILED'], 5000);
+        check('second request while the sheet is up fails immediately', second.type === 'APPLE_SIGN_IN_FAILED' && second.payload.code === 'failed');
+        const r = await first;
+        if (r.type === 'APPLE_SIGN_IN_SUCCESS') {
+          const p = r.payload;
+          check('success carries identityToken, rawNonce and user.id', typeof p.identityToken === 'string' && p.identityToken.length > 100 && typeof p.rawNonce === 'string' && p.rawNonce.length === 64 && typeof p.user?.id === 'string');
+          check('identityToken looks like a JWT', p.identityToken.split('.').length === 3);
+        } else if (r.type === 'APPLE_SIGN_IN_FAILED') {
+          check('failure has code cancelled|failed and a message', ['cancelled', 'failed'].includes(r.payload.code) && typeof r.payload.message === 'string');
+          log('RESULT ' + r.payload.code + ': ' + r.payload.message);
+        } else {
+          check('sheet answered within 120 s', false);
+        }
         log('SCENARIO DONE');
       },
       async 'sound'() {
