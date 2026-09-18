@@ -171,6 +171,16 @@ enum BridgeStub {
         check('started act-bg 20 s', r.type === 'TIMER_STARTED');
         log('SCENARIO DONE');
       },
+      // Start, cancel, then background the app: no banner may appear at endsAt.
+      async 'timer-cancel-background'() {
+        let r = await req('START_TIMER', { activityId: 'act-cx', activityName: 'Cancelled', durationSeconds: 15 }, ['TIMER_STARTED']);
+        check('started act-cx 15 s', r.type === 'TIMER_STARTED');
+        r = await req('CANCEL_TIMER', { activityId: 'act-cx' }, ['TIMER_CANCELLED']);
+        check('cancelled act-cx', r.type === 'TIMER_CANCELLED');
+        r = await req('GET_TIMER_STATE', {}, ['TIMER_STATE']);
+        check('state inactive after cancel', r.payload.active === false);
+        log('SCENARIO DONE');
+      },
       async 'timer-state'() {
         const r = await req('GET_TIMER_STATE', {}, ['TIMER_STATE']);
         log('STATE ' + JSON.stringify(r.payload));
