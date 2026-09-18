@@ -2,6 +2,10 @@
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <plist version="1.0">
 <dict>
+	<key>BGTaskSchedulerPermittedIdentifiers</key>
+	<array>
+		<string>$(PRODUCT_BUNDLE_IDENTIFIER).healthsync</string>
+	</array>
 	<key>CFBundleDevelopmentRegion</key>
 	<string>$(DEVELOPMENT_LANGUAGE)</string>
 	<key>CFBundleDisplayName</key>
@@ -24,24 +28,29 @@
 	<string>$(HONOURED_WEB_APP_URL)</string>
 	<key>LSRequiresIPhoneOS</key>
 	<true/>
-	<key>RevenueCatAPIKey</key>
-	<string>$(REVENUECAT_IOS_API_KEY)</string>
-	<key>NSMicrophoneUsageDescription</key>
-	<string>Record a private Voice of Change reflection.</string>
 	<key>NSHealthShareUsageDescription</key>
 	<string>Honoured reads your steps, distance, energy, heart rate, exercise minutes and sleep to check the contracts you sign with yourself. Nothing is written back to Health.</string>
+	<!-- Never shown: the app requests no share types. Required anyway because the
+	     binary references requestAuthorization(toShare:read:), which App Store
+	     validation flags as a write-capable API (ITMS-90683). -->
+	<key>NSHealthUpdateUsageDescription</key>
+	<string>Honoured only reads your Health data and never writes to it.</string>
+	<key>NSMicrophoneUsageDescription</key>
+	<string>Record a private Voice of Change reflection.</string>
+	<key>RevenueCatAPIKey</key>
+	<string>$(REVENUECAT_IOS_API_KEY)</string>
+	<key>SupabaseAnonKey</key>
+	<string>$(SUPABASE_ANON_KEY)</string>
+	<key>SupabaseURL</key>
+	<string>$(SUPABASE_URL)</string>
 	<key>UIBackgroundModes</key>
 	<array>
 		<string>fetch</string>
 	</array>
-	<key>BGTaskSchedulerPermittedIdentifiers</key>
-	<array>
-		<string>$(PRODUCT_BUNDLE_IDENTIFIER).healthsync</string>
-	</array>
-	<key>SupabaseURL</key>
-	<string>$(SUPABASE_URL)</string>
-	<key>SupabaseAnonKey</key>
-	<string>$(SUPABASE_ANON_KEY)</string>
+	<!-- HTTPS only, no custom encryption: exempt from export compliance, so every
+	     TestFlight/App Store upload skips the encryption questionnaire. -->
+	<key>ITSAppUsesNonExemptEncryption</key>
+	<false/>
 	<key>UILaunchScreen</key>
 	<dict/>
 	<key>UIRequiresFullScreen</key>
