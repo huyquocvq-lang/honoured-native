@@ -185,7 +185,7 @@ Native detects goal completion in the background, so it must know the targets an
 | `GOAL_REACHED { activityId, metric, value, target, reachedAt, notified }` | A goal crossed its target. `notified` is `true` if native posted a local notification because the app was not active. Fired at most once per activity per day. Queued if the WebView is not ready. |
 | `HEALTH_DATA_UPDATED { syncedAt, metrics: [...] }` | A background sync finished. Web should re-query anything it displays. |
 
-Web owns contract state: on `GOAL_REACHED` it marks the contract honoured and runs the in-app celebration if the app is in the foreground.
+Web owns contract state. `GOAL_REACHED` is per slot; the web app records the slot as reached for that health day (`honoured.goalsReached.v1`) and marks the contract honoured only once **every Health-mapped slot** of the contract has been reached — the same rule `trackedProgress()` and the standing-contract rollover already use. Slots that are not Health-mapped never block. The in-app celebration runs when the contract is honoured and `notified` is `false`; a partial slot only updates the measured line on the contract card. Native needs no change for this: it keeps firing once per activity per day.
 
 How native decides:
 
