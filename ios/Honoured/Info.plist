@@ -26,13 +26,12 @@
 	<string>1</string>
 	<key>HonouredWebAppURL</key>
 	<string>$(HONOURED_WEB_APP_URL)</string>
+	<key>ITSAppUsesNonExemptEncryption</key>
+	<false/>
 	<key>LSRequiresIPhoneOS</key>
 	<true/>
 	<key>NSHealthShareUsageDescription</key>
 	<string>Honoured reads your steps, distance, energy, heart rate, exercise minutes and sleep to check the contracts you sign with yourself. Nothing is written back to Health.</string>
-	<!-- Never shown: the app requests no share types. Required anyway because the
-	     binary references requestAuthorization(toShare:read:), which App Store
-	     validation flags as a write-capable API (ITMS-90683). -->
 	<key>NSHealthUpdateUsageDescription</key>
 	<string>Honoured only reads your Health data and never writes to it.</string>
 	<key>NSMicrophoneUsageDescription</key>
@@ -47,10 +46,6 @@
 	<array>
 		<string>fetch</string>
 	</array>
-	<!-- HTTPS only, no custom encryption: exempt from export compliance, so every
-	     TestFlight/App Store upload skips the encryption questionnaire. -->
-	<key>ITSAppUsesNonExemptEncryption</key>
-	<false/>
 	<key>UILaunchScreen</key>
 	<dict/>
 	<key>UIRequiresFullScreen</key>
