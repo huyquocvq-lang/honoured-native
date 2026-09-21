@@ -28,6 +28,7 @@ struct HonouredWebView: UIViewRepresentable {
         webView.uiDelegate = context.coordinator
         webView.allowsBackForwardNavigationGestures = true
         webView.scrollView.contentInsetAdjustmentBehavior = .never
+        NativeFeel.apply(to: webView)
 
         // An opaque view lets the compositor skip blending the web layer against
         // what is behind it on every frame, which is the fast path for scrolling.
