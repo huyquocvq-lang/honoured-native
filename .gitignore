@@ -26,3 +26,12 @@ xcuserdata/
 
 # IDE
 .idea/
+
+# Output of the build process
+build/
+
+#Outputs
+outputs/
+
+# Playwright MCP session logs
+.playwright-mcp/
