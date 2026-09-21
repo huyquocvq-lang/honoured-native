@@ -71,13 +71,25 @@ REVENUECAT_ANDROID_API_KEY=goog_xxxxxxxxxxxxxxxxx
 
 For local development this can live in the user's Gradle properties rather than committed source. The value is exposed as a generated `BuildConfig` field.
 
-## Required RevenueCat dashboard setup
+## Required store and RevenueCat setup
 
-1. Add the Apple app using the final iOS bundle ID.
-2. Add the Google Play app using the final Android application ID.
-3. Configure each platform's public SDK key in the native build.
-4. Create entitlement `honoured_plus`.
-5. Import/link the store subscription product(s).
+App Store Connect (once, by the account holder):
+
+1. Sign the Paid Apps agreement under Agreements, Tax, and Banking. Until it is signed, sandbox returns no products.
+2. Create one subscription group with two auto-renewable subscriptions (monthly, annual) under the **same bundle ID the build uses**. Fill in the metadata so each product is at least *Ready to Submit*.
+
+RevenueCat dashboard:
+
+3. Add the Apple app using that bundle ID, and the Google Play app using the Android application ID.
+4. Configure each platform's public SDK key in the native build.
+5. Products: import from App Store Connect (requires the In-App Purchase key uploaded to RevenueCat) or add the exact product IDs by hand.
+6. Create entitlement `honoured_plus` and attach both products.
+7. Offerings: in the offering marked *Current*, attach the monthly product to package `$rc_monthly` and the annual product to `$rc_annual`.
+
+If step 7 is missing, `Purchases.offerings()` fails before the purchase sheet with
+"You have configured the SDK with an App Store API key, but there are no App Store products registered in the RevenueCat dashboard for your offerings", and the web app shows it verbatim as *Payment failed*.
+
+A build signed under a different bundle ID or team (e.g. a developer's own `HONOURED_BUNDLE_ID`) can never fetch the client's products: StoreKit only returns products for the running app's bundle ID. Purchase testing needs a build under the store bundle ID — a TestFlight build or team membership — plus a Sandbox Apple ID on the device.
 6. Attach the product(s) to `honoured_plus`.
 7. Create a current Offering and add at least one Package.
 
