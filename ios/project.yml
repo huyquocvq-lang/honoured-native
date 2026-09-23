@@ -34,3 +34,22 @@ targets:
     scheme:
       testTargets: []
       storeKitConfiguration: Honoured.storekit
+
+# The Honoured scheme runs against Honoured.storekit, which serves products
+# and payments locally: convenient, but it proves nothing about App Store
+# Connect. This second scheme attaches no StoreKit configuration, so a run
+# from Xcode uses the real sandbox exactly as a TestFlight build does, while
+# keeping a Debug build's RevenueCat debug logging.
+schemes:
+  Honoured (Store Sandbox):
+    build:
+      targets:
+        Honoured: all
+    run:
+      config: Debug
+    profile:
+      config: Release
+    analyze:
+      config: Debug
+    archive:
+      config: Release

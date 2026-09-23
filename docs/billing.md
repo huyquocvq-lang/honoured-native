@@ -71,6 +71,15 @@ The key is injected into `Info.plist` as `RevenueCatAPIKey` and read at runtime.
 
 The App Store target must also have the In-App Purchase capability enabled before sandbox/store testing.
 
+Two schemes are generated. **Honoured** attaches `Honoured.storekit`, so products
+and payments are served locally from that file: it exercises the app's own flow
+but proves nothing about App Store Connect, and RevenueCat cannot validate the
+receipts it produces. **Honoured (Store Sandbox)** attaches no StoreKit
+configuration, so a run on a real device goes through the real sandbox exactly
+as a TestFlight build does — with a Sandbox Apple ID signed in under Settings →
+Developer — while still being a Debug build, so `Purchases.logLevel = .debug`
+prints the underlying StoreKit error that the web app's failure dialog hides.
+
 ## Android configuration
 
 Set the Gradle property before building:
