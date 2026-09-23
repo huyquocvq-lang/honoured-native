@@ -30,7 +30,7 @@ enum BridgeStub {
     }
 
     /// `-HonouredFakeHealthTotals steps=9000,active_energy=300` (also settable
-    /// at runtime with `simctl spawn booted defaults write com.testho.app
+    /// at runtime with `simctl spawn booted defaults write com.jimmy.upwork.honoured
     /// HonouredFakeHealthTotals -string ...`) replaces the statistics query for
     /// the listed metrics so goal detection can run without Health data.
     static func fakeHealthTotal(for metric: HealthMetric) -> Double? {
