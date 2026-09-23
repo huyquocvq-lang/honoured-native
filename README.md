@@ -90,6 +90,8 @@ Before real billing tests:
 1. Select the Apple development team.
 2. Confirm the final App Store bundle identifier.
 3. Set `REVENUECAT_IOS_API_KEY` in `.env` and run `./scripts/sync-env.sh`.
+   Leave `REVENUECAT_ENTITLEMENT_ID` empty unless you are testing against an
+   entitlement in your own RevenueCat project; see `docs/billing.md`.
 4. Enable the In-App Purchase capability.
 
 RevenueCat iOS is integrated with Swift Package Manager.

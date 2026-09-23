@@ -2,7 +2,16 @@ import Foundation
 
 enum AppConfig {
     static let bridgeVersion = 2
-    static let revenueCatEntitlementID = "honoured_plus"
+
+    /// The RevenueCat entitlement the shell checks. Production is
+    /// `honoured_plus`; a developer build can point at its own entitlement
+    /// with REVENUECAT_ENTITLEMENT_ID in .env, so testing against a personal
+    /// RevenueCat project never edits tracked source. An unset value keeps
+    /// the production identifier.
+    static var revenueCatEntitlementID: String {
+        let value = infoString("RevenueCatEntitlementID")
+        return value.isEmpty ? "honoured_plus" : value
+    }
 
     static var webAppURL: URL {
         let value = infoString("HonouredWebAppURL")

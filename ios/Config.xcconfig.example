@@ -5,6 +5,11 @@ HONOURED_URL_SLASH = /
 HONOURED_WEB_APP_URL = https:$(HONOURED_URL_SLASH)$(HONOURED_URL_SLASH)honour-your-word.lovable.app
 REVENUECAT_IOS_API_KEY = 
 
+// RevenueCat entitlement the shell checks. Empty keeps the production
+// identifier honoured_plus. Set it only to test against an entitlement in
+// your own RevenueCat project, and clear it before archiving for the store.
+REVENUECAT_ENTITLEMENT_ID =
+
 // Bundle identifier used for this machine's builds. Defaults to
 // com.honoured.app when unset. Override it here while testing against a
 // throwaway App ID so the production identifier stays in project.yml.

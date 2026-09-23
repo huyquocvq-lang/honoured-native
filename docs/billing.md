@@ -4,7 +4,17 @@ Honoured uses RevenueCat as the subscription state layer while Apple StoreKit 2 
 
 ## RevenueCat contract
 
-- Entitlement ID: `honoured_plus`
+- Entitlement ID: `honoured_plus`. Both shells read it from
+  `REVENUECAT_ENTITLEMENT_ID` (`.env`, or `android/local.properties` for
+  Android only) and fall back to `honoured_plus` when it is unset, so a
+  developer build can check an entitlement in a personal RevenueCat project
+  without editing tracked source. The web app and `has_entitlement()` in the
+  database are hardcoded to `honoured_plus`: under any other identifier the
+  RevenueCat webhook writes no `subscriptions` row, so paid state holds only
+  through the native `ACCESS_STATUS` path and not server-side. iOS reads the
+  value from `Info.plist`, so `./scripts/sync-env.sh` has to run after
+  changing it; both platforms print a warning while the override is set, and
+  it must be cleared before archiving a store build.
 - Current offering: required
 - Purchase packages: the web app passes the exact RevenueCat identifiers `$rc_monthly` or `$rc_annual`. Native rejects an unknown identifier instead of silently purchasing a different package. The first package is used only for legacy callers that omit the identifier entirely.
 - Subscription source of truth: RevenueCat `CustomerInfo`

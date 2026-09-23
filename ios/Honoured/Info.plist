@@ -38,6 +38,8 @@
 	<string>Record a private Voice of Change reflection.</string>
 	<key>RevenueCatAPIKey</key>
 	<string>$(REVENUECAT_IOS_API_KEY)</string>
+	<key>RevenueCatEntitlementID</key>
+	<string>$(REVENUECAT_ENTITLEMENT_ID)</string>
 	<key>SupabaseAnonKey</key>
 	<string>$(SUPABASE_ANON_KEY)</string>
 	<key>SupabaseURL</key>

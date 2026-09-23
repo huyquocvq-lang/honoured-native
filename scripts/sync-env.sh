@@ -29,6 +29,7 @@ escape_slashes() {
 
 WEB_APP_URL="$(read_env HONOURED_WEB_APP_URL)"
 IOS_API_KEY="$(read_env REVENUECAT_IOS_API_KEY)"
+ENTITLEMENT_ID="$(read_env REVENUECAT_ENTITLEMENT_ID)"
 BUNDLE_ID="$(read_env IOS_BUNDLE_ID)"
 TEAM_ID="$(read_env IOS_DEVELOPMENT_TEAM)"
 SUPABASE_URL="$(read_env SUPABASE_URL)"
@@ -47,6 +48,7 @@ HONOURED_URL_SLASH = /
 
 HONOURED_WEB_APP_URL = $(escape_slashes "$WEB_APP_URL")
 REVENUECAT_IOS_API_KEY = $IOS_API_KEY
+REVENUECAT_ENTITLEMENT_ID = $ENTITLEMENT_ID
 HONOURED_BUNDLE_ID = $BUNDLE_ID
 DEVELOPMENT_TEAM = $TEAM_ID
 SUPABASE_URL = $(escape_slashes "$SUPABASE_URL")
@@ -54,3 +56,8 @@ SUPABASE_ANON_KEY = $SUPABASE_ANON_KEY
 EOF
 
 echo "wrote $OUT"
+
+if [ -n "$ENTITLEMENT_ID" ]; then
+  echo "warning: REVENUECAT_ENTITLEMENT_ID=$ENTITLEMENT_ID — this build checks a non-production entitlement." >&2
+  echo "warning: clear it in .env and re-run this script before archiving for the store." >&2
+fi

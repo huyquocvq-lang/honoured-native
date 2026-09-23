@@ -22,6 +22,13 @@ fun env(name: String): String =
 
 val revenueCatApiKey = env("REVENUECAT_ANDROID_API_KEY")
 val honouredWebAppUrl = env("HONOURED_WEB_APP_URL")
+val revenueCatEntitlementId = env("REVENUECAT_ENTITLEMENT_ID")
+if (revenueCatEntitlementId.isNotEmpty()) {
+    logger.lifecycle(
+        "warning: REVENUECAT_ENTITLEMENT_ID=$revenueCatEntitlementId — this build checks a " +
+            "non-production entitlement. Clear it before building a release for the store.",
+    )
+}
 
 android {
     namespace = "com.honoured.app"
@@ -35,6 +42,7 @@ android {
         versionName = "1.0.0"
         buildConfigField("String", "REVENUECAT_ANDROID_API_KEY", "\"$revenueCatApiKey\"")
         buildConfigField("String", "HONOURED_WEB_APP_URL", "\"$honouredWebAppUrl\"")
+        buildConfigField("String", "REVENUECAT_ENTITLEMENT_ID", "\"$revenueCatEntitlementId\"")
     }
 
     buildFeatures {

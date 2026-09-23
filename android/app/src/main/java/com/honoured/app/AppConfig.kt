@@ -4,7 +4,16 @@ import android.net.Uri
 
 object AppConfig {
     const val BRIDGE_VERSION = 1
-    const val REVENUECAT_ENTITLEMENT_ID = "honoured_plus"
+
+    /**
+     * The RevenueCat entitlement the shell checks. Production is
+     * `honoured_plus`; a developer build can point at its own entitlement with
+     * REVENUECAT_ENTITLEMENT_ID in `.env` or `android/local.properties`, so
+     * testing against a personal RevenueCat project never edits tracked
+     * source. An unset value keeps the production identifier.
+     */
+    val REVENUECAT_ENTITLEMENT_ID: String
+        get() = BuildConfig.REVENUECAT_ENTITLEMENT_ID.trim().ifEmpty { "honoured_plus" }
 
     val WEB_APP_URL: String
         get() = BuildConfig.HONOURED_WEB_APP_URL.trim().also {
