@@ -73,9 +73,14 @@ actor TestamentTimer {
     func reconcile() async {
         guard let timer = current() else { return }
         if timer.endsAt <= Date() {
-            // Without permission no banner was ever shown, so the web app still
-            // owes the user an in-app completion.
-            let notified = await NotificationCoordinator.shared.isAuthorized()
+            // Only a banner still sitting in Notification Center proves one was
+            // shown. Permission alone does not: a Focus mode or a denial made
+            // mid-timer leaves nothing on screen, and the web app would then
+            // skip the in-app completion the person is still owed. A tapped
+            // banner is settled by `notificationTapped` before this runs.
+            let notified = await NotificationCoordinator.shared.wasDelivered(
+                identifier: timer.notificationIdentifier
+            )
             complete(timer, notified: notified)
         } else {
             armDeadline(for: timer)
@@ -106,6 +111,21 @@ actor TestamentTimer {
         guard let timer = current(), timer.activityId == activityId,
               timer.endsAt <= Date().addingTimeInterval(1) else { return }
         complete(timer, notified: false)
+    }
+
+    /// The person tapped the timer's notification, so they have seen it: the
+    /// web app owes them navigation, not a second celebration.
+    func notificationTapped(activityId: String) async {
+        guard let timer = current() else { return }
+        guard timer.activityId == activityId else {
+            await reconcile()
+            return
+        }
+        if timer.endsAt <= Date() {
+            complete(timer, notified: true)
+        } else {
+            armDeadline(for: timer)
+        }
     }
 
     // MARK: - Completion

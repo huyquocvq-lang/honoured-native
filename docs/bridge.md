@@ -221,7 +221,7 @@ Timers must survive backgrounding, so native owns the countdown and the completi
 
 | Native → Web (broadcast) | When |
 |---|---|
-| `TIMER_COMPLETED { activityId, completedAt, notified }` | The countdown reached `endsAt`. `notified` is `true` if a local notification was posted because the app was not active. |
+| `TIMER_COMPLETED { activityId, completedAt, notified }` | The countdown reached `endsAt`. `notified` is `true` only when the banner was actually delivered or tapped, so `false` always means the web app still owes an in-app completion. |
 
 Rules:
 
@@ -230,7 +230,8 @@ Rules:
 - `CANCEL_TIMER` is idempotent: with no timer running it still replies `TIMER_CANCELLED`. If a *different* activity's timer is running it replies `ERROR { code: "timer_not_active" }` and leaves that timer alone.
 - `endsAt` is ISO 8601. The web app must derive its display from it rather than from its own `setInterval`, which stops when the app is backgrounded.
 - Web calls `GET_TIMER_STATE` after every `NATIVE_READY` so a reload mid-timer picks the countdown back up. The timer is persisted natively, so it also survives an app relaunch; a timer that expired while the app was not running completes on the next launch and `TIMER_COMPLETED` is delivered from the durable event queue before `TIMER_STATE { active: false }`.
-- Native schedules a local notification at `endsAt` with identifier `timer-<activityId>`. When the app returns to the foreground before `endsAt`, the notification stays scheduled. When the app is active at `endsAt`, native cancels the notification and emits `TIMER_COMPLETED { notified: false }` so the web app runs the in-app celebration instead. `notified: true` means the app was not in the foreground at `endsAt` and notifications are authorized, so the system showed the banner; if permission was denied it is `false` and the web app should still celebrate in-app.
+- Native schedules a local notification at `endsAt` with identifier `timer-<activityId>`. When the app returns to the foreground before `endsAt`, the notification stays scheduled. When the app is active at `endsAt`, native cancels the notification and emits `TIMER_COMPLETED { notified: false }` so the web app runs the in-app celebration instead.
+- `notified: true` means the banner really reached the person: either they tapped it, or it is still sitting in Notification Center when the app next reconciles. Authorisation alone is not enough — a Focus mode or a permission withdrawn mid-timer leaves nothing on screen — so a granted permission with no delivered banner still reports `notified: false` and the web app must celebrate in-app.
 - The first `START_TIMER` ever triggers the notification permission prompt (after the reply). While that prompt — or any other system alert — is up the app counts as inactive, so a timer expiring underneath it completes on dismissal rather than in-app.
 
 ---
@@ -241,6 +242,8 @@ Rules:
 |---|---|
 | `ACTIVITY_COMPLETED { activityId, source }` | `ACTIVITY_COMPLETION_ACCEPTED` |
 | `SET_SOUND_ENABLED { enabled }` | `SOUND_STATE { enabled }` |
+| `GET_NOTIFICATION_STATUS` | `NOTIFICATION_STATUS { authorized, undetermined }` |
+| `OPEN_NOTIFICATION_SETTINGS` | `NOTIFICATION_STATUS { authorized, undetermined, opened }` |
 
 - `source` is `"timer"`, `"healthkit"` or `"manual"`. Web sends this whenever a contract is marked honoured from its side, so native can mark `(activityId, today)` as celebrated and skip its own background notification for it. In M3 this is also what drives the Live Activity blink.
 - `enabled` mirrors the "Completion sound" setting, default `false`. It decides whether the timer and goal notifications carry the gong sound. The in-app gong is played by the web app; native only sets the audio session to `.ambient` so the hardware silent switch is respected.
@@ -254,6 +257,10 @@ Rules:
 | `NOTIFICATION_OPENED { kind, activityId }` | The user tapped a notification. `kind` is `"timer"` or `"goal"`. Queued on cold start and delivered after `NATIVE_READY`. The web app navigates to that activity. |
 
 Native asks for notification permission the first time `START_TIMER` or `SET_GOALS` with a non-empty list arrives, not at launch. The request is made after the reply to that message has gone out, so the web app's request timeout is not affected by how long the user looks at the sheet. Native never re-prompts: once the user has decided, a later denial can only be changed in Settings → Notifications.
+
+`GET_NOTIFICATION_STATUS` and `OPEN_NOTIFICATION_SETTINGS` exist so a declined permission is not a dead end. `authorized` says whether banners can be shown; `undetermined` says the person has not been asked yet, so the next timer or goal list will prompt. Both `false` means they declined: the only way back is `OPEN_NOTIFICATION_SETTINGS`, which opens this app's page in iOS Settings and replies with `opened: false` if the system refused to open it. The reply carries the status read before leaving the app, so the web app should ask again on the next `NATIVE_READY` rather than assume the person changed the switch. Nothing here reveals more than iOS allows, and neither message prompts.
+
+Both are iOS-only, like the Testament Timer and goal notifications; the Android shell implements neither and replies `ERROR { code: "not_implemented" }`.
 
 Notifications that fire while the app is in the foreground are not shown. The owning feature emits its bridge event (`TIMER_COMPLETED` / `GOAL_REACHED` with `notified: false`) and the web app runs the in-app celebration.
 
@@ -293,6 +300,6 @@ Native remembers the Apple user identifier after a successful authorization so i
 
 ## Message index
 
-Web → Native: `APP_READY` `GET_PLATFORM_INFO` `IDENTIFY_USER` `LOGOUT_USER` `CHECK_ACCESS` `START_PURCHASE` `RESTORE_PURCHASES` `START_SESSION` `SET_AUTH_SESSION` `CLEAR_AUTH_SESSION` `REQUEST_HEALTH_PERMISSION` `GET_HEALTH_STATUS` `QUERY_HEALTH_METRICS` `SET_GOALS` `SET_DAY_RESET_HOUR` `START_TIMER` `CANCEL_TIMER` `GET_TIMER_STATE` `ACTIVITY_COMPLETED` `SET_SOUND_ENABLED` `SIGN_IN_WITH_APPLE`
+Web → Native: `APP_READY` `GET_PLATFORM_INFO` `IDENTIFY_USER` `LOGOUT_USER` `CHECK_ACCESS` `START_PURCHASE` `RESTORE_PURCHASES` `START_SESSION` `SET_AUTH_SESSION` `CLEAR_AUTH_SESSION` `REQUEST_HEALTH_PERMISSION` `GET_HEALTH_STATUS` `QUERY_HEALTH_METRICS` `SET_GOALS` `SET_DAY_RESET_HOUR` `START_TIMER` `CANCEL_TIMER` `GET_TIMER_STATE` `ACTIVITY_COMPLETED` `SET_SOUND_ENABLED` `GET_NOTIFICATION_STATUS` `OPEN_NOTIFICATION_SETTINGS` `SIGN_IN_WITH_APPLE`
 
-Native → Web: `NATIVE_READY` `PLATFORM_INFO` `ERROR` `IDENTIFY_SUCCESS` `IDENTIFY_FAILED` `LOGOUT_SUCCESS` `LOGOUT_FAILED` `ACCESS_STATUS` `PURCHASE_SUCCESS` `PURCHASE_CANCELLED` `PURCHASE_FAILED` `RESTORE_SUCCESS` `RESTORE_FAILED` `AUTH_SESSION_ACCEPTED` `AUTH_SESSION_CLEARED` `AUTH_SESSION_UPDATED` `AUTH_SESSION_INVALID` `HEALTH_PERMISSION_STATUS` `HEALTH_METRICS` `GOALS_ACCEPTED` `DAY_RESET_HOUR_ACCEPTED` `GOAL_REACHED` `HEALTH_DATA_UPDATED` `TIMER_STARTED` `TIMER_CANCELLED` `TIMER_STATE` `TIMER_COMPLETED` `ACTIVITY_COMPLETION_ACCEPTED` `SOUND_STATE` `NOTIFICATION_OPENED` `APPLE_SIGN_IN_SUCCESS` `APPLE_SIGN_IN_FAILED` `APPLE_CREDENTIAL_REVOKED`
+Native → Web: `NATIVE_READY` `PLATFORM_INFO` `ERROR` `IDENTIFY_SUCCESS` `IDENTIFY_FAILED` `LOGOUT_SUCCESS` `LOGOUT_FAILED` `ACCESS_STATUS` `PURCHASE_SUCCESS` `PURCHASE_CANCELLED` `PURCHASE_FAILED` `RESTORE_SUCCESS` `RESTORE_FAILED` `AUTH_SESSION_ACCEPTED` `AUTH_SESSION_CLEARED` `AUTH_SESSION_UPDATED` `AUTH_SESSION_INVALID` `HEALTH_PERMISSION_STATUS` `HEALTH_METRICS` `GOALS_ACCEPTED` `DAY_RESET_HOUR_ACCEPTED` `GOAL_REACHED` `HEALTH_DATA_UPDATED` `TIMER_STARTED` `TIMER_CANCELLED` `TIMER_STATE` `TIMER_COMPLETED` `ACTIVITY_COMPLETION_ACCEPTED` `SOUND_STATE` `NOTIFICATION_STATUS` `NOTIFICATION_OPENED` `APPLE_SIGN_IN_SUCCESS` `APPLE_SIGN_IN_FAILED` `APPLE_CREDENTIAL_REVOKED`

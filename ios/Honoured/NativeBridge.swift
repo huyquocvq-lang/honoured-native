@@ -53,6 +53,7 @@ final class NativeBridge: NSObject, WKScriptMessageHandler {
         "SET_GOALS", "SET_DAY_RESET_HOUR",
         "START_TIMER", "CANCEL_TIMER", "GET_TIMER_STATE",
         "ACTIVITY_COMPLETED", "SET_SOUND_ENABLED",
+        "GET_NOTIFICATION_STATUS", "OPEN_NOTIFICATION_SETTINGS",
         "SIGN_IN_WITH_APPLE",
     ]
 
@@ -450,6 +451,20 @@ final class NativeBridge: NSObject, WKScriptMessageHandler {
                 } else {
                     reply("TIMER_STATE", ["active": false])
                 }
+            }
+        case "GET_NOTIFICATION_STATUS":
+            Task {
+                reply("NOTIFICATION_STATUS", await NotificationCoordinator.shared.statusPayload())
+            }
+        case "OPEN_NOTIFICATION_SETTINGS":
+            // iOS asks for notification permission once. Once declined, the
+            // only way back is the system Settings page, so the web app needs
+            // to be able to send the person there.
+            Task { @MainActor in
+                let opened = NotificationCoordinator.shared.openSystemSettings()
+                var payload = await NotificationCoordinator.shared.statusPayload()
+                payload["opened"] = opened
+                reply("NOTIFICATION_STATUS", payload)
             }
         default:
             reply("ERROR", [

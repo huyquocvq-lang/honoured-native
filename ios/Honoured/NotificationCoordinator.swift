@@ -1,4 +1,5 @@
 import Foundation
+import UIKit
 import UserNotifications
 
 /// Owns local-notification permission, scheduling and the delegate that turns a
@@ -66,6 +67,39 @@ final class NotificationCoordinator: NSObject, UNUserNotificationCenterDelegate 
 
     func isUndetermined() async -> Bool {
         await center.notificationSettings().authorizationStatus == .notDetermined
+    }
+
+    /// Whether this notification is actually sitting in Notification Center.
+    /// Permission is not proof of delivery: a Focus mode, a permission revoked
+    /// mid-timer and a request cancelled before its trigger all leave nothing
+    /// on screen.
+    func wasDelivered(identifier: String) async -> Bool {
+        await withCheckedContinuation { continuation in
+            center.getDeliveredNotifications { delivered in
+                continuation.resume(returning: delivered.contains { $0.request.identifier == identifier })
+            }
+        }
+    }
+
+    /// The permission state the web app is allowed to act on: whether banners
+    /// can be shown at all, and whether the person has been asked yet. Both
+    /// false means they declined, and only Settings can change that.
+    func statusPayload() async -> [String: Any] {
+        let status = await center.notificationSettings().authorizationStatus
+        return [
+            "authorized": status == .authorized || status == .provisional || status == .ephemeral,
+            "undetermined": status == .notDetermined
+        ]
+    }
+
+    /// Opens this app's page in iOS Settings — the only place a declined
+    /// notification permission can be turned back on, because iOS asks once.
+    @MainActor
+    func openSystemSettings() -> Bool {
+        guard let url = URL(string: UIApplication.openSettingsURLString),
+              UIApplication.shared.canOpenURL(url) else { return false }
+        UIApplication.shared.open(url)
+        return true
     }
 
     // MARK: - Scheduling
@@ -142,7 +176,9 @@ final class NotificationCoordinator: NSObject, UNUserNotificationCenterDelegate 
             // Settle the owning feature first so its completion event is stored
             // ahead of the navigation event.
             if kind == .timer {
-                await TestamentTimer.shared.reconcile()
+                // A tapped banner was seen, so the timer is settled as notified
+                // here; `reconcile()` would have to infer it.
+                await TestamentTimer.shared.notificationTapped(activityId: activityId)
             }
             NativeBridgeEvents.postDurable(type: "NOTIFICATION_OPENED", payload: [
                 "kind": kind.rawValue,
