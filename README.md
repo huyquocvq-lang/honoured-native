@@ -63,11 +63,25 @@ honoured-native/
 ├── scripts/
 │   └── sync-env.sh
 ├── ios/
-│   ├── project.yml
+│   ├── project.yml          # XcodeGen spec; Honoured.xcodeproj is generated
 │   ├── Honoured.storekit
-│   └── Honoured/
+│   └── Honoured/            # app target, one folder per feature
+│       ├── App/             # entry point, app delegate, AppConfig
+│       ├── WebView/         # root view, WKWebView host, load state, WebKit tweaks
+│       ├── Bridge/          # NativeBridge message handling, durable event store
+│       ├── Auth/            # Keychain session store, Sign in with Apple
+│       ├── Billing/         # RevenueCat
+│       ├── Health/          # HealthKit reads, upload queue, background sync, goals
+│       ├── Timer/           # Testament Timer
+│       ├── Notifications/   # local notifications, completion sound
+│       ├── Debug/           # BridgeStub test page (Debug builds only)
+│       └── Info.plist, Honoured.entitlements, PrivacyInfo.xcprivacy, Assets.xcassets
 ├── android/
-│   └── app/
+│   └── app/src/main/java/com/honoured/app/
+│       ├── MainActivity.kt  # WebView shell
+│       ├── AppConfig.kt
+│       ├── bridge/          # NativeBridge message handling
+│       └── billing/         # RevenueCat
 └── docs/
     ├── bridge.md
     └── billing.md

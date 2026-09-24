@@ -1,7 +1,9 @@
-package com.honoured.app
+package com.honoured.app.billing
 
 import android.app.Activity
 import android.content.Context
+import com.honoured.app.AppConfig
+import com.honoured.app.BuildConfig
 import com.revenuecat.purchases.CustomerInfo
 import com.revenuecat.purchases.LogLevel
 import com.revenuecat.purchases.PurchaseParams

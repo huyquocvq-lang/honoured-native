@@ -1,8 +1,11 @@
-package com.honoured.app
+package com.honoured.app.bridge
 
 import android.app.Activity
 import android.webkit.JavascriptInterface
 import android.webkit.WebView
+import com.honoured.app.AppConfig
+import com.honoured.app.billing.PurchaseOutcome
+import com.honoured.app.billing.SubscriptionService
 import org.json.JSONObject
 
 class NativeBridge(

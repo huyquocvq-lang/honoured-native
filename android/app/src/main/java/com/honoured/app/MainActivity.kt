@@ -25,6 +25,8 @@ import androidx.activity.OnBackPressedCallback
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.core.content.ContextCompat
 import androidx.appcompat.app.AppCompatActivity
+import com.honoured.app.billing.SubscriptionService
+import com.honoured.app.bridge.NativeBridge
 
 class MainActivity : AppCompatActivity() {
     private lateinit var webView: WebView
