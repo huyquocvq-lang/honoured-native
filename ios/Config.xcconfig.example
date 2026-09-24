@@ -24,3 +24,9 @@ DEVELOPMENT_TEAM =
 // slash escaping as the web app URL above.
 SUPABASE_URL =
 SUPABASE_ANON_KEY =
+
+// Google Sign-In public client IDs (see .env.example). The reversed iOS client
+// ID is the callback URL scheme; sync-env.sh derives it.
+GOOGLE_WEB_CLIENT_ID =
+GOOGLE_IOS_CLIENT_ID =
+GOOGLE_IOS_REVERSED_CLIENT_ID =

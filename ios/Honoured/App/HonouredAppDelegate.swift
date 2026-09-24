@@ -19,6 +19,10 @@ final class HonouredAppDelegate: NSObject, UIApplicationDelegate {
         NotificationSound.configureAudioSession()
         AppleSignInCoordinator.shared.observeRevocation()
         AppleSignInCoordinator.shared.checkCredentialStateIfNeeded()
+        // Queued before the timer reconcile below, so cards are matched to the
+        // signed-in account before a finished timer is reported to them. It
+        // only ends or adopts cards; a background launch never creates one.
+        LiveActivityCoordinator.shared.applicationDidFinishLaunching()
         observeLifecycle()
 
         Task {
@@ -41,6 +45,7 @@ final class HonouredAppDelegate: NSObject, UIApplicationDelegate {
             center.addObserver(
                 forName: UIApplication.didBecomeActiveNotification, object: nil, queue: .main
             ) { _ in
+                LiveActivityCoordinator.shared.applicationDidBecomeActive()
                 Task {
                     await TestamentTimer.shared.reconcile()
                     await HealthBackgroundDeliveryCoordinator.shared.retryPendingCollection()
@@ -49,7 +54,20 @@ final class HonouredAppDelegate: NSObject, UIApplicationDelegate {
             center.addObserver(
                 forName: UIApplication.protectedDataDidBecomeAvailableNotification, object: nil, queue: .main
             ) { _ in
+                LiveActivityCoordinator.shared.protectedDataDidBecomeAvailable()
                 Task { await HealthBackgroundDeliveryCoordinator.shared.retryPendingCollection() }
+            },
+            // Midnight, a time-zone or DST change, or a manual clock change can
+            // move the health day under a card.
+            center.addObserver(
+                forName: UIApplication.significantTimeChangeNotification, object: nil, queue: .main
+            ) { _ in
+                LiveActivityCoordinator.shared.dayMayHaveChanged()
+            },
+            center.addObserver(
+                forName: .NSSystemTimeZoneDidChange, object: nil, queue: .main
+            ) { _ in
+                LiveActivityCoordinator.shared.dayMayHaveChanged()
             },
             center.addObserver(
                 forName: UIApplication.didEnterBackgroundNotification, object: nil, queue: .main

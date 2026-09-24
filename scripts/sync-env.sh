@@ -34,6 +34,16 @@ BUNDLE_ID="$(read_env IOS_BUNDLE_ID)"
 TEAM_ID="$(read_env IOS_DEVELOPMENT_TEAM)"
 SUPABASE_URL="$(read_env SUPABASE_URL)"
 SUPABASE_ANON_KEY="$(read_env SUPABASE_ANON_KEY)"
+GOOGLE_WEB_CLIENT_ID="$(read_env GOOGLE_WEB_CLIENT_ID)"
+GOOGLE_IOS_CLIENT_ID="$(read_env GOOGLE_IOS_CLIENT_ID)"
+# The callback URL scheme is the iOS client ID reversed. Derived here so the
+# two can never disagree; an unset client ID leaves Google Sign-In off.
+GOOGLE_IOS_REVERSED_CLIENT_ID=""
+case "$GOOGLE_IOS_CLIENT_ID" in
+  *.apps.googleusercontent.com)
+    GOOGLE_IOS_REVERSED_CLIENT_ID="com.googleusercontent.apps.${GOOGLE_IOS_CLIENT_ID%.apps.googleusercontent.com}"
+    ;;
+esac
 
 if [ -z "$WEB_APP_URL" ]; then
   echo "error: HONOURED_WEB_APP_URL is empty in $ENV_FILE" >&2
@@ -53,6 +63,9 @@ HONOURED_BUNDLE_ID = $BUNDLE_ID
 DEVELOPMENT_TEAM = $TEAM_ID
 SUPABASE_URL = $(escape_slashes "$SUPABASE_URL")
 SUPABASE_ANON_KEY = $SUPABASE_ANON_KEY
+GOOGLE_WEB_CLIENT_ID = $GOOGLE_WEB_CLIENT_ID
+GOOGLE_IOS_CLIENT_ID = $GOOGLE_IOS_CLIENT_ID
+GOOGLE_IOS_REVERSED_CLIENT_ID = $GOOGLE_IOS_REVERSED_CLIENT_ID
 EOF
 
 echo "wrote $OUT"

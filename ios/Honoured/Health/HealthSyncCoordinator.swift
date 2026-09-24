@@ -67,12 +67,17 @@ actor HealthSyncCoordinator {
 
         if outcome.completedLocalProcessing {
             HealthBackgroundPendingState.clear()
-        }
-        // New samples are the only thing that can push a total past its goal.
-        // This runs before any HealthKit completion handler is acknowledged, so
-        // a background wake is not suspended before the check.
-        if case .queued = outcome {
-            await GoalMonitor.shared.evaluate()
+            // Every tracked contract's card gets the local totals now, whether or
+            // not the upload that follows succeeds. The reads and the card update
+            // requests happen before any HealthKit completion handler is
+            // acknowledged; ActivityKit applies the updates asynchronously, so a
+            // background wake can still be suspended before they land.
+            let prefetched = await LiveActivityCoordinator.shared.refreshHealthProgress()
+            // New samples are the only thing that can push a total past its goal.
+            // The same reads are reused, so the card and GOAL_REACHED agree.
+            if case .queued = outcome {
+                await GoalMonitor.shared.evaluate(prefetched: prefetched)
+            }
         }
 
         let waiters = collectionWaiters
@@ -257,7 +262,10 @@ actor HealthSyncCoordinator {
                 return await retryableAttempt(for: batch)
             }
 
-            if let refreshedSession {
+            // Only announce tokens that are still the stored session: a sign-out
+            // or account switch during the upload must not receive them.
+            if let refreshedSession,
+               await AuthSessionStore.shared.load()?.refreshToken == refreshedSession.refreshToken {
                 NativeBridgeEvents.post(type: "AUTH_SESSION_UPDATED", payload: [
                     "userId": refreshedSession.userId,
                     "accessToken": refreshedSession.accessToken,

@@ -43,6 +43,30 @@ actor AuthSessionStore {
         return try? JSONDecoder().decode(NativeAuthSession.self, from: data)
     }
 
+    /// Who native is signed in as, telling "no session" apart from "cannot read
+    /// the Keychain yet" (before the first unlock), which `load()` does not.
+    /// Live Activity restore must not treat a locked Keychain as a sign-out.
+    func accountState() -> NativeAccountState {
+        let query: [String: Any] = [
+            kSecClass as String: kSecClassGenericPassword,
+            kSecAttrService as String: service,
+            kSecAttrAccount as String: account,
+            kSecReturnData as String: true,
+            kSecMatchLimit as String: kSecMatchLimitOne,
+        ]
+        var result: CFTypeRef?
+        switch SecItemCopyMatching(query as CFDictionary, &result) {
+        case errSecSuccess:
+            guard let data = result as? Data,
+                  let session = try? JSONDecoder().decode(NativeAuthSession.self, from: data) else { return .signedOut }
+            return .signedIn(session.userId)
+        case errSecItemNotFound:
+            return .signedOut
+        default:
+            return .unavailable
+        }
+    }
+
     func clear() throws {
         let status = SecItemDelete([
             kSecClass as String: kSecClassGenericPassword,
@@ -95,6 +119,12 @@ actor AuthSessionStore {
             refreshToken: refreshed.refreshToken,
             expiresAt: expiresAt
         )
+        // The network call suspended this actor: the web app may have signed
+        // out, switched account or saved a newer session meanwhile. Only the
+        // session this refresh started from may be replaced.
+        guard let stored = load(), stored.userId == current.userId, stored.refreshToken == current.refreshToken else {
+            throw SessionRefreshError.superseded
+        }
         try save(session)
         return session
     }
@@ -122,13 +152,14 @@ actor AuthSessionStore {
     }
 
     enum SessionRefreshError: LocalizedError {
-        case notConfigured, invalidResponse, invalidSession, http(Int)
+        case notConfigured, invalidResponse, invalidSession, superseded, http(Int)
 
         var errorDescription: String? {
             switch self {
             case .notConfigured: return "Supabase native sync is not configured"
             case .invalidResponse: return "Supabase returned an invalid auth response"
             case .invalidSession: return "The Supabase session is no longer valid"
+            case .superseded: return "The Supabase session changed while it was being refreshed"
             case .http(let code): return "Supabase auth refresh failed with HTTP \(code)"
             }
         }

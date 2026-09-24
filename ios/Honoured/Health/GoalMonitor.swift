@@ -17,7 +17,10 @@ actor GoalMonitor {
 
     // MARK: - Evaluation
 
-    func evaluate() async {
+    /// - Parameter prefetched: totals the Live Activity refresh just read for
+    ///   today's window. They are reused only for the same health-day start, so
+    ///   a read that straddled the reset never counts toward the new day.
+    func evaluate(prefetched: HealthPrefetch? = nil) async {
         let goals = await HealthSyncSettings.shared.currentGoals()
         guard !goals.isEmpty, HealthKitService.shared.isAvailable else { return }
 
@@ -25,10 +28,16 @@ actor GoalMonitor {
         let dayStart = await HealthSyncSettings.shared.healthDayStart(containing: now)
         let day = HealthSyncSettings.dayString(dayStart)
         var markers = prunedMarkers(keeping: day)
+        let reusable = prefetched?.dayStart == dayStart ? prefetched?.totals ?? [:] : [:]
 
         for goal in goals where !markers.contains(Self.marker(goal.activityId, day)) {
-            guard let value = await HealthKitService.shared.total(for: goal.metric, from: dayStart, to: now),
-                  value >= goal.target else { continue }
+            let total: Double?
+            if let read = reusable[goal.metric] {
+                total = read.numericValue
+            } else {
+                total = await HealthKitService.shared.total(for: goal.metric, from: dayStart, to: now)
+            }
+            guard let value = total, value >= goal.target else { continue }
 
             // Persist the marker before announcing so a crash in between can only
             // lose an event, never repeat a notification.
@@ -67,14 +76,19 @@ actor GoalMonitor {
     /// manual completions name the contract id while goals are addressed per
     /// slot (`<id>:primary`), so every current goal under that contract is
     /// marked as well.
-    func markCelebrated(activityId: String) async {
+    ///
+    /// - Parameter day: the health day the completion belongs to, when the web
+    ///   app names it. A completion that arrives after the reset then marks
+    ///   its own day and cannot silence today's goal. Nil means today.
+    func markCelebrated(activityId: String, day: String? = nil) async {
         let dayStart = await HealthSyncSettings.shared.healthDayStart(containing: Date())
-        let day = HealthSyncSettings.dayString(dayStart)
-        var markers = prunedMarkers(keeping: day)
-        markers.insert(Self.marker(activityId, day))
+        let today = HealthSyncSettings.dayString(dayStart)
+        let markerDay = day ?? today
+        var markers = prunedMarkers(keeping: today)
+        markers.insert(Self.marker(activityId, markerDay))
         let slotPrefix = activityId + ":"
         for goal in await HealthSyncSettings.shared.currentGoals() where goal.activityId.hasPrefix(slotPrefix) {
-            markers.insert(Self.marker(goal.activityId, day))
+            markers.insert(Self.marker(goal.activityId, markerDay))
         }
         save(markers)
     }

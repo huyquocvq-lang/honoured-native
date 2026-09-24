@@ -67,10 +67,19 @@ actor HealthKitService {
 
     /// Source-deduplicated total (or average, for heart rate) over the range, the
     /// way the Health app reports it. Raw samples from an iPhone and a Watch
-    /// overlap, so summing them by hand would double count.
+    /// overlap, so summing them by hand would double count. Nil when there is
+    /// no data or the read failed; `readTotal` tells those apart.
     func total(for metric: HealthMetric, from: Date, to: Date) async -> Double? {
+        await readTotal(for: metric, from: from, to: to).numericValue
+    }
+
+    /// Same numbers as `total`, keeping "nothing recorded" apart from "could not
+    /// read" (a locked device before the data is decrypted, a failed query), so
+    /// a Live Activity can keep its last reading instead of showing zero. A
+    /// declined read permission looks exactly like no data, as iOS intends.
+    func readTotal(for metric: HealthMetric, from: Date, to: Date) async -> HealthTotalRead {
         #if DEBUG
-        if let fake = BridgeStub.fakeHealthTotal(for: metric) { return fake }
+        if let fake = BridgeStub.fakeHealthRead(for: metric) { return fake }
         #endif
         guard let unit = metric.quantityUnit, let type = metric.objectType as? HKQuantityType else {
             return await sleepMinutes(from: from, to: to)
@@ -82,27 +91,50 @@ actor HealthKitService {
             predicate: .quantitySample(type: type, predicate: range),
             options: options
         )
-        guard let statistics = try? await descriptor.result(for: store) else { return nil }
-        let quantity = metric.aggregation == .average ? statistics.averageQuantity() : statistics.sumQuantity()
-        return quantity?.doubleValue(for: unit)
+        do {
+            guard let statistics = try await descriptor.result(for: store) else { return .noData }
+            let quantity = metric.aggregation == .average ? statistics.averageQuantity() : statistics.sumQuantity()
+            guard let quantity else { return .noData }
+            return .value(quantity.doubleValue(for: unit))
+        } catch {
+            return Self.readFailure(error)
+        }
+    }
+
+    private static func readFailure(_ error: Error) -> HealthTotalRead {
+        let nsError = error as NSError
+        guard nsError.domain == HKErrorDomain else { return .failed }
+        switch HKError.Code(rawValue: nsError.code) {
+        case .errorNoData?, .errorAuthorizationDenied?, .errorAuthorizationNotDetermined?:
+            return .noData
+        case .errorDatabaseInaccessible?:
+            return .protectedDataUnavailable
+        default:
+            return .failed
+        }
     }
 
     /// Minutes asleep for sleep segments ending in the range. Overlapping segments
     /// are merged so multiple sources and sleep-stage records cannot double count a
     /// minute. A night is credited to the day it ended on when the range is a day.
-    private func sleepMinutes(from: Date, to: Date) async -> Double? {
+    private func sleepMinutes(from: Date, to: Date) async -> HealthTotalRead {
         let range = HKQuery.predicateForSamples(withStart: from, end: to)
         let descriptor = HKSampleQueryDescriptor(
             predicates: [.categorySample(type: HKCategoryType(.sleepAnalysis), predicate: range)],
             sortDescriptors: []
         )
-        guard let samples = try? await descriptor.result(for: store) else { return nil }
+        let samples: [HKCategorySample]
+        do {
+            samples = try await descriptor.result(for: store)
+        } catch {
+            return Self.readFailure(error)
+        }
 
         let intervals = samples
             .filter { Self.isAsleep($0) && $0.endDate > from && $0.endDate <= to }
             .map { ($0.startDate, $0.endDate) }
             .sorted { $0.0 < $1.0 }
-        guard var current = intervals.first else { return nil }
+        guard var current = intervals.first else { return .noData }
 
         var seconds: TimeInterval = 0
         for interval in intervals.dropFirst() {
@@ -114,7 +146,7 @@ actor HealthKitService {
             }
         }
         seconds += current.1.timeIntervalSince(current.0)
-        return seconds / 60
+        return .value(seconds / 60)
     }
 
     private static func isAsleep(_ sample: HKCategorySample) -> Bool {

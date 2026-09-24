@@ -33,28 +33,19 @@ actor HealthSyncSettings {
     }
 
     /// Start of the health day containing `date`: local midnight shifted by the
-    /// user's reset hour. Shared by daily totals and goal detection so
-    /// `health_daily.day` and "reached today" always mean the same window.
+    /// user's reset hour. Shared by daily totals, goal detection and Live
+    /// Activities (through `HealthDayMath`) so `health_daily.day`, "reached
+    /// today" and a card's day always mean the same window.
     func healthDayStart(containing date: Date) -> Date {
-        let calendar = Calendar.current
-        let midnight = calendar.startOfDay(for: date)
-        let todayBoundary = calendar.date(byAdding: .hour, value: dayResetHour(), to: midnight) ?? midnight
-        if date >= todayBoundary { return todayBoundary }
-        return calendar.date(byAdding: .day, value: -1, to: todayBoundary) ?? todayBoundary
+        HealthDayMath.dayStart(containing: date, resetHour: dayResetHour(), calendar: .current)
     }
 
     /// `yyyy-MM-dd` of a health-day start, the value stored in `health_daily.day`.
+    /// Uses the current time zone at every call, so a time-zone change is not
+    /// masked by a formatter created before it.
     nonisolated static func dayString(_ dayStart: Date) -> String {
-        dayFormatter.string(from: dayStart)
+        HealthDayMath.dayString(dayStart, calendar: .current)
     }
-
-    private nonisolated static let dayFormatter: DateFormatter = {
-        let formatter = DateFormatter()
-        formatter.calendar = .current
-        formatter.locale = Locale(identifier: "en_US_POSIX")
-        formatter.dateFormat = "yyyy-MM-dd"
-        return formatter
-    }()
 
     func reset() {
         defaults.removeObject(forKey: goalsKey)

@@ -6,8 +6,38 @@ struct ActiveTimer: Codable, Equatable {
     let activityName: String
     let startedAt: Date
     let endsAt: Date
+    /// One per start. Pause and resume start a new run of the same activity,
+    /// so an event about the old run can never touch the new one.
+    let runId: String
 
     var notificationIdentifier: String { "timer-\(activityId)" }
+
+    var runSnapshot: TimerRunSnapshot {
+        TimerRunSnapshot(runId: runId, activityId: activityId, activityName: activityName, startedAt: startedAt, endsAt: endsAt)
+    }
+
+    init(activityId: String, activityName: String, startedAt: Date, endsAt: Date, runId: String = UUID().uuidString) {
+        self.activityId = activityId
+        self.activityName = activityName
+        self.startedAt = startedAt
+        self.endsAt = endsAt
+        self.runId = runId
+    }
+
+    private enum CodingKeys: String, CodingKey {
+        case activityId, activityName, startedAt, endsAt, runId
+    }
+
+    /// A timer persisted before run IDs existed gets a stable one from its start.
+    init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        activityId = try container.decode(String.self, forKey: .activityId)
+        activityName = try container.decode(String.self, forKey: .activityName)
+        startedAt = try container.decode(Date.self, forKey: .startedAt)
+        endsAt = try container.decode(Date.self, forKey: .endsAt)
+        runId = try container.decodeIfPresent(String.self, forKey: .runId)
+            ?? "legacy-\(Int((startedAt.timeIntervalSince1970 * 1000).rounded()))"
+    }
 }
 
 /// One Testament Timer at a time. The countdown is persisted so it survives a
@@ -56,6 +86,7 @@ actor TestamentTimer {
         store(timer)
         await scheduleNotification(for: timer)
         armDeadline(for: timer)
+        LiveActivityCoordinator.shared.timerStarted(timer, replaced: previous)
         return (timer, previous)
     }
 
@@ -63,6 +94,7 @@ actor TestamentTimer {
         guard let running = current() else { return .nothingRunning }
         guard running.activityId == activityId else { return .differentTimerRunning(running) }
         discard(running)
+        LiveActivityCoordinator.shared.timerDiscarded(running)
         return .cancelled
     }
 
@@ -100,6 +132,7 @@ actor TestamentTimer {
     func clear() {
         if let running = current() {
             discard(running)
+            LiveActivityCoordinator.shared.timerDiscarded(running)
         }
     }
 
@@ -159,6 +192,9 @@ actor TestamentTimer {
             "completedAt": Self.iso8601.string(from: timer.endsAt),
             "notified": notified
         ])
+        // Only now has native really processed the finish. A card whose
+        // countdown reached zero while the app was suspended waited for this.
+        LiveActivityCoordinator.shared.timerCompleted(timer)
     }
 
     private func discard(_ timer: ActiveTimer) {

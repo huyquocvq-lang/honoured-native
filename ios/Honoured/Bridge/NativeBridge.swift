@@ -14,6 +14,28 @@ final class NativeBridge: NSObject, WKScriptMessageHandler {
     private var isWebReady = false
     private let pendingLimit = 50
 
+    /// Orders and deduplicates Live Activity mutations for the current page and
+    /// account. Main thread only, like the script message callbacks.
+    let liveActivitySession = LiveActivityBridgeSession()
+
+    /// Google Sign-In ownership for the current page: context, attempt and
+    /// page generation. Main thread only.
+    let googleAuth = GoogleAuthState()
+    var googleTimeouts: [String: DispatchWorkItem] = [:]
+    var signOutGoogleAfterPresentation = false
+
+    /// The user of the last `SET_AUTH_SESSION` on this bridge.
+    private var boundAuthUserId: String?
+
+    /// The exact origin the auth messages must come from. Nil (feature off)
+    /// when the configured web app URL is not HTTPS.
+    let trustedWebOrigin = TrustedWebOrigin(url: AppConfig.webAppURL)
+
+    /// Native session writes (`SET_AUTH_SESSION`, `CLEAR_AUTH_SESSION`) run
+    /// strictly in arrival order, so an older write can never land after a
+    /// newer one and revive a session that was cleared.
+    static let authMutations = SerialAsyncQueue()
+
     override init() {
         super.init()
         NotificationCenter.default.addObserver(
@@ -61,6 +83,37 @@ final class NativeBridge: NSObject, WKScriptMessageHandler {
     /// from now until the next APP_READY is queued instead of dropped.
     func webViewWillReload() {
         isWebReady = false
+        invalidateGoogleDocument()
+    }
+
+    /// The page that owned any Google attempt is going away: its result, and
+    /// any reply still pending for it, must not reach the next document.
+    private func invalidateGoogleDocument() {
+        for item in googleTimeouts.values { item.cancel() }
+        googleTimeouts.removeAll()
+        googleAuth.documentWillChange()
+    }
+
+    /// The new page replaced the old one. Only now do Live Activity mutations
+    /// of the old page stop being accepted: a navigation that fails before
+    /// this point leaves the old page, and its session, in place.
+    func webViewDidCommitNavigation() {
+        liveActivitySession.pageWillLoad()
+        invalidateGoogleDocument()
+    }
+
+    /// A state hint queued for a page that is not ready describes the account
+    /// that was signed in when it was queued; after an account message the new
+    /// page asks with GET_LIVE_ACTIVITY_STATE instead.
+    private func dropQueuedLiveActivityState() {
+        pendingBroadcasts.removeAll { $0.type == "LIVE_ACTIVITY_STATE_CHANGED" }
+    }
+
+    /// Queued auth broadcasts describe the account that was signed in when
+    /// they were raised. After a switch or sign-out they would hand the old
+    /// account's tokens or state to the new page.
+    private func dropQueuedAuthBroadcasts() {
+        pendingBroadcasts.removeAll { $0.type == "AUTH_SESSION_UPDATED" || $0.type == "AUTH_SESSION_INVALID" }
     }
 
     func userContentController(_ userContentController: WKUserContentController, didReceive message: WKScriptMessage) {
@@ -71,16 +124,29 @@ final class NativeBridge: NSObject, WKScriptMessageHandler {
         }
 
         let payload = body["payload"] as? [String: Any] ?? [:]
+        let requestID = payload["requestId"] as? String
+
+        // Checked before anything else, including the ready flush: a frame or
+        // page that is not the trusted main frame gets no reply at all.
+        if Self.googleMessageTypes.contains(type) {
+            guard isTrustedAuthMessage(message) else { return }
+            if !isWebReady { markWebReadyAndFlush() }
+            handleGoogle(type: type, payload: payload, requestId: requestID)
+            return
+        }
+        let reply: (String, [String: Any]) -> Void = { [weak self] replyType, replyPayload in
+            self?.send(type: replyType, payload: replyPayload, requestId: requestID)
+        }
         #if DEBUG
         if type == "STUB_LOG" {
             BridgeStub.log(payload["line"] as? String ?? "")
             return
         }
-        #endif
-        let requestID = payload["requestId"] as? String
-        let reply: (String, [String: Any]) -> Void = { [weak self] replyType, replyPayload in
-            self?.send(type: replyType, payload: replyPayload, requestId: requestID)
+        if BridgeStub.isEnabled, type.hasPrefix("STUB_") {
+            BridgeStub.handle(type: type, payload: payload, reply: reply)
+            return
         }
+        #endif
 
         // Any inbound message proves the web app's bridge module is running and
         // listening. The current web build never sends APP_READY, so waiting for
@@ -93,18 +159,16 @@ final class NativeBridge: NSObject, WKScriptMessageHandler {
             handleV2(type: type, payload: payload, reply: reply)
             return
         }
+        if Self.liveActivityMessageTypes.contains(type) {
+            handleLiveActivity(type: type, payload: payload, reply: reply)
+            return
+        }
 
         switch type {
         case "APP_READY":
-            reply("NATIVE_READY", [
-                "platform": "ios",
-                "bridgeVersion": AppConfig.bridgeVersion
-            ])
+            reply("NATIVE_READY", readyPayload())
         case "GET_PLATFORM_INFO":
-            reply("PLATFORM_INFO", [
-                "platform": "ios",
-                "bridgeVersion": AppConfig.bridgeVersion
-            ])
+            reply("PLATFORM_INFO", readyPayload())
         case "IDENTIFY_USER":
             guard let userID = payload["userId"] as? String, !userID.isEmpty else {
                 reply("IDENTIFY_FAILED", ["message": "Missing userId"])
@@ -226,7 +290,19 @@ final class NativeBridge: NSObject, WKScriptMessageHandler {
                 reply("ERROR", ["message": "Invalid auth session", "code": "invalid_auth_session"])
                 return
             }
-            Task {
+            // Before any await: a Live Activity mutation sent after this message
+            // must already see the new account, and one meant for the previous
+            // account must be refused. The same user refreshing keeps both.
+            liveActivitySession.bind(account: userId)
+            LiveActivityCoordinator.shared.accountChanged(userId)
+            dropQueuedLiveActivityState()
+            // A different owner invalidates any Google attempt; a token refresh
+            // for the same user keeps a link flow alive.
+            googleAuth.sessionOwnerChanged(to: userId)
+            if boundAuthUserId != userId { dropQueuedAuthBroadcasts() }
+            boundAuthUserId = userId
+            let liveActivitySessionId = liveActivitySession.id
+            Self.authMutations.enqueue {
                 do {
                     let previousUserId = await AuthSessionStore.shared.load()?.userId
                     if let previousUserId, previousUserId != userId {
@@ -245,7 +321,7 @@ final class NativeBridge: NSObject, WKScriptMessageHandler {
                         refreshToken: refreshToken,
                         expiresAt: expiresAt
                     ))
-                    reply("AUTH_SESSION_ACCEPTED", ["userId": userId])
+                    reply("AUTH_SESSION_ACCEPTED", ["userId": userId, "liveActivityBridgeSessionId": liveActivitySessionId])
                     HealthBackgroundObserver.shared.enableBackgroundDelivery()
                     HealthBackgroundRefresh.shared.schedule()
                     await HealthSyncCoordinator.shared.syncNow()
@@ -254,7 +330,16 @@ final class NativeBridge: NSObject, WKScriptMessageHandler {
                 }
             }
         case "CLEAR_AUTH_SESSION":
-            Task {
+            // Ends every Honoured card and forgets the account's tracking
+            // before anything else can run.
+            liveActivitySession.unbind()
+            LiveActivityCoordinator.shared.accountChanged(nil)
+            dropQueuedLiveActivityState()
+            googleAuth.sessionOwnerChanged(to: nil)
+            dropQueuedAuthBroadcasts()
+            boundAuthUserId = nil
+            let liveActivitySessionId = liveActivitySession.id
+            Self.authMutations.enqueue {
                 do {
                     try await AuthSessionStore.shared.clear()
                     try await HealthSyncCoordinator.shared.clear()
@@ -267,7 +352,7 @@ final class NativeBridge: NSObject, WKScriptMessageHandler {
                     NotificationCoordinator.shared.cancelAll()
                     HealthBackgroundObserver.shared.disableBackgroundDelivery()
                     HealthBackgroundRefresh.shared.cancel()
-                    reply("AUTH_SESSION_CLEARED", [:])
+                    reply("AUTH_SESSION_CLEARED", ["liveActivityBridgeSessionId": liveActivitySessionId])
                 } catch {
                     reply("ERROR", ["message": error.localizedDescription, "code": "auth_session_clear_failed"])
                 }
@@ -359,6 +444,9 @@ final class NativeBridge: NSObject, WKScriptMessageHandler {
                 if changed {
                     await GoalMonitor.shared.clear()
                     await GoalMonitor.shared.evaluate()
+                    // The current health day may be a different one now; cards
+                    // of the old day stop showing its Health numbers.
+                    LiveActivityCoordinator.shared.dayMayHaveChanged()
                 }
             }
         case "SIGN_IN_WITH_APPLE":
@@ -394,10 +482,23 @@ final class NativeBridge: NSObject, WKScriptMessageHandler {
                 ])
                 return
             }
-            Task {
-                await GoalMonitor.shared.markCelebrated(activityId: activityId)
-                reply("ACTIVITY_COMPLETION_ACCEPTED", ["activityId": activityId, "source": source])
+            let scope: LiveActivityProtocol.CompletionScope?
+            do {
+                scope = try LiveActivityProtocol.completionScope(from: payload)
+            } catch {
+                reply("ERROR", Self.liveActivityErrorPayload(error))
+                return
             }
+            guard let scope else {
+                // Legacy payload: mark the celebration exactly as before and
+                // infer nothing about the contract from the ID.
+                Task {
+                    await GoalMonitor.shared.markCelebrated(activityId: activityId)
+                    reply("ACTIVITY_COMPLETION_ACCEPTED", ["activityId": activityId, "source": source])
+                }
+                return
+            }
+            completeTrackedActivity(activityId: activityId, source: source, scope: scope, payload: payload, reply: reply)
         case "START_TIMER":
             guard let activityId = payload["activityId"] as? String, !activityId.isEmpty,
                   let activityName = payload["activityName"] as? String, !activityName.isEmpty,
@@ -405,40 +506,22 @@ final class NativeBridge: NSObject, WKScriptMessageHandler {
                 reply("ERROR", ["message": "activityId, activityName and a positive durationSeconds are required", "code": "invalid_timer"])
                 return
             }
-            Task {
-                let askPermission = await NotificationCoordinator.shared.isUndetermined()
-                let result = await TestamentTimer.shared.start(
-                    activityId: activityId, activityName: activityName, durationSeconds: duration
-                )
-                if let replaced = result.replaced {
-                    send(type: "TIMER_CANCELLED", payload: ["activityId": replaced.activityId])
+            if let trackingContext = LiveActivityProtocol.present(payload["trackingContext"]) {
+                if LiveActivityCoordinator.shared.isSupported {
+                    startTrackedTimer(
+                        activityId: activityId, activityName: activityName, durationSeconds: duration,
+                        payload: payload, context: trackingContext, reply: reply
+                    )
+                    return
                 }
-                reply("TIMER_STARTED", [
-                    "activityId": result.timer.activityId,
-                    "endsAt": TestamentTimer.iso8601.string(from: result.timer.endsAt)
-                ])
-                // First timer ever is the agreed moment to ask. The reply is already
-                // out, so the sheet cannot time the request out on the web side.
-                if askPermission, await NotificationCoordinator.shared.requestPermissionIfNeeded() {
-                    await TestamentTimer.shared.rescheduleNotificationIfRunning(activityId: activityId)
-                }
-            }
-        case "CANCEL_TIMER":
-            guard let activityId = payload["activityId"] as? String, !activityId.isEmpty else {
-                reply("ERROR", ["message": "activityId is required", "code": "invalid_timer"])
+                // Below iOS 16.2 the context is ignored and the timer starts as
+                // it always has; the reply says the card was not possible.
+                startLegacyTimer(activityId: activityId, activityName: activityName, duration: duration, liveActivityStatus: "unsupported", reply: reply)
                 return
             }
-            Task {
-                switch await TestamentTimer.shared.cancel(activityId: activityId) {
-                case .cancelled, .nothingRunning:
-                    reply("TIMER_CANCELLED", ["activityId": activityId])
-                case .differentTimerRunning(let running):
-                    reply("ERROR", [
-                        "message": "The running timer is for \(running.activityId)",
-                        "code": "timer_not_active"
-                    ])
-                }
-            }
+            startLegacyTimer(activityId: activityId, activityName: activityName, duration: duration, liveActivityStatus: nil, reply: reply)
+        case "CANCEL_TIMER":
+            cancelTimer(payload: payload, reply: reply)
         case "GET_TIMER_STATE":
             Task {
                 await TestamentTimer.shared.reconcile()
@@ -471,6 +554,132 @@ final class NativeBridge: NSObject, WKScriptMessageHandler {
                 "message": "\(type) is not implemented in this build",
                 "code": "not_implemented"
             ])
+        }
+    }
+
+    // MARK: - Timer
+
+    /// The original `START_TIMER`, unchanged for payloads without a tracking
+    /// context. `TestamentTimer` tells the Live Activity engine about the run,
+    /// which attaches it to a tracked contract that declared this timer.
+    private func startLegacyTimer(
+        activityId: String,
+        activityName: String,
+        duration: Double,
+        liveActivityStatus: String?,
+        reply: @escaping (String, [String: Any]) -> Void
+    ) {
+        Task {
+            let askPermission = await NotificationCoordinator.shared.isUndetermined()
+            let result = await TestamentTimer.shared.start(
+                activityId: activityId, activityName: activityName, durationSeconds: duration
+            )
+            if let replaced = result.replaced {
+                send(type: "TIMER_CANCELLED", payload: ["activityId": replaced.activityId])
+            }
+            var body: [String: Any] = [
+                "activityId": result.timer.activityId,
+                "endsAt": TestamentTimer.iso8601.string(from: result.timer.endsAt)
+            ]
+            if let liveActivityStatus { body["liveActivityStatus"] = liveActivityStatus }
+            reply("TIMER_STARTED", body)
+            // First timer ever is the agreed moment to ask. The reply is already
+            // out, so the sheet cannot time the request out on the web side.
+            if askPermission, await NotificationCoordinator.shared.requestPermissionIfNeeded() {
+                await TestamentTimer.shared.rescheduleNotificationIfRunning(activityId: activityId)
+            }
+        }
+    }
+
+    /// `reason` (`paused` or `cancelled`, default `cancelled`) is echoed back.
+    /// Native has no pause: a pause is a cancel and a resume is a new start
+    /// with the remaining time. Either way the card drops the timer; a card
+    /// that shows nothing else ends until the timer runs again.
+    private func cancelTimer(payload: [String: Any], reply: @escaping (String, [String: Any]) -> Void) {
+        guard let activityId = payload["activityId"] as? String, !activityId.isEmpty else {
+            reply("ERROR", ["message": "activityId is required", "code": "invalid_timer"])
+            return
+        }
+        // The cancel is what matters; an unknown reason never blocks it.
+        let requestedReason = payload["reason"] as? String ?? "cancelled"
+        let reason = LiveActivityProtocol.cancelReasons.contains(requestedReason) ? requestedReason : "cancelled"
+        var finish = reply
+        if let rawContext = LiveActivityProtocol.present(payload["trackingContext"]), LiveActivityCoordinator.shared.isSupported {
+            guard let context = rawContext as? [String: Any] else {
+                reply("ERROR", LiveActivityError.invalidEnvelope("trackingContext must be an object").payload)
+                return
+            }
+            guard let admitted = admitLiveActivityMutation(payload: payload, context: context, reply: reply) else { return }
+            finish = liveActivityFinisher(admitted.0, reply: reply)
+        }
+        Task {
+            switch await TestamentTimer.shared.cancel(activityId: activityId) {
+            case .cancelled, .nothingRunning:
+                finish("TIMER_CANCELLED", ["activityId": activityId, "reason": reason])
+            case .differentTimerRunning(let running):
+                finish("ERROR", [
+                    "message": "The running timer is for \(running.activityId)",
+                    "code": "timer_not_active"
+                ])
+            }
+        }
+    }
+
+    // MARK: - Completion
+
+    /// `ACTIVITY_COMPLETED` with `scope`, `contractId` and `healthDay`. The
+    /// celebration marker is set for the occurrence's own health day, so a
+    /// completion received after the reset never silences today's goal.
+    /// `scope: contract` ends that card as honoured; `scope: slot` only marks
+    /// the slot. The web app remains the one that records the outcome.
+    private func completeTrackedActivity(
+        activityId: String,
+        source: String,
+        scope: LiveActivityProtocol.CompletionScope,
+        payload: [String: Any],
+        reply: @escaping (String, [String: Any]) -> Void
+    ) {
+        // The web app has honoured this contract whatever happens to the card:
+        // silence native's own goal announcement first, for the occurrence's
+        // own health day. Marking twice is harmless, so a retry or a stale
+        // envelope cannot leave a notification behind.
+        let marker = Task {
+            await GoalMonitor.shared.markCelebrated(activityId: activityId, day: scope.key.healthDay)
+        }
+        var body: [String: Any] = [
+            "activityId": activityId,
+            "source": source,
+            "contractId": scope.key.contractId,
+            "healthDay": scope.key.healthDay,
+            "scope": scope.isContract ? "contract" : "slot"
+        ]
+        let coordinator = LiveActivityCoordinator.shared
+        guard coordinator.isSupported else {
+            Task {
+                await marker.value
+                body["liveActivityStatus"] = "unsupported"
+                reply("ACTIVITY_COMPLETION_ACCEPTED", body)
+            }
+            return
+        }
+        guard let admitted = admitLiveActivityMutation(payload: payload, context: nil, reply: reply) else { return }
+        let (envelope, account) = admitted
+        let finish = liveActivityFinisher(envelope, reply: reply)
+        let completion = LiveActivityEngine.Completion(scope: scope, activityId: activityId, account: account)
+        coordinator.submit(.completion(completion)) { outcome in
+            Task {
+                await marker.value
+                switch outcome {
+                case .completion(let tracked, let status):
+                    body["tracked"] = tracked
+                    if let status { body["presentationStatus"] = status.rawValue }
+                    finish("ACTIVITY_COMPLETION_ACCEPTED", body)
+                case .rejected(let error):
+                    finish("ERROR", error.payload)
+                default:
+                    finish("ERROR", ["message": "Unexpected Live Activity result", "code": "internal_error"])
+                }
+            }
         }
     }
 
@@ -530,12 +739,11 @@ final class NativeBridge: NSObject, WKScriptMessageHandler {
         return raw as? Bool
     }
 
+    /// JSON numbers only. `raw is Bool` is also true for the numbers 0 and 1
+    /// from JSON, which rejected a 1-second timer or a target of 1, so booleans
+    /// are told apart by their CoreFoundation type instead.
     private static func number(_ raw: Any?) -> Double? {
-        if raw is Bool { return nil }
-        if let value = raw as? Double { return value }
-        if let value = raw as? Int { return Double(value) }
-        if let value = raw as? NSNumber { return value.doubleValue }
-        return nil
+        LiveActivityProtocol.number(raw)
     }
 
     // MARK: - Sending
@@ -598,18 +806,32 @@ final class NativeBridge: NSObject, WKScriptMessageHandler {
         }
     }
 
-    private func dispatch(type: String, payload: [String: Any]) {
+    /// Auth replies: evaluated only if the page that asked is still the one
+    /// loaded when the script actually runs.
+    func dispatchNow(type: String, payload: [String: Any], generation: Int) {
+        guard let script = Self.eventScript(type: type, payload: payload) else { return }
+        DispatchQueue.main.async { [weak self] in
+            guard let self, generation == self.googleAuth.documentGeneration,
+                  let webView = self.webView,
+                  self.trustedWebOrigin?.matches(url: webView.url) == true else { return }
+            webView.evaluateJavaScript(script)
+        }
+    }
+
+    private static func eventScript(type: String, payload: [String: Any]) -> String? {
         guard JSONSerialization.isValidJSONObject(payload),
               let payloadData = try? JSONSerialization.data(withJSONObject: payload),
-              let payloadJSON = String(data: payloadData, encoding: .utf8) else { return }
-
+              let payloadJSON = String(data: payloadData, encoding: .utf8) else { return nil }
         let escapedType = type.replacingOccurrences(of: "'", with: "\\'")
-        let script = """
+        return """
         window.dispatchEvent(new CustomEvent('honoured:native', {
           detail: { bridgeVersion: \(AppConfig.bridgeVersion), type: '\(escapedType)', payload: \(payloadJSON) }
         }));
         """
+    }
 
+    private func dispatch(type: String, payload: [String: Any]) {
+        guard let script = Self.eventScript(type: type, payload: payload) else { return }
         DispatchQueue.main.async { [weak self] in
             self?.webView?.evaluateJavaScript(script)
         }

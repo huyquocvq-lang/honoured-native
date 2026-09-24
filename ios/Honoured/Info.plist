@@ -21,9 +21,32 @@
 	<key>CFBundlePackageType</key>
 	<string>$(PRODUCT_BUNDLE_PACKAGE_TYPE)</string>
 	<key>CFBundleShortVersionString</key>
-	<string>1.0.0</string>
+	<string>$(MARKETING_VERSION)</string>
+	<key>CFBundleURLTypes</key>
+	<array>
+		<dict>
+			<key>CFBundleURLName</key>
+			<string>$(PRODUCT_BUNDLE_IDENTIFIER).contract</string>
+			<key>CFBundleURLSchemes</key>
+			<array>
+				<string>honoured</string>
+			</array>
+		</dict>
+		<dict>
+			<key>CFBundleURLName</key>
+			<string>$(PRODUCT_BUNDLE_IDENTIFIER).google</string>
+			<key>CFBundleURLSchemes</key>
+			<array>
+				<string>$(GOOGLE_IOS_REVERSED_CLIENT_ID)</string>
+			</array>
+		</dict>
+	</array>
 	<key>CFBundleVersion</key>
-	<string>1</string>
+	<string>$(CURRENT_PROJECT_VERSION)</string>
+	<key>GoogleIOSClientID</key>
+	<string>$(GOOGLE_IOS_CLIENT_ID)</string>
+	<key>GoogleServerClientID</key>
+	<string>$(GOOGLE_WEB_CLIENT_ID)</string>
 	<key>HonouredWebAppURL</key>
 	<string>$(HONOURED_WEB_APP_URL)</string>
 	<key>ITSAppUsesNonExemptEncryption</key>
@@ -36,6 +59,8 @@
 	<string>Honoured only reads your Health data and never writes to it.</string>
 	<key>NSMicrophoneUsageDescription</key>
 	<string>Record a private Voice of Change reflection.</string>
+	<key>NSSupportsLiveActivities</key>
+	<true/>
 	<key>RevenueCatAPIKey</key>
 	<string>$(REVENUECAT_IOS_API_KEY)</string>
 	<key>RevenueCatEntitlementID</key>

@@ -4,14 +4,23 @@ import android.app.Activity
 import android.webkit.JavascriptInterface
 import android.webkit.WebView
 import com.honoured.app.AppConfig
+import com.honoured.app.auth.AuthBridge
 import com.honoured.app.billing.PurchaseOutcome
 import com.honoured.app.billing.SubscriptionService
 import org.json.JSONObject
 
 class NativeBridge(
     private val activity: Activity,
-    private val webView: WebView
+    private val webView: WebView,
+    /** Capabilities added to NATIVE_READY / PLATFORM_INFO (Google Sign-In). */
+    private val capabilities: () -> JSONObject = { JSONObject() },
 ) {
+
+    /** Same payload for every NATIVE_READY / PLATFORM_INFO path. */
+    fun readyPayload(): JSONObject = JSONObject()
+        .put("platform", "android")
+        .put("bridgeVersion", AppConfig.BRIDGE_VERSION)
+        .put("capabilities", capabilities())
 
     @JavascriptInterface
     fun postMessage(rawMessage: String) {
@@ -24,17 +33,14 @@ class NativeBridge(
         }
 
         when (type) {
-            "APP_READY" -> reply(
-                "NATIVE_READY",
+            "APP_READY" -> reply("NATIVE_READY", readyPayload())
+            "GET_PLATFORM_INFO" -> reply("PLATFORM_INFO", readyPayload())
+            // Google auth runs only on the origin-scoped HonouredAuth transport.
+            in AuthBridge.MESSAGE_TYPES -> reply(
+                "ERROR",
                 JSONObject()
-                    .put("platform", "android")
-                    .put("bridgeVersion", AppConfig.BRIDGE_VERSION)
-            )
-            "GET_PLATFORM_INFO" -> reply(
-                "PLATFORM_INFO",
-                JSONObject()
-                    .put("platform", "android")
-                    .put("bridgeVersion", AppConfig.BRIDGE_VERSION)
+                    .put("message", "$type is only accepted on the secure auth transport")
+                    .put("code", "insecure_transport")
             )
             "IDENTIFY_USER" -> {
                 val userId = payload.optString("userId")
@@ -189,6 +195,15 @@ class NativeBridge(
                     "message",
                     "Trial sessions are enforced by Supabase RPC from the authenticated web app"
                 )
+            )
+            // Live Activities are iOS-only. The web app checks the capability in
+            // NATIVE_READY first; a stray call still gets a correlated answer.
+            "TRACK_CONTRACT", "SYNC_TRACKED_CONTRACTS", "STOP_TRACKING_CONTRACT",
+            "GET_LIVE_ACTIVITY_STATE" -> reply(
+                "ERROR",
+                JSONObject()
+                    .put("message", "$type is not implemented on Android")
+                    .put("code", "not_implemented")
             )
             else -> reply(
                 "ERROR",

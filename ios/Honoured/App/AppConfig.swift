@@ -27,12 +27,30 @@ enum AppConfig {
 
     /// Nil leaves native HealthKit sync disabled rather than crashing.
     static var supabaseURL: URL? {
+        #if DEBUG
+        // The bridge stub signs in with fake sessions and fake Health totals;
+        // none of that may ever reach the real backend.
+        if BridgeStub.isEnabled { return nil }
+        #endif
         let value = infoString("SupabaseURL")
         return value.isEmpty ? nil : URL(string: value)
     }
 
     static var supabaseAnonKey: String {
         infoString("SupabaseAnonKey")
+    }
+
+    /// Public Google client IDs. Nil when missing, malformed, or when the
+    /// reversed iOS client ID is not registered as a URL scheme, which turns
+    /// Google Sign-In off (`configured: false`) instead of crashing the SDK.
+    static var googleClientConfig: GoogleClientConfig? {
+        let urlTypes = Bundle.main.object(forInfoDictionaryKey: "CFBundleURLTypes") as? [[String: Any]] ?? []
+        let schemes = urlTypes.flatMap { $0["CFBundleURLSchemes"] as? [String] ?? [] }
+        return GoogleClientConfig.validate(
+            clientID: infoString("GoogleIOSClientID"),
+            serverClientID: infoString("GoogleServerClientID"),
+            registeredSchemes: schemes
+        )
     }
 
     static var healthSyncTaskIdentifier: String {

@@ -65,17 +65,21 @@ honoured-native/
 ├── ios/
 │   ├── project.yml          # XcodeGen spec; Honoured.xcodeproj is generated
 │   ├── Honoured.storekit
-│   └── Honoured/            # app target, one folder per feature
-│       ├── App/             # entry point, app delegate, AppConfig
-│       ├── WebView/         # root view, WKWebView host, load state, WebKit tweaks
-│       ├── Bridge/          # NativeBridge message handling, durable event store
-│       ├── Auth/            # Keychain session store, Sign in with Apple
-│       ├── Billing/         # RevenueCat
-│       ├── Health/          # HealthKit reads, upload queue, background sync, goals
-│       ├── Timer/           # Testament Timer
-│       ├── Notifications/   # local notifications, completion sound
-│       ├── Debug/           # BridgeStub test page (Debug builds only)
-│       └── Info.plist, Honoured.entitlements, PrivacyInfo.xcprivacy, Assets.xcassets
+│   ├── Honoured/            # app target, one folder per feature
+│   │   ├── App/             # entry point, app delegate, AppConfig
+│   │   ├── WebView/         # root view, WKWebView host, load state, WebKit tweaks
+│   │   ├── Bridge/          # NativeBridge message handling, durable event store
+│   │   ├── Auth/            # Keychain session store, Sign in with Apple
+│   │   ├── Billing/         # RevenueCat
+│   │   ├── Health/          # HealthKit reads, upload queue, background sync, goals
+│   │   ├── Timer/           # Testament Timer
+│   │   ├── Notifications/   # local notifications, completion sound
+│   │   ├── LiveActivities/  # ActivityKit and bridge glue; Core/ is the engine
+│   │   ├── Debug/           # BridgeStub test page (Debug builds only)
+│   │   └── Info.plist, Honoured.entitlements, PrivacyInfo.xcprivacy, Assets.xcassets
+│   ├── HonouredShared/      # content state and deep links shared with the widget
+│   ├── HonouredWidgets/     # Widget Extension that renders the Live Activities
+│   └── HonouredTests/       # unit tests (fake ActivityKit, Health, timer, clock)
 ├── android/
 │   └── app/src/main/java/com/honoured/app/
 │       ├── MainActivity.kt  # WebView shell
@@ -110,6 +114,88 @@ Before real billing tests:
 
 RevenueCat iOS is integrated with Swift Package Manager.
 
+### Live Activities
+
+Contract Live Activities need iOS 16.2; the app still runs on iOS 16.0 and
+reports the feature as unsupported there (ActivityKit is weak-linked). The
+`HonouredWidgets` extension is embedded in the app and built with it:
+
+- Its bundle identifier is the app's plus `.widgets` (for example
+  `com.honoured.app.widgets`), so the App ID behind `IOS_BUNDLE_ID` needs a
+  matching extension App ID. Automatic signing creates it for the team in
+  `IOS_DEVELOPMENT_TEAM`; with manual signing, create it and a profile first.
+- The app declares `NSSupportsLiveActivities` and the `honoured://` URL scheme
+  that a tapped card opens. No App Group, push notification or
+  frequent-update capability is needed.
+- The app and the extension read their version from `MARKETING_VERSION` and
+  `CURRENT_PROJECT_VERSION` in `ios/project.yml`; bump them there.
+
+The protocol is in `docs/bridge.md` (*v2 — Live Activities*). The plan, its
+limits and the validation record are in `docs/live-activities-plan.vi.md`.
+
+### Google Sign-In
+
+Native shows Google's own UI and returns an ID token; the web app verifies it
+with Supabase (`docs/bridge.md`, *Google Sign-In*). Public client IDs come from
+`.env`, never a client secret:
+
+```dotenv
+GOOGLE_WEB_CLIENT_ID=123-web.apps.googleusercontent.com   # token audience, both platforms
+GOOGLE_IOS_CLIENT_ID=123-ios.apps.googleusercontent.com   # iOS client for the signed bundle id
+```
+
+- `scripts/sync-env.sh` writes both to `ios/Config.xcconfig` and derives the
+  callback URL scheme (the reversed iOS client ID), which `Info.plist`
+  registers next to `honoured://`. Missing or malformed values leave the
+  feature off (`configured: false`); nothing crashes.
+- GoogleSignIn-iOS is pinned to 10.0.0 in `ios/project.yml` (the first release
+  that accepts a custom nonce) and linked into the app target only.
+- Google Cloud needs, in the same project and environment: the Web client, an
+  iOS client for the real bundle id, and an Android client for
+  `com.honoured.app` with the SHA-1 of every signing key (debug, and the Play
+  App Signing certificate for store builds).
+- Supabase's Google provider must accept the Web and iOS client IDs, keep
+  nonce checks on, and have **Manual linking** enabled for "Link Google".
+
+Debug builds can fake Google's UI with `-HonouredFakeGoogle success|slow|cancel|error|network`
+together with `-HonouredBridgeStub`; the `google` and `google-reload` scenarios
+use it (see Tests below).
+
+### Tests
+
+The `HonouredTests` unit tests run on a simulator without a host app:
+
+```bash
+cd ios
+xcodebuild -project Honoured.xcodeproj -scheme Honoured \
+  -destination 'platform=iOS Simulator,name=iPhone 17' \
+  -derivedDataPath ~/Library/Developer/Xcode/DerivedData/Honoured-sim \
+  CODE_SIGNING_ALLOWED=NO test
+```
+
+Set `TEST_RUNNER_HONOURED_RENDER_DIR=/some/folder` to also write the rendered
+card variants as PNG files.
+
+A Debug build started with `-HonouredBridgeStub` loads a test page instead of
+the web app (see `ios/Honoured/Debug/BridgeStub.swift`). `-HonouredBridgeScenario`
+runs one of its scripted checks, for example `google` (with
+`-HonouredFakeGoogle success`), `google-reload` (with `-HonouredFakeGoogle slow`),
+`live-activities-multiple`,
+`live-activities-focus-race`, `live-activities-health`, `live-activities-timer`,
+`live-activities-account`, `live-activities-deeplink` or
+`live-activities-restore-setup` followed by `live-activities-restore-check`;
+add `-HonouredStubExitWhenDone` to quit when it finishes. Build with ad-hoc
+signing (`CODE_SIGN_IDENTITY=- CODE_SIGNING_REQUIRED=NO`) to run it:
+
+```bash
+xcrun simctl launch --console-pty booted <bundle id> \
+  -HonouredBridgeStub -HonouredStubExitWhenDone \
+  -HonouredBridgeScenario live-activities-multiple
+```
+
+The stub signs in with a fake session and fake Health totals, never reaches
+Supabase, and is compiled out of Release builds.
+
 ## Android development
 
 Open the `android` directory in Android Studio and let Gradle sync the project.
@@ -129,6 +215,19 @@ cp .env.example .env   # then fill in the values
 cd android
 ./gradlew assembleDebug
 ```
+
+Unit tests and lint:
+
+```bash
+./gradlew testDebugUnitTest lintDebug
+```
+
+Google Sign-In uses Credential Manager and reads only `GOOGLE_WEB_CLIENT_ID`.
+It runs over an origin-scoped `WebMessageListener` (`window.HonouredAuth`),
+installed before the first page load; a WebView without
+`WEB_MESSAGE_LISTENER` reports the feature unsupported. The legacy
+`HonouredNative` interface keeps serving billing and refuses the auth
+messages. No Firebase or `google-services.json` is involved.
 
 ## Foundation bridge
 

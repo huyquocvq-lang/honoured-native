@@ -27,6 +27,7 @@ final class AppleSignInCoordinator: NSObject {
     private var continuation: CheckedContinuation<Outcome, Never>?
     private var rawNonce: String?
     private var revocationObserver: NSObjectProtocol?
+    private var presentationToken: Int?
 
     private override init() {
         super.init()
@@ -40,6 +41,11 @@ final class AppleSignInCoordinator: NSObject {
         guard continuation == nil else {
             return .failed(message: "A Sign in with Apple request is already in progress")
         }
+        // Apple and Google never present at the same time.
+        guard let token = SignInPresentation.gate.acquire(.apple) else {
+            return .failed(message: "Another sign-in is already in progress")
+        }
+        presentationToken = token
 
         let nonce = Self.randomNonce()
         rawNonce = nonce
@@ -112,6 +118,10 @@ final class AppleSignInCoordinator: NSObject {
         self.continuation = nil
         controller = nil
         rawNonce = nil
+        if let presentationToken {
+            SignInPresentation.gate.release(presentationToken)
+            self.presentationToken = nil
+        }
         continuation?.resume(returning: outcome)
     }
 

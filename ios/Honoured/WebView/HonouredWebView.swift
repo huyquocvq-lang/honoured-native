@@ -67,12 +67,13 @@ struct HonouredWebView: UIViewRepresentable {
             bridge.webViewWillReload()
         }
 
+        func webView(_ webView: WKWebView, didCommit navigation: WKNavigation!) {
+            bridge.webViewDidCommitNavigation()
+        }
+
         func webView(_ webView: WKWebView, didFinish navigation: WKNavigation!) {
             Task { @MainActor in state.markLoaded() }
-            bridge.send(type: "NATIVE_READY", payload: [
-                "platform": "ios",
-                "bridgeVersion": AppConfig.bridgeVersion
-            ])
+            bridge.send(type: "NATIVE_READY", payload: bridge.readyPayload())
         }
 
         func webView(_ webView: WKWebView, didFail navigation: WKNavigation!, withError error: Error) {

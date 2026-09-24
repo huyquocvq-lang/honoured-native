@@ -6,10 +6,19 @@ packages:
   RevenueCat:
     url: https://github.com/RevenueCat/purchases-ios-spm.git
     from: 5.83.2
+  # 10.0.0 is the first release whose sign-in call takes a custom nonce, which
+  # Supabase needs to verify the ID token. Pinned exactly; app target only.
+  GoogleSignIn:
+    url: https://github.com/google/GoogleSignIn-iOS.git
+    exactVersion: 10.0.0
 settings:
   base:
     IPHONEOS_DEPLOYMENT_TARGET: 16.0
     SWIFT_VERSION: 5.9
+    # The app and its widget extension must ship the same version and build,
+    # so both Info.plist files read these.
+    MARKETING_VERSION: 1.0.3
+    CURRENT_PROJECT_VERSION: 1
 targets:
   Honoured:
     type: application
@@ -17,12 +26,16 @@ targets:
     deploymentTarget: "16.0"
     sources:
       - Honoured
+      - HonouredShared
     configFiles:
       Debug: Config.xcconfig
       Release: Config.xcconfig
     dependencies:
       - package: RevenueCat
         product: RevenueCat
+      - package: GoogleSignIn
+        product: GoogleSignIn
+      - target: HonouredWidgets
     settings:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: $(HONOURED_BUNDLE_ID:default=com.honoured.app)
@@ -31,9 +44,61 @@ targets:
         TARGETED_DEVICE_FAMILY: "1"
         INFOPLIST_FILE: Honoured/Info.plist
         CODE_SIGN_ENTITLEMENTS: Honoured/Honoured.entitlements
+        # ActivityKit first shipped in iOS 16.1. Weak linking keeps the app
+        # launching on 16.0, where Live Activities report unsupported.
+        OTHER_LDFLAGS: ["$(inherited)", "-weak_framework", "ActivityKit"]
     scheme:
-      testTargets: []
+      testTargets:
+        - HonouredTests
       storeKitConfiguration: Honoured.storekit
+
+  # Live Activities for tracked contracts. iOS 16.2 is the first release with
+  # ActivityContent and relevance scores; on older systems the app runs
+  # without it. The extension renders only what ActivityKit hands it and links
+  # no billing, HealthKit or backend code.
+  HonouredWidgets:
+    type: app-extension
+    platform: iOS
+    deploymentTarget: "16.2"
+    sources:
+      - HonouredWidgets
+      - HonouredShared
+    configFiles:
+      Debug: Config.xcconfig
+      Release: Config.xcconfig
+    dependencies:
+      - sdk: ActivityKit.framework
+      - sdk: WidgetKit.framework
+      - sdk: SwiftUI.framework
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: $(HONOURED_BUNDLE_ID:default=com.honoured.app).widgets
+        PRODUCT_NAME: HonouredWidgets
+        INFOPLIST_FILE: HonouredWidgets/Info.plist
+        TARGETED_DEVICE_FAMILY: "1"
+        SKIP_INSTALL: YES
+        APPLICATION_EXTENSION_API_ONLY: YES
+
+  # Logic tests without a host app: the Live Activity core and the auth core
+  # are compiled in directly and run against fakes (ActivityKit, Health, timer,
+  # clock); no Google SDK is linked here.
+  HonouredTests:
+    type: bundle.unit-test
+    platform: iOS
+    deploymentTarget: "16.2"
+    sources:
+      - HonouredTests
+      - HonouredShared
+      - Honoured/LiveActivities/Core
+      - Honoured/Auth/Core
+      - Honoured/Health/HealthMetric.swift
+      - HonouredWidgets/ContractLiveActivityViews.swift
+      - HonouredWidgets/LiveActivityPreviewStates.swift
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.honoured.app.tests
+        GENERATE_INFOPLIST_FILE: YES
+        TARGETED_DEVICE_FAMILY: "1"
 
 # The Honoured scheme runs against Honoured.storekit, which serves products
 # and payments locally: convenient, but it proves nothing about App Store

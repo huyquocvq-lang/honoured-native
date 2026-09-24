@@ -22,6 +22,10 @@ object AppConfig {
             }
         }
 
+    /** Public Web application client ID (Google ID token audience). */
+    val GOOGLE_WEB_CLIENT_ID: String
+        get() = BuildConfig.GOOGLE_WEB_CLIENT_ID.trim()
+
     val WEB_APP_HOST: String
         get() = Uri.parse(WEB_APP_URL).host.orEmpty()
 }
