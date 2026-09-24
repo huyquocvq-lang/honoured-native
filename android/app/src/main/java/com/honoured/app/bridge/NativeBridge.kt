@@ -53,8 +53,9 @@ class NativeBridge(
                                 reply("IDENTIFY_SUCCESS", outcome.status)
                                 // The already-identified shortcut skips the CustomerInfo
                                 // fetch, so its payload carries no verdict. Broadcasting it
-                                // as a status would read as "not subscribed".
-                                if (outcome.status.has("isSubscribed")) {
+                                // as a status would read as "not subscribed". A verdict for a
+                                // user RevenueCat is no longer bound to is not sent.
+                                if (outcome.status.has("isSubscribed") && SubscriptionService.isIdentified(userId)) {
                                     reply("ACCESS_STATUS", outcome.status)
                                 }
                             }
@@ -74,10 +75,13 @@ class NativeBridge(
                 when (outcome) {
                     is PurchaseOutcome.Completed -> {
                         reply("LOGOUT_SUCCESS", JSONObject().put("isSubscribed", false))
-                        reply(
-                            "ACCESS_STATUS",
-                            JSONObject().put("isSubscribed", false).put("source", "logout")
-                        )
+                        // A sign-in queued after this logout may already own the identity.
+                        if (SubscriptionService.isAnonymous) {
+                            reply(
+                                "ACCESS_STATUS",
+                                JSONObject().put("isSubscribed", false).put("source", "logout")
+                            )
+                        }
                     }
                     PurchaseOutcome.Cancelled -> reply(
                         "LOGOUT_FAILED",
@@ -101,7 +105,14 @@ class NativeBridge(
                 SubscriptionService.identify(userId) { identifyOutcome ->
                     when (identifyOutcome) {
                         is PurchaseOutcome.Completed -> SubscriptionService.checkAccess { status ->
-                            reply("ACCESS_STATUS", status)
+                            if (SubscriptionService.isIdentified(userId)) {
+                                reply("ACCESS_STATUS", status)
+                            } else {
+                                reply(
+                                    "ACCESS_STATUS",
+                                    JSONObject().put("isSubscribed", false).put("source", "identity_changed")
+                                )
+                            }
                         }
                         PurchaseOutcome.Cancelled -> reply(
                             "ACCESS_STATUS",

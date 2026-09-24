@@ -180,8 +180,9 @@ final class NativeBridge: NSObject, WKScriptMessageHandler {
                     reply("IDENTIFY_SUCCESS", status)
                     // The already-identified shortcut skips the CustomerInfo fetch, so
                     // its payload carries no verdict. Broadcasting it as a status would
-                    // read as "not subscribed".
-                    if status["isSubscribed"] != nil {
+                    // read as "not subscribed". A verdict for a user RevenueCat is no
+                    // longer bound to (a newer sign-in or logout ran) is not sent.
+                    if status["isSubscribed"] != nil, SubscriptionService.shared.isIdentified(as: userID) {
                         reply("ACCESS_STATUS", status)
                     }
                 case .cancelled:
@@ -195,7 +196,11 @@ final class NativeBridge: NSObject, WKScriptMessageHandler {
                 switch await SubscriptionService.shared.logout() {
                 case .completed:
                     reply("LOGOUT_SUCCESS", ["isSubscribed": false])
-                    reply("ACCESS_STATUS", ["isSubscribed": false, "source": "logout"])
+                    // A sign-in queued after this logout may already own the
+                    // RevenueCat identity; its status must not be overwritten.
+                    if SubscriptionService.shared.isAnonymous {
+                        reply("ACCESS_STATUS", ["isSubscribed": false, "source": "logout"])
+                    }
                 case .cancelled:
                     reply("LOGOUT_FAILED", ["message": "Unexpected cancellation"])
                 case .failed(let message):
@@ -211,6 +216,10 @@ final class NativeBridge: NSObject, WKScriptMessageHandler {
                 switch await SubscriptionService.shared.identify(appUserID: userID) {
                 case .completed:
                     let status = await SubscriptionService.shared.accessStatus()
+                    guard SubscriptionService.shared.isIdentified(as: userID) else {
+                        reply("ACCESS_STATUS", ["isSubscribed": false, "source": "identity_changed"])
+                        return
+                    }
                     reply("ACCESS_STATUS", status)
                 case .cancelled:
                     reply("ACCESS_STATUS", ["isSubscribed": false, "source": "identify_cancelled"])

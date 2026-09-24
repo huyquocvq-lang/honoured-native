@@ -4,6 +4,7 @@ import android.app.Activity
 import android.content.Context
 import com.honoured.app.AppConfig
 import com.honoured.app.BuildConfig
+import com.honoured.app.auth.SerialCallbackQueue
 import com.revenuecat.purchases.CustomerInfo
 import com.revenuecat.purchases.LogLevel
 import com.revenuecat.purchases.PurchaseParams
@@ -19,6 +20,20 @@ import org.json.JSONObject
 
 object SubscriptionService {
     private var configured = false
+
+    /**
+     * identify and logout change the one RevenueCat identity on this device.
+     * They run strictly in request order, so a slow logout for the previous
+     * account can never finish after the next account's sign-in.
+     */
+    private val identityQueue = SerialCallbackQueue()
+
+    /** True when RevenueCat is currently bound to exactly this app user. */
+    fun isIdentified(appUserID: String): Boolean =
+        configured && Purchases.sharedInstance.appUserID == appUserID.trim()
+
+    val isAnonymous: Boolean
+        get() = !configured || Purchases.sharedInstance.appUserID.startsWith("\$RCAnonymousID:")
 
     fun configureIfPossible(context: Context) {
         if (configured) return
@@ -38,6 +53,15 @@ object SubscriptionService {
     }
 
     fun identify(appUserID: String, callback: (PurchaseOutcome) -> Unit) {
+        identityQueue.enqueue { done ->
+            identifyNow(appUserID) { outcome ->
+                callback(outcome)
+                done()
+            }
+        }
+    }
+
+    private fun identifyNow(appUserID: String, callback: (PurchaseOutcome) -> Unit) {
         if (!configured) {
             callback(PurchaseOutcome.Failed("RevenueCat is not configured"))
             return
@@ -73,6 +97,15 @@ object SubscriptionService {
     }
 
     fun logout(callback: (PurchaseOutcome) -> Unit) {
+        identityQueue.enqueue { done ->
+            logoutNow { outcome ->
+                callback(outcome)
+                done()
+            }
+        }
+    }
+
+    private fun logoutNow(callback: (PurchaseOutcome) -> Unit) {
         if (!configured) {
             callback(PurchaseOutcome.Failed("RevenueCat is not configured"))
             return

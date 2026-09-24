@@ -7,7 +7,22 @@ final class SubscriptionService {
 
     private(set) var isConfigured = false
 
+    /// `identify` and `logout` change the one RevenueCat identity on this
+    /// device. They run strictly in request order, so a slow logout for the
+    /// previous account can never finish after the next account's sign-in.
+    private let identityQueue = SerialAsyncQueue()
+
     private init() {}
+
+    /// True when RevenueCat is currently bound to exactly this app user. Used to
+    /// drop an `ACCESS_STATUS` that describes a user no longer signed in.
+    func isIdentified(as appUserID: String) -> Bool {
+        isConfigured && Purchases.shared.appUserID == appUserID.trimmingCharacters(in: .whitespacesAndNewlines)
+    }
+
+    var isAnonymous: Bool {
+        !isConfigured || Purchases.shared.appUserID.hasPrefix("$RCAnonymousID:")
+    }
 
     func configureIfPossible() {
         guard !isConfigured else { return }
@@ -25,6 +40,10 @@ final class SubscriptionService {
     }
 
     func identify(appUserID: String) async -> PurchaseOutcome {
+        await identityQueue.run { @MainActor in await self.identifyNow(appUserID: appUserID) }
+    }
+
+    private func identifyNow(appUserID: String) async -> PurchaseOutcome {
         guard isConfigured else {
             return .failed("RevenueCat is not configured")
         }
@@ -60,6 +79,10 @@ final class SubscriptionService {
     }
 
     func logout() async -> PurchaseOutcome {
+        await identityQueue.run { @MainActor in await self.logoutNow() }
+    }
+
+    private func logoutNow() async -> PurchaseOutcome {
         guard isConfigured else {
             return .failed("RevenueCat is not configured")
         }
