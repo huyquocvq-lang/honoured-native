@@ -46,6 +46,27 @@ struct HealthReadPlan {
 /// loop: HealthKit is read between a plan and an apply command, and ActivityKit
 /// updates run per card, one at a time, latest content wins.
 actor LiveActivityEngine {
+    /// HealthKit must not acknowledge a background delivery until the first
+    /// completed content update has reached ActivityKit. The ten-second visual
+    /// presentation continues independently after this barrier is signalled.
+    actor CompletionPresentationBarrier {
+        private var presented = false
+        private var waiters: [CheckedContinuation<Void, Never>] = []
+
+        func wait() async {
+            guard !presented else { return }
+            await withCheckedContinuation { waiters.append($0) }
+        }
+
+        func signal() {
+            guard !presented else { return }
+            presented = true
+            let current = waiters
+            waiters.removeAll()
+            current.forEach { $0.resume() }
+        }
+    }
+
     enum SyncEntry {
         case valid(ContractDefinition)
         case invalid(OccurrenceKey, LiveActivityError)
@@ -109,6 +130,7 @@ actor LiveActivityEngine {
         case timerStarted(TimerStartResult)
         case completion(tracked: Bool, status: PresentationStatus?)
         case healthPlan(HealthReadPlan?)
+        case healthApplied([CompletionPresentationBarrier])
     }
 
     private struct Queued {
@@ -143,6 +165,7 @@ actor LiveActivityEngine {
         struct PendingEnd {
             let content: DriverContent?
             let dismissal: DriverDismissal
+            let completionBarrier: CompletionPresentationBarrier?
         }
 
         var desired: DriverContent?
@@ -231,7 +254,11 @@ actor LiveActivityEngine {
         for query in plan.queries {
             results[query] = await environment.readHealth(metric: query.metric, from: query.start, to: query.end)
         }
-        _ = await perform(.applyHealth(plan, results))
+        if case .healthApplied(let barriers) = await perform(.applyHealth(plan, results)) {
+            // The command loop is free while these wait, so an earlier card
+            // update can finish and the queued completion update can start.
+            for barrier in barriers { await barrier.wait() }
+        }
 
         var today: [HealthMetric: HealthTotalRead] = [:]
         for (query, read) in results where query.start == plan.dayStart && query.end == plan.readAt {
@@ -274,8 +301,7 @@ actor LiveActivityEngine {
         case .planHealthRead:
             return .healthPlan(await planHealthRead())
         case .applyHealth(let plan, let results):
-            await applyHealth(plan, results)
-            return .done
+            return .healthApplied(await applyHealth(plan, results))
         case .activityStateChanged(let id, let state):
             await activityStateChanged(id, state)
             return .done
@@ -569,7 +595,7 @@ actor LiveActivityEngine {
             if !file.records[index].slotCompletions.contains(request.activityId) {
                 file.records[index].slotCompletions.append(request.activityId)
             }
-            evaluateHealthCompletion(index, context: context)
+            _ = evaluateHealthCompletion(index, context: context)
         }
         refreshCards(context)
         persist()
@@ -695,9 +721,13 @@ actor LiveActivityEngine {
     /// clears the old value instead of passing it off as current. Totals may
     /// go down (samples can be deleted); a slot once reached stays reached for
     /// the occurrence, as it does in the web app.
-    private func applyHealth(_ plan: HealthReadPlan, _ results: [HealthQuery: HealthTotalRead]) async {
-        guard driver.isSupported, loaded, plan.accountGeneration == file.accountGeneration else { return }
+    private func applyHealth(
+        _ plan: HealthReadPlan,
+        _ results: [HealthQuery: HealthTotalRead]
+    ) async -> [CompletionPresentationBarrier] {
+        guard driver.isSupported, loaded, plan.accountGeneration == file.accountGeneration else { return [] }
         let context = await makeContext()
+        var completionBarriers: [CompletionPresentationBarrier] = []
         for (key, target) in plan.targets {
             guard let index = file.records.firstIndex(where: { $0.key == key }),
                   file.records[index].occurrenceToken == target.occurrenceToken,
@@ -730,23 +760,30 @@ actor LiveActivityEngine {
                 record.slots[activity.activityId] = progress
             }
             file.records[index] = record
-            evaluateHealthCompletion(index, context: context)
+            if let barrier = evaluateHealthCompletion(index, context: context) {
+                completionBarriers.append(barrier)
+            }
         }
         refreshCards(context)
         persist()
+        return completionBarriers
     }
 
     /// Every Health-mapped slot reached in this occurrence, the deployed web
     /// rule. One slot reached is progress, never the contract.
-    private func evaluateHealthCompletion(_ index: Int, context: Context) {
+    private func evaluateHealthCompletion(
+        _ index: Int,
+        context: Context
+    ) -> CompletionPresentationBarrier? {
         let record = file.records[index]
         let policy = record.definition.completionPolicy
-        guard record.terminal == nil, policy.completesOnHealth, record.key.healthDay == context.today.day else { return }
+        guard record.terminal == nil, policy.completesOnHealth,
+              record.key.healthDay == context.today.day else { return nil }
         let required = record.definition.activities.filter { policy.requiredActivityIds.contains($0.activityId) }
         guard required.count == policy.requiredActivityIds.count,
-              required.allSatisfy({ LiveActivityPresenter.isReached($0, in: record) }) else { return }
+              required.allSatisfy({ LiveActivityPresenter.isReached($0, in: record) }) else { return nil }
         let reachedAt = required.compactMap { record.slots[$0.activityId]?.reachedAt }.max() ?? context.now
-        complete(index, at: min(reachedAt, context.now), finishedTimer: nil, context: context)
+        return complete(index, at: min(reachedAt, context.now), finishedTimer: nil, context: context)
     }
 
     // MARK: - Lifecycle
@@ -921,20 +958,33 @@ actor LiveActivityEngine {
         return scores
     }
 
-    private func complete(_ index: Int, at date: Date, finishedTimer: TimerRunSnapshot?, context: Context) {
+    @discardableResult
+    private func complete(
+        _ index: Int,
+        at date: Date,
+        finishedTimer: TimerRunSnapshot?,
+        context: Context
+    ) -> CompletionPresentationBarrier? {
         file.records[index].terminal = .completed
         file.records[index].completedAt = date
         file.records[index].timerRunId = nil
         if let finishedTimer { file.records[index].finishedTimer = finishedTimer }
         file.records[index].presentation = .ended
         file.records[index].presentationReason = TerminalReason.completed.rawValue
-        guard let id = file.records[index].activityKitId else { return }
-        // The result stays readable on the Lock Screen for a moment. This only
-        // schedules removal of a card that has already ended.
+        guard let id = file.records[index].activityKitId else { return nil }
+        // The driver first presents the completion moment in the Dynamic
+        // Island, then ends the card and leaves its result briefly on Lock Screen.
         let dismissal = DriverDismissal.after(context.now.addingTimeInterval(LiveActivityConfig.completedDismissalDelay))
-        requestEnd(id, content: LiveActivityPresenter.finalContent(for: file.records[index], now: context.now), dismissal: dismissal)
+        let barrier = CompletionPresentationBarrier()
+        requestEnd(
+            id,
+            content: LiveActivityPresenter.finalContent(for: file.records[index], now: context.now),
+            dismissal: dismissal,
+            completionBarrier: barrier
+        )
         file.records[index].activityKitId = nil
         file.records[index].lastUpdatedAt = context.now
+        return barrier
     }
 
     /// Expired or out of its day. The Testament Timer is business state and is
@@ -1022,7 +1072,12 @@ actor LiveActivityEngine {
     /// End is terminal for the card: later updates are ignored and a stale
     /// result can never bring it back. A second end only matters when it
     /// removes the card sooner (sign-out while a result is still on show).
-    private func requestEnd(_ id: String, content: DriverContent?, dismissal: DriverDismissal) {
+    private func requestEnd(
+        _ id: String,
+        content: DriverContent?,
+        dismissal: DriverDismissal,
+        completionBarrier: CompletionPresentationBarrier? = nil
+    ) {
         endedByNative.insert(id)
         var operations = cards[id] ?? CardOperations()
         if let pending = operations.pendingEnd {
@@ -1030,12 +1085,20 @@ actor LiveActivityEngine {
             if operations.endSent {
                 operations.removeImmediatelyAfterEnd = true
             } else {
-                operations.pendingEnd = CardOperations.PendingEnd(content: pending.content, dismissal: .immediate)
+                operations.pendingEnd = CardOperations.PendingEnd(
+                    content: pending.content,
+                    dismissal: .immediate,
+                    completionBarrier: pending.completionBarrier
+                )
             }
             cards[id] = operations
             return
         }
-        operations.pendingEnd = CardOperations.PendingEnd(content: content, dismissal: dismissal)
+        operations.pendingEnd = CardOperations.PendingEnd(
+            content: content,
+            dismissal: dismissal,
+            completionBarrier: completionBarrier
+        )
         cards[id] = operations
         pump(id)
     }
@@ -1050,6 +1113,7 @@ actor LiveActivityEngine {
             cards[id] = operations
             Task {
                 await driver.end(activityId: id, content: end.content, dismissal: end.dismissal)
+                await end.completionBarrier?.signal()
                 self.submit(.cardOperationFinished(activityId: id, version: Self.endVersion))
             }
             return
@@ -1072,7 +1136,11 @@ actor LiveActivityEngine {
                 return
             }
             operations = CardOperations()
-            operations.pendingEnd = CardOperations.PendingEnd(content: nil, dismissal: .immediate)
+            operations.pendingEnd = CardOperations.PendingEnd(
+                content: nil,
+                dismissal: .immediate,
+                completionBarrier: nil
+            )
             cards[id] = operations
             pump(id)
             return

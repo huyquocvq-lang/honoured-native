@@ -46,6 +46,13 @@ enum LiveActivityPreviewStates {
 
     static let timerOnly = state("Meditation", timer: runningTimer("Meditation", minutesLeft: 9, total: 10))
 
+    static let timerDeadlineCompleted: HonouredLiveActivityState = {
+        var result = state("Meditation", timer: runningTimer("Meditation", minutesLeft: 0, total: 10))
+        result.timerCompletesContract = true
+        result.timer?.endsAt = Date().addingTimeInterval(-10)
+        return result
+    }()
+
     static let mixed = state(
         "Run 30",
         timer: runningTimer("Running"),
@@ -87,7 +94,8 @@ enum LiveActivityPreviewStates {
     )
 
     static let all: [(name: String, state: HonouredLiveActivityState)] = [
-        ("timer-only", timerOnly), ("mixed", mixed), ("two-slots", twoSlots), ("distance", distance),
+        ("timer-only", timerOnly), ("timer-deadline-completed", timerDeadlineCompleted),
+        ("mixed", mixed), ("two-slots", twoSlots), ("distance", distance),
         ("unknown", unknown), ("no-data", noData), ("stale", stale), ("completed", completed), ("long-names", longNames)
     ]
 }

@@ -69,6 +69,10 @@ struct HonouredLiveActivityState: Codable, Hashable {
     /// `activityId` of the Health slot compact presentations lead with.
     var displaySlot: String?
     var timer: TimerPart?
+    /// Lets the widget show the completion moment when the card turns stale at
+    /// the timer's `endsAt`, while the containing app is suspended. Nil decodes
+    /// cards made by older builds.
+    var timerCompletesContract: Bool? = nil
     var health: [HealthPart]
     var completedAt: Date?
     var updatedAt: Date

@@ -26,6 +26,25 @@ final class LiveActivityViewRenderTests: XCTestCase {
         }
         try render(lockScreen(LiveActivityPreviewStates.stale, isStale: true), width: 360, name: "lock-stale-flagged")
         try render(lockScreen(finishedWhileSuspended, isStale: true), width: 360, name: "lock-timer-at-zero")
+        let timerDone = LiveActivityPreviewStates.timerDeadlineCompleted
+        try render(island(timerDone, isStale: true), width: 370, name: "expanded-timer-deadline-stale")
+        try render(compact(timerDone, isStale: true), width: 250, name: "compact-timer-deadline-stale")
+    }
+
+    func testTimerAndHealthCompletionShareTheCompletionMoment() {
+        let now = Date(timeIntervalSince1970: 1_800_000_000)
+
+        XCTAssertTrue(LiveActivityPreviewStates.completed.showsCompletion(isStale: false, now: now))
+
+        var timer = LiveActivityPreviewStates.timerOnly
+        timer.timer?.endsAt = now.addingTimeInterval(-1)
+        XCTAssertFalse(timer.showsCompletion(isStale: true, now: now), "a timer under a Health-only policy never looks honoured")
+
+        timer.timerCompletesContract = true
+        XCTAssertTrue(timer.showsCompletion(isStale: true, now: now), "the stale redraw at endsAt starts the flash while the app is suspended")
+        XCTAssertFalse(timer.showsCompletion(isStale: false, now: now))
+        timer.timer?.endsAt = now.addingTimeInterval(60)
+        XCTAssertFalse(timer.showsCompletion(isStale: true, now: now))
     }
 
     /// A countdown that passed zero while the app was suspended: stale, not
@@ -42,30 +61,30 @@ final class LiveActivityViewRenderTests: XCTestCase {
             .background(HonouredPalette.background)
     }
 
-    private func island(_ state: HonouredLiveActivityState) -> some View {
+    private func island(_ state: HonouredLiveActivityState, isStale: Bool = false) -> some View {
         VStack(alignment: .leading, spacing: 8) {
             HStack {
-                ExpandedLeadingView(state: state)
+                ExpandedLeadingView(state: state, isStale: isStale)
                 Spacer()
-                ExpandedTrailingView(state: state, isStale: false)
+                ExpandedTrailingView(state: state, isStale: isStale)
             }
-            ExpandedBottomView(state: state, isStale: false)
+            ExpandedBottomView(state: state, isStale: isStale)
         }
         .padding(14)
         .background(Color.black)
     }
 
-    private func compact(_ state: HonouredLiveActivityState) -> some View {
+    private func compact(_ state: HonouredLiveActivityState, isStale: Bool = false) -> some View {
         HStack(spacing: 24) {
             HStack {
-                CompactLeadingView(state: state)
+                CompactLeadingView(state: state, isStale: isStale)
                 Spacer(minLength: 60)
-                CompactTrailingView(state: state, isStale: false)
+                CompactTrailingView(state: state, isStale: isStale)
             }
             .padding(.horizontal, 12)
             .frame(height: 36)
             .background(Capsule().fill(Color.black))
-            MinimalView(state: state, isStale: false)
+            MinimalView(state: state, isStale: isStale)
                 .frame(width: 26, height: 26)
                 .padding(5)
                 .background(Circle().fill(Color.black))

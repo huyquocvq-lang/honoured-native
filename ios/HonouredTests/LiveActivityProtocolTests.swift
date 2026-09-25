@@ -7,6 +7,19 @@ private func json(_ text: String) -> [String: Any] {
 }
 
 final class LiveActivityProtocolTests: XCTestCase {
+    func testContentStateDecodesCardsCreatedBeforeWidgetCompletionFields() throws {
+        let state = LiveActivityPreviewStates.completed
+        var object = try XCTUnwrap(JSONSerialization.jsonObject(with: JSONEncoder().encode(state)) as? [String: Any])
+        object.removeValue(forKey: "timerCompletesContract")
+
+        let decoded = try JSONDecoder().decode(
+            HonouredLiveActivityState.self,
+            from: JSONSerialization.data(withJSONObject: object)
+        )
+
+        XCTAssertNil(decoded.timerCompletesContract)
+        XCTAssertEqual(decoded.status, .completed)
+    }
     private let walk = """
     {
       "contractId": "contract-walk",

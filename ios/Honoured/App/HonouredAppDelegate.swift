@@ -25,6 +25,9 @@ final class HonouredAppDelegate: NSObject, UIApplicationDelegate {
         // only ends or adopts cards; a background launch never creates one.
         LiveActivityCoordinator.shared.applicationDidFinishLaunching()
         observeLifecycle()
+        #if DEBUG
+        LiveActivityPulseProbe.runIfRequested()
+        #endif
 
         Task {
             await TestamentTimer.shared.reconcile()
@@ -73,10 +76,10 @@ final class HonouredAppDelegate: NSObject, UIApplicationDelegate {
             center.addObserver(
                 forName: UIApplication.didEnterBackgroundNotification, object: nil, queue: .main
             ) { _ in
+                NotificationSound.yieldToOtherApps()
                 // Refresh the pending request on every background transition so the
                 // earliest-begin date is measured from the last time the user left.
                 HealthBackgroundRefresh.shared.scheduleIfSessionExists()
-                NotificationSound.yieldToOtherApps()
             }
         ]
     }

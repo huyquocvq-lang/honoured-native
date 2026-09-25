@@ -38,6 +38,11 @@ final class LiveActivityPresenterTests: XCTestCase {
         content = LiveActivityPresenter.content(for: walk, timer: run, today: today, now: now, relevanceScore: 100, previous: nil)
         XCTAssertEqual(content.staleDate, run.endsAt, "the countdown reaching zero makes the card stale, it does not end it")
         XCTAssertEqual(content.state.timer?.finished, false)
+        XCTAssertEqual(content.state.timerCompletesContract, false, "a timer must not imply completion under a Health-only policy")
+
+        walk.definition.completionPolicy = .allHealthSlotsOrTimer(requiredActivityIds: ["w:primary"], timerActivityId: "w")
+        content = LiveActivityPresenter.content(for: walk, timer: run, today: today, now: now, relevanceScore: 100, previous: nil)
+        XCTAssertEqual(content.state.timerCompletesContract, true, "the widget may render completion at the known timer deadline")
 
         let other = TimerRunSnapshot(runId: "other", activityId: "w", activityName: "Walk", startedAt: now, endsAt: now.addingTimeInterval(60))
         XCTAssertNil(LiveActivityPresenter.content(for: walk, timer: other, today: today, now: now, relevanceScore: 1, previous: nil).state.timer,
@@ -70,6 +75,7 @@ final class LiveActivityPresenterTests: XCTestCase {
         done.completedAt = now
         let final = LiveActivityPresenter.finalContent(for: done, now: now)
         XCTAssertEqual(final.state.status, .completed)
+        XCTAssertEqual(final.state.timerCompletesContract, false)
         XCTAssertNil(final.staleDate)
         done.terminal = .expired
         XCTAssertEqual(LiveActivityPresenter.finalContent(for: done, now: now).state.status, .ended)

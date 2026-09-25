@@ -517,6 +517,47 @@ final class LiveActivityEngineTests: XCTestCase {
         XCTAssertEqual(h.driver.liveCard("b")?.content.state.health.first?.value, 6000)
     }
 
+    func testHealthRefreshWaitsUntilCompletedContentReachesActivityKit() async {
+        let h = await EngineHarness.make()
+        let walk = h.healthContract("walk")
+        h.setGoals(for: [walk])
+        _ = await h.track(walk)
+
+        let endGate = AsyncGate()
+        let returned = AsyncGate()
+        h.driver.endGate = { await endGate.wait() }
+        h.environment.health = [.steps: .value(9000)]
+
+        let refresh = Task {
+            _ = await h.engine.refreshHealth()
+            await returned.wait()
+        }
+        await endGate.waitForArrival()
+        let returnsBeforePresentation = await returned.arrivals
+        XCTAssertEqual(returnsBeforePresentation, 0, "HealthKit must stay acknowledged-open until completed content is presented")
+
+        await endGate.open()
+        await returned.waitForArrival()
+        await returned.open()
+        _ = await refresh.value
+        XCTAssertEqual(h.driver.anyCard("walk")?.content.state.status, .completed)
+    }
+
+    func testHealthCompletesTheCombinedHealthOrTimerPolicy() async {
+        let h = await EngineHarness.make()
+        let walk = h.healthContract("walk", policy: "all_health_slots_or_timer")
+        h.setGoals(for: [walk])
+        _ = await h.track(walk)
+        h.environment.health = [.steps: .value(9000)]
+
+        await h.engine.refreshHealth()
+        await h.settle()
+
+        let reason = await h.entry("walk")?.reason
+        XCTAssertEqual(reason, "completed")
+        XCTAssertEqual(h.driver.anyCard("walk")?.content.state.status, .completed)
+    }
+
     func testUnknownIsNeverZeroAndAFailedReadKeepsTheLastReading() async {
         let h = await EngineHarness.make()
         let walk = h.healthContract("walk", policy: "web_authoritative")

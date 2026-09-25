@@ -45,9 +45,21 @@ struct ContractLockScreenView: View {
 
 struct CompactLeadingView: View {
     let state: HonouredLiveActivityState
+    let isStale: Bool
+
+    var body: some View {
+        let completed = state.showsCompletion(isStale: isStale)
+        ZStack {
+            regularContent
+                .opacity(completed ? 0 : 1)
+                .animation(nil, value: completed)
+            CompletionBrandMark(isCompleted: completed, width: 28, height: 18)
+        }
+        .frame(width: 34, height: 24)
+    }
 
     @ViewBuilder
-    var body: some View {
+    private var regularContent: some View {
         if state.status == .active, state.timer == nil, let part = state.displayedHealth {
             ProgressRing(
                 fraction: HonouredLiveActivityFormat.progress(value: part.value, target: part.target),
@@ -70,12 +82,12 @@ struct CompactTrailingView: View {
 
     var body: some View {
         Group {
-            if state.status == .completed {
-                Image(systemName: "checkmark")
-                    .foregroundStyle(HonouredPalette.gold)
-                    .accessibilityLabel("Honoured")
-            } else if state.status == .ended {
+            if state.status == .ended {
                 Text("Closed").font(.caption).foregroundStyle(HonouredPalette.muted)
+            } else if state.timer != nil, state.showsCompletion(isStale: isStale) {
+                // Completion only changes the leading mark; the trailing side
+                // stays where the countdown stopped.
+                Text("0:00").monospacedDigit()
             } else if let timer = state.timer {
                 if timer.finished {
                     // The timer is done; the contract is not necessarily.
@@ -107,10 +119,22 @@ struct MinimalView: View {
     let isStale: Bool
 
     var body: some View {
+        let completed = state.showsCompletion(isStale: isStale)
+        ZStack {
+            regularContent
+                .opacity(completed ? 0 : 1)
+                .animation(nil, value: completed)
+            CompletionBrandMark(isCompleted: completed, width: 24, height: 16)
+        }
+        .frame(width: 28, height: 24)
+    }
+
+    @ViewBuilder
+    private var regularContent: some View {
         if state.status != .active {
             Image(systemName: ContractSymbol.leading(for: state))
-                .foregroundStyle(state.status == .completed ? HonouredPalette.gold : HonouredPalette.muted)
-                .accessibilityLabel(state.status == .completed ? "Honoured" : "Closed")
+                .foregroundStyle(HonouredPalette.muted)
+                .accessibilityLabel("Closed")
         } else if let timer = state.timer {
             if timer.finished || (isStale && timer.endsAt <= Date()) {
                 Image(systemName: timer.finished ? ContractSymbol.timerDone : ContractSymbol.timer)
@@ -135,10 +159,15 @@ struct MinimalView: View {
 
 struct ExpandedLeadingView: View {
     let state: HonouredLiveActivityState
+    let isStale: Bool
 
     var body: some View {
-        // Only the mark: the activity name is on the row below.
+        // On completion the large pulsing mark in the bottom region takes
+        // over; a second mark here would compete with it.
+        let completed = state.showsCompletion(isStale: isStale)
         HonouredBrandMark()
+            .opacity(completed ? 0 : 1)
+            .animation(nil, value: completed)
             .padding(.leading, 4)
     }
 }
@@ -158,6 +187,34 @@ struct ExpandedBottomView: View {
     let isStale: Bool
 
     var body: some View {
+        // Both layers are always present so the completed update animates the
+        // mark in place; a view inserted already completed would not pulse.
+        let completed = state.showsCompletion(isStale: isStale)
+        // The text swaps without a cross-fade so the two layouts never overlap.
+        ZStack {
+            if !completed {
+                regularContent.transition(.identity)
+            }
+            VStack(spacing: 4) {
+                CompletionBrandMark(isCompleted: completed, width: 64, height: 36)
+                if completed {
+                    VStack(spacing: 2) {
+                        Text("HONOURED")
+                            .font(.headline.weight(.bold))
+                            .foregroundStyle(HonouredPalette.gold)
+                        Text(state.contractName)
+                            .font(.caption.weight(.medium))
+                            .foregroundStyle(HonouredPalette.ink)
+                            .lineLimit(1)
+                    }
+                    .transition(.identity)
+                }
+            }
+            .frame(maxWidth: .infinity)
+        }
+    }
+
+    private var regularContent: some View {
         VStack(alignment: .leading, spacing: 8) {
             if state.status == .active {
                 if let timer = state.timer {
@@ -212,6 +269,9 @@ private struct ContractHeader: View {
 /// The app identity belongs in the card header. Metric identity stays in each
 /// progress row and in the compact/minimal Dynamic Island presentations.
 private struct HonouredBrandMark: View {
+    var width: CGFloat = 32
+    var height: CGFloat = 18
+
     private var hasBundledMark: Bool {
         UIImage(named: "HonouredMark") != nil
     }
@@ -233,9 +293,56 @@ private struct HonouredBrandMark: View {
                     .scaledToFit()
             }
         }
-        .frame(width: 32, height: 18)
+        .frame(width: width, height: height)
         .foregroundStyle(HonouredPalette.gold)
         .accessibilityHidden(true)
+    }
+}
+
+/// Pulses the mark (grows and shrinks, fading in and out) when the card turns
+/// completed. A Live Activity has no running clock between content updates
+/// (TimelineView does not tick there), so the pulse is one animation attached
+/// to the update that changes `isCompleted`, under the 2 s
+/// WidgetKit allows. It therefore needs an update from the app: a redraw iOS
+/// makes on its own (a timer turning stale) shows the mark without motion.
+/// iOS 16 ignores custom animations and simply fades in.
+private struct CompletionBrandMark: View {
+    let isCompleted: Bool
+    var width: CGFloat = 32
+    var height: CGFloat = 18
+
+    @Environment(\.isLuminanceReduced) private var isLuminanceReduced
+
+    /// Seven half-cycles end on the full-size mark: four grows and three
+    /// shrinks in 1.96 s, just inside the 2 s WidgetKit allows.
+    static let pulse = Animation.easeInOut(duration: 0.28).repeatCount(7, autoreverses: true)
+
+    var body: some View {
+        HonouredBrandMark(width: width, height: height)
+            // The island "lights up": a gold glow that brightens and fades with
+            // each pulse. It stays inside the island's black shape.
+            .shadow(color: HonouredPalette.gold.opacity(isCompleted ? 0.95 : 0), radius: isCompleted ? 6 : 0)
+            .shadow(color: HonouredPalette.gold.opacity(isCompleted ? 0.6 : 0), radius: isCompleted ? 12 : 0)
+            .scaleEffect(isCompleted ? 1 : 0.5)
+            .opacity(isCompleted ? 1 : 0)
+            // Always On does not animate; show the result without the pulse.
+            .animation(isLuminanceReduced ? nil : Self.pulse, value: isCompleted)
+            .accessibilityHidden(!isCompleted)
+            .accessibilityLabel("Honoured")
+    }
+}
+
+extension HonouredLiveActivityState {
+    /// Completed, or a timer that completes this contract has reached zero.
+    /// The second case needs no update from the app: ActivityKit redraws the
+    /// card when it turns stale at `endsAt`, so the island can celebrate while
+    /// the app is suspended. Business completion still happens when the app
+    /// reconciles; a timer under a Health-only policy never looks honoured.
+    func showsCompletion(isStale: Bool, now: Date = Date()) -> Bool {
+        if status == .completed { return true }
+        guard status == .active, timerCompletesContract == true, isStale,
+              let timer, timer.endsAt <= now else { return false }
+        return true
     }
 }
 

@@ -23,6 +23,8 @@ final class FakeDriver: LiveActivityDriving {
     var requestError: DriverRequestError?
     /// Delays every update, to hold one in flight while something else happens.
     var updateDelayNanoseconds: UInt64 = 0
+    /// Holds an end call before its first completed presentation is recorded.
+    var endGate: (() async -> Void)?
 
     private(set) var requestCount = 0
 
@@ -60,6 +62,8 @@ final class FakeDriver: LiveActivityDriving {
     }
 
     func end(activityId: String, content: DriverContent?, dismissal: DriverDismissal) async {
+        let gate = locked { endGate }
+        await gate?()
         locked {
             guard var card = storage[activityId], card.state != .dismissed else { return }
             if let content, card.state != .ended { card.content = content }

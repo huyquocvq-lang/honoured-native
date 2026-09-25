@@ -12,18 +12,22 @@ final class LiveActivityCoordinator {
     static let shared = LiveActivityCoordinator()
 
     private let engine: LiveActivityEngine?
+    private let endPresentedCompletions: (() async -> Void)?
 
     private init() {
         if #available(iOS 16.2, *) {
+            let driver = ActivityKitDriver()
             let engine = LiveActivityEngine(
-                driver: ActivityKitDriver(),
+                driver: driver,
                 environment: AppLiveActivityEnvironment(),
                 persistence: FileTrackedContractsPersistence(url: FileTrackedContractsPersistence.defaultURL)
             )
             engine.start()
             self.engine = engine
+            endPresentedCompletions = { await driver.endPresentedCompletions() }
         } else {
             engine = nil
+            endPresentedCompletions = nil
         }
     }
 
@@ -55,6 +59,9 @@ final class LiveActivityCoordinator {
     }
 
     func applicationDidBecomeActive() {
+        // A completion held on the island has been seen once the app is open;
+        // leaving the app again must not bring it back.
+        if let endPresentedCompletions { Task { await endPresentedCompletions() } }
         submit(.appBecameActive)
         refreshHealthSoon()
     }

@@ -688,6 +688,7 @@ enum BridgeStub {
         check('Walking keeps priority', s.payload.focusedOccurrence?.contractId === 'c-walk');
         list = await laList();
         const done = list.find((a) => a.contractId === 'c-exercise');
+        // In the foreground the island is hidden, so the card ends at once.
         check('Exercise final content says completed', !!done && done.status === 'completed' && done.activityState === 'ended');
 
         r = await req('CLEAR_AUTH_SESSION', {}, ['AUTH_SESSION_CLEARED']);
