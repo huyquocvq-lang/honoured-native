@@ -23,7 +23,7 @@ struct ContractLockScreenView: View {
             ContractHeader(state: state, isStale: isStale)
             if state.status == .active {
                 if let timer = state.timer {
-                    TimerRow(timer: timer, contractName: state.contractName, isStale: isStale)
+                    TimerRow(timer: timer, isStale: isStale)
                 }
                 ForEach(state.health, id: \.activityId) { part in
                     HealthRow(part: part)
@@ -137,15 +137,9 @@ struct ExpandedLeadingView: View {
     let state: HonouredLiveActivityState
 
     var body: some View {
-        HStack(spacing: 6) {
-            HonouredBrandMark()
-            Text(state.contractName)
-                .font(.headline)
-                .lineLimit(1)
-                .minimumScaleFactor(0.75)
-        }
-        .foregroundStyle(HonouredPalette.ink)
-        .padding(.leading, 4)
+        // Only the mark: the activity name is on the row below.
+        HonouredBrandMark()
+            .padding(.leading, 4)
     }
 }
 
@@ -167,7 +161,7 @@ struct ExpandedBottomView: View {
         VStack(alignment: .leading, spacing: 8) {
             if state.status == .active {
                 if let timer = state.timer {
-                    TimerRow(timer: timer, contractName: state.contractName, isStale: isStale)
+                    TimerRow(timer: timer, isStale: isStale)
                 }
                 ForEach(state.health, id: \.activityId) { part in
                     HealthRow(part: part)
@@ -206,12 +200,9 @@ private struct ContractHeader: View {
     let isStale: Bool
 
     var body: some View {
+        // Only the mark: the activity name is on the row below.
         HStack(alignment: .center, spacing: 8) {
             HonouredBrandMark()
-            Text(state.contractName)
-                .font(.headline)
-                .lineLimit(1)
-                .minimumScaleFactor(0.75)
             Spacer(minLength: 8)
             ContractSummary(state: state, isStale: isStale)
         }
@@ -279,7 +270,6 @@ private struct ContractSummary: View {
 
 private struct TimerRow: View {
     let timer: HonouredLiveActivityState.TimerPart
-    let contractName: String
     let isStale: Bool
 
     var body: some View {
@@ -287,18 +277,20 @@ private struct TimerRow: View {
             // At zero with the app suspended the finish is not processed yet;
             // say so instead of implying the contract is done.
             Label(
-                timer.finished ? "Time's up" : "Time's up · open Honoured",
+                "\(timer.name) · \(timer.finished ? "Time's up" : "Time's up · open Honoured")",
                 systemImage: timer.finished ? ContractSymbol.timerDone : ContractSymbol.timer
             )
             .font(.subheadline)
+            .lineLimit(1)
             .foregroundStyle(timer.finished ? HonouredPalette.gold : HonouredPalette.muted)
         } else {
             VStack(alignment: .leading, spacing: 4) {
-                if timer.name != contractName {
-                    Text(timer.name)
+                // The header shows only the mark, so the name is always here.
+                HStack(alignment: .firstTextBaseline, spacing: 6) {
+                    Image(systemName: ContractSymbol.timer)
                         .font(.caption)
                         .foregroundStyle(HonouredPalette.muted)
-                        .lineLimit(1)
+                    Text(timer.name).font(.subheadline).lineLimit(1)
                 }
                 // The countdown itself is in the summary at the top right.
                 ProgressView(timerInterval: timer.startedAt...timer.endsAt, countsDown: false) {
@@ -439,6 +431,17 @@ private struct ResultRow: View {
     let state: HonouredLiveActivityState
 
     var body: some View {
+        VStack(alignment: .leading, spacing: 4) {
+            // The header shows only the mark, so name the contract here.
+            Text(state.contractName)
+                .font(.subheadline)
+                .foregroundStyle(HonouredPalette.muted)
+                .lineLimit(1)
+            outcome
+        }
+    }
+
+    @ViewBuilder private var outcome: some View {
         if state.status == .completed {
             HStack(alignment: .firstTextBaseline) {
                 Text("Honoured")
