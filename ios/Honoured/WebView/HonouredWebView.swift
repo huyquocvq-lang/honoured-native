@@ -18,10 +18,12 @@ struct HonouredWebView: UIViewRepresentable {
         // Paint partial frames instead of holding a blank view until the whole
         // document is ready.
         configuration.suppressesIncrementalRendering = false
-        // Media the web app starts itself (the ambient restriction tone) should
-        // not need a second user gesture inside the shell.
+        // Keep media inline, but require a user gesture before HTML audio can
+        // claim the shared iOS audio session.
         configuration.allowsInlineMediaPlayback = true
-        configuration.mediaTypesRequiringUserActionForPlayback = []
+        // Never let an HTML audio/video element silently take ownership of the
+        // system audio session. User-started playback and Web Audio still work.
+        configuration.mediaTypesRequiringUserActionForPlayback = .audio
 
         let webView = WKWebView(frame: .zero, configuration: configuration)
         webView.navigationDelegate = context.coordinator

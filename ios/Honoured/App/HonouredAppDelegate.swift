@@ -16,7 +16,7 @@ final class HonouredAppDelegate: NSObject, UIApplicationDelegate {
         HealthBackgroundObserver.shared.start()
         HealthBackgroundRefresh.shared.register()
         NotificationCoordinator.shared.install()
-        NotificationSound.migrateDefaultToEnabledIfNeeded()
+        NotificationSound.migrateDefaultToDisabledIfNeeded()
         NotificationSound.configureAudioSession()
         AppleSignInCoordinator.shared.observeRevocation()
         AppleSignInCoordinator.shared.checkCredentialStateIfNeeded()
@@ -76,6 +76,7 @@ final class HonouredAppDelegate: NSObject, UIApplicationDelegate {
                 // Refresh the pending request on every background transition so the
                 // earliest-begin date is measured from the last time the user left.
                 HealthBackgroundRefresh.shared.scheduleIfSessionExists()
+                NotificationSound.yieldToOtherApps()
             }
         ]
     }

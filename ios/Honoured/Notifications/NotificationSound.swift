@@ -4,11 +4,12 @@ import UserNotifications
 
 /// The "Completion sound" setting mirrored from the web app through
 /// `SET_SOUND_ENABLED`, and the sound it attaches to timer and goal
-/// notifications. Default is on for a fresh install; the web setting can still
+/// notifications. Default is off so completion never interrupts music unless
+/// the person explicitly opts in; the web setting can still
 /// disable it explicitly and that choice remains persisted.
 enum NotificationSound {
     private static let key = "sound.enabled"
-    private static let defaultOnMigrationKey = "sound.default-on.v2"
+    private static let defaultOffMigrationKey = "sound.default-off.v3"
 
     /// Drop the approved gong at `ios/Honoured/gong.caf` (`.caf`, `.aiff` or
     /// `.wav`, under 30 s); XcodeGen bundles it as a resource. The system default
@@ -16,7 +17,7 @@ enum NotificationSound {
     static let gongFileName = "gong.caf"
 
     static var isEnabled: Bool {
-        guard UserDefaults.standard.object(forKey: key) != nil else { return true }
+        guard UserDefaults.standard.object(forKey: key) != nil else { return false }
         return UserDefaults.standard.bool(forKey: key)
     }
 
@@ -24,19 +25,21 @@ enum NotificationSound {
         UserDefaults.standard.set(enabled, forKey: key)
     }
 
-    /// Earlier builds persisted the old default (`false`), which is
-    /// indistinguishable from a user choice. Enable sound once when upgrading
-    /// to the bundled-gong build; later changes through Settings remain intact.
-    static func migrateDefaultToEnabledIfNeeded() {
-        guard !UserDefaults.standard.bool(forKey: defaultOnMigrationKey) else { return }
-        UserDefaults.standard.set(true, forKey: key)
-        UserDefaults.standard.set(true, forKey: defaultOnMigrationKey)
+    /// Move existing installs to the music-safe default once. A later explicit
+    /// Settings change remains persisted.
+    static func migrateDefaultToDisabledIfNeeded() {
+        guard !UserDefaults.standard.bool(forKey: defaultOffMigrationKey) else { return }
+        UserDefaults.standard.set(false, forKey: key)
+        UserDefaults.standard.set(true, forKey: defaultOffMigrationKey)
     }
 
     /// Nil when the setting is off: iOS then delivers the notification without
     /// sound or vibration. When on, the bundled gong or the system default.
     static var current: UNNotificationSound? {
         guard isEnabled else { return nil }
+        // Primary audio such as Amazon Music takes priority over Honoured's
+        // optional completion gong.
+        guard !AVAudioSession.sharedInstance().isOtherAudioPlaying else { return nil }
         guard isGongBundled else { return .default }
         return UNNotificationSound(named: UNNotificationSoundName(gongFileName))
     }
@@ -54,5 +57,13 @@ enum NotificationSound {
     /// which ignores the switch. Notification sounds are not affected either way.
     static func configureAudioSession() {
         try? AVAudioSession.sharedInstance().setCategory(.ambient, mode: .default)
+    }
+
+    /// Relinquishes any session WebKit activated and tells the previous audio
+    /// app (for example Amazon Music) that it may resume immediately.
+    static func yieldToOtherApps() {
+        let session = AVAudioSession.sharedInstance()
+        try? session.setCategory(.ambient, mode: .default)
+        try? session.setActive(false, options: .notifyOthersOnDeactivation)
     }
 }
