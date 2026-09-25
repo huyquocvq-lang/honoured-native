@@ -1,4 +1,5 @@
 import SwiftUI
+import UIKit
 
 // Views for a contract's Live Activity. They take the plain content state, not
 // the ActivityKit context, so the unit tests can render every variant.
@@ -137,9 +138,7 @@ struct ExpandedLeadingView: View {
 
     var body: some View {
         HStack(spacing: 6) {
-            Image(systemName: ContractSymbol.leading(for: state))
-                .foregroundStyle(HonouredPalette.gold)
-                .accessibilityHidden(true)
+            HonouredBrandMark()
             Text(state.contractName)
                 .font(.headline)
                 .lineLimit(1)
@@ -207,10 +206,8 @@ private struct ContractHeader: View {
     let isStale: Bool
 
     var body: some View {
-        HStack(alignment: .firstTextBaseline, spacing: 8) {
-            Image(systemName: ContractSymbol.leading(for: state))
-                .foregroundStyle(HonouredPalette.gold)
-                .accessibilityHidden(true)
+        HStack(alignment: .center, spacing: 8) {
+            HonouredBrandMark()
             Text(state.contractName)
                 .font(.headline)
                 .lineLimit(1)
@@ -218,6 +215,36 @@ private struct ContractHeader: View {
             Spacer(minLength: 8)
             ContractSummary(state: state, isStale: isStale)
         }
+    }
+}
+
+/// The app identity belongs in the card header. Metric identity stays in each
+/// progress row and in the compact/minimal Dynamic Island presentations.
+private struct HonouredBrandMark: View {
+    private var hasBundledMark: Bool {
+        UIImage(named: "HonouredMark") != nil
+    }
+
+    @ViewBuilder
+    var body: some View {
+        Group {
+            if hasBundledMark {
+                Image("HonouredMark")
+                    .renderingMode(.template)
+                    .resizable()
+                    .scaledToFit()
+            } else {
+                // The logic-test bundle does not carry the Widget Extension's
+                // asset catalog. Keep render tests meaningful without logging
+                // a missing-image warning; production uses the bundled mark.
+                Image(systemName: "infinity")
+                    .resizable()
+                    .scaledToFit()
+            }
+        }
+        .frame(width: 32, height: 18)
+        .foregroundStyle(HonouredPalette.gold)
+        .accessibilityHidden(true)
     }
 }
 
