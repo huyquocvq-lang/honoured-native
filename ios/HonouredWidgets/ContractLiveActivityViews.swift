@@ -45,10 +45,21 @@ struct ContractLockScreenView: View {
 struct CompactLeadingView: View {
     let state: HonouredLiveActivityState
 
+    @ViewBuilder
     var body: some View {
-        Image(systemName: ContractSymbol.leading(for: state))
-            .foregroundStyle(HonouredPalette.gold)
-            .accessibilityHidden(true)
+        if state.status == .active, state.timer == nil, let part = state.displayedHealth {
+            ProgressRing(
+                fraction: HonouredLiveActivityFormat.progress(value: part.value, target: part.target),
+                symbol: HonouredLiveActivityFormat.symbol(forMetric: part.metric),
+                reached: part.reached,
+                preservesMetricSymbol: true
+            )
+            .frame(width: 24, height: 24)
+        } else {
+            Image(systemName: ContractSymbol.leading(for: state))
+                .foregroundStyle(HonouredPalette.gold)
+                .accessibilityHidden(true)
+        }
     }
 }
 
@@ -367,15 +378,14 @@ private struct ShortHealthValue: View {
     let part: HonouredLiveActivityState.HealthPart
 
     var body: some View {
-        if part.reached {
-            Image(systemName: "checkmark").foregroundStyle(HonouredPalette.gold)
-                .accessibilityLabel("\(part.name) reached")
-        } else if let value = part.value {
+        if let value = part.value {
             Text(HonouredLiveActivityFormat.shortValueText(value, metric: part.metric, displayUnit: part.displayUnit))
+                .monospacedDigit()
                 .lineLimit(1)
                 .minimumScaleFactor(0.6)
                 .frame(maxWidth: 52, alignment: .trailing)
                 .privacySensitive()
+                .accessibilityLabel("\(part.name), \(HonouredLiveActivityFormat.valueText(value, metric: part.metric, displayUnit: part.displayUnit)), \(Int(((HonouredLiveActivityFormat.progress(value: value, target: part.target) ?? 0) * 100).rounded())) percent")
         } else {
             Text("–").foregroundStyle(HonouredPalette.muted)
                 .accessibilityLabel("\(part.name), no reading yet")
@@ -447,6 +457,7 @@ private struct ProgressRing: View {
     let fraction: Double?
     let symbol: String
     let reached: Bool
+    var preservesMetricSymbol = false
 
     var body: some View {
         ZStack {
@@ -457,7 +468,7 @@ private struct ProgressRing: View {
                     .stroke(HonouredPalette.gold, style: StrokeStyle(lineWidth: 2.5, lineCap: .round))
                     .rotationEffect(.degrees(-90))
             }
-            Image(systemName: reached ? "checkmark" : symbol)
+            Image(systemName: reached && !preservesMetricSymbol ? "checkmark" : symbol)
                 .font(.system(size: 9, weight: .bold))
                 .foregroundStyle(fraction == nil ? HonouredPalette.muted : HonouredPalette.gold)
         }

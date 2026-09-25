@@ -49,7 +49,7 @@ actor HealthSyncCoordinator {
     /// Coalesces concurrent triggers without dropping a HealthKit change. A trigger
     /// received while a pass is running requests one more full anchored-read pass;
     /// all callers resume after the final pass has durably queued its results.
-    func collectAndEnqueue() async -> HealthCollectionOutcome {
+    func collectAndEnqueue(prefetched: HealthPrefetch? = nil) async -> HealthCollectionOutcome {
         if isCollecting {
             needsAnotherCollectionPass = true
             return await withCheckedContinuation { continuation in
@@ -72,11 +72,16 @@ actor HealthSyncCoordinator {
             // requests happen before any HealthKit completion handler is
             // acknowledged; ActivityKit applies the updates asynchronously, so a
             // background wake can still be suspended before they land.
-            let prefetched = await LiveActivityCoordinator.shared.refreshHealthProgress()
+            let currentTotals: HealthPrefetch?
+            if let prefetched {
+                currentTotals = prefetched
+            } else {
+                currentTotals = await LiveActivityCoordinator.shared.refreshHealthProgress()
+            }
             // New samples are the only thing that can push a total past its goal.
             // The same reads are reused, so the card and GOAL_REACHED agree.
             if case .queued = outcome {
-                await GoalMonitor.shared.evaluate(prefetched: prefetched)
+                await GoalMonitor.shared.evaluate(prefetched: currentTotals)
             }
         }
 

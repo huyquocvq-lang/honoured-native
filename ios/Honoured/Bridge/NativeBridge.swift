@@ -75,7 +75,7 @@ final class NativeBridge: NSObject, WKScriptMessageHandler {
         "SET_GOALS", "SET_DAY_RESET_HOUR",
         "START_TIMER", "CANCEL_TIMER", "GET_TIMER_STATE",
         "ACTIVITY_COMPLETED", "SET_SOUND_ENABLED",
-        "GET_NOTIFICATION_STATUS", "OPEN_NOTIFICATION_SETTINGS",
+        "GET_NOTIFICATION_STATUS", "REQUEST_NOTIFICATION_PERMISSION", "OPEN_NOTIFICATION_SETTINGS",
         "SIGN_IN_WITH_APPLE",
     ]
 
@@ -546,6 +546,14 @@ final class NativeBridge: NSObject, WKScriptMessageHandler {
             }
         case "GET_NOTIFICATION_STATUS":
             Task {
+                reply("NOTIFICATION_STATUS", await NotificationCoordinator.shared.statusPayload())
+            }
+        case "REQUEST_NOTIFICATION_PERMISSION":
+            // This command is sent only after the person taps Enable in the
+            // web Settings screen. iOS presents its system prompt at most once;
+            // later calls simply return the current authorization state.
+            Task {
+                _ = await NotificationCoordinator.shared.requestPermissionIfNeeded()
                 reply("NOTIFICATION_STATUS", await NotificationCoordinator.shared.statusPayload())
             }
         case "OPEN_NOTIFICATION_SETTINGS":

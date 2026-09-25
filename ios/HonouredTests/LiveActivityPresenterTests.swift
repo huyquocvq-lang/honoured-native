@@ -131,8 +131,8 @@ final class LiveActivityFormatTests: XCTestCase {
 
     func testShortValuesFitTheCompactSlot() {
         XCTAssertEqual(HonouredLiveActivityFormat.shortValueText(640, metric: "steps", displayUnit: nil, locale: us), "640")
-        XCTAssertEqual(HonouredLiveActivityFormat.shortValueText(6249, metric: "steps", displayUnit: nil, locale: us), "6.2k")
-        XCTAssertEqual(HonouredLiveActivityFormat.shortValueText(12_345, metric: "steps", displayUnit: nil, locale: us), "12k")
+        XCTAssertEqual(HonouredLiveActivityFormat.shortValueText(6249, metric: "steps", displayUnit: nil, locale: us), "6,249")
+        XCTAssertEqual(HonouredLiveActivityFormat.shortValueText(12_345, metric: "steps", displayUnit: nil, locale: us), "12,345")
         XCTAssertEqual(HonouredLiveActivityFormat.shortValueText(18.4, metric: "exercise_minutes", displayUnit: nil, locale: us), "18m")
         XCTAssertEqual(HonouredLiveActivityFormat.shortValueText(425, metric: "sleep", displayUnit: nil, locale: us), "7h05")
     }

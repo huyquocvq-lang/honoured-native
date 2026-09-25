@@ -1,5 +1,8 @@
 import Foundation
 import HealthKit
+import OSLog
+
+private let healthBackgroundLogger = Logger(subsystem: "com.honoured.app", category: "HealthBackground")
 
 enum HealthBackgroundPendingState {
     private static let key = "healthkit.background-collection-pending"
@@ -61,7 +64,12 @@ final class HealthBackgroundObserver: @unchecked Sendable {
         queries = HealthMetric.allCases.compactMap { metric in
             guard let sampleType = metric.objectType as? HKSampleType else { return nil }
             return HKObserverQuery(sampleType: sampleType, predicate: nil) {
-                _, completionHandler, _ in
+                _, completionHandler, error in
+                if let error {
+                    healthBackgroundLogger.error("Observer callback failed for \(metric.rawValue, privacy: .public): \(error.localizedDescription, privacy: .public)")
+                    completionHandler()
+                    return
+                }
                 // Persist the signal before crossing into async work. If the process
                 // is suspended, launch/foreground recovery will perform the read.
                 HealthBackgroundPendingState.markPending()
@@ -76,16 +84,20 @@ final class HealthBackgroundObserver: @unchecked Sendable {
         }
     }
 
-    /// Idempotently enables hourly delivery for every supported sample type.
-    /// `.hourly` is a maximum wake frequency, not a scheduling guarantee.
+    /// Requests delivery whenever HealthKit detects a change. HealthKit and the
+    /// system still decide when samples are committed and background runtime is
+    /// granted, so this is near-real-time rather than a per-reading guarantee.
     func enableBackgroundDelivery() {
         guard HKHealthStore.isHealthDataAvailable() else { return }
         start()
 
         for metric in HealthMetric.allCases where shouldEnable(metric) {
-            store.enableBackgroundDelivery(for: metric.objectType, frequency: .hourly) {
-                [weak self] success, _ in
+            store.enableBackgroundDelivery(for: metric.objectType, frequency: .immediate) {
+                [weak self] success, error in
                 self?.finishEnabling(metric, success: success)
+                if !success {
+                    healthBackgroundLogger.error("Could not enable immediate delivery for \(metric.rawValue, privacy: .public): \(error?.localizedDescription ?? "unknown error", privacy: .public)")
+                }
             }
         }
     }
@@ -152,7 +164,11 @@ actor HealthBackgroundDeliveryCoordinator {
         var outcome: HealthCollectionOutcome = .failed
         repeat {
             needsAnotherPass = false
-            outcome = await HealthSyncCoordinator.shared.collectAndEnqueue()
+            // Use the limited HealthKit wake window for visible feedback first.
+            // The durable collection and upload path follows, and reuses these
+            // totals for goal detection instead of querying them again.
+            let prefetched = await LiveActivityCoordinator.shared.refreshHealthProgress()
+            outcome = await HealthSyncCoordinator.shared.collectAndEnqueue(prefetched: prefetched)
         } while needsAnotherPass
 
         let pendingCompletions = completions

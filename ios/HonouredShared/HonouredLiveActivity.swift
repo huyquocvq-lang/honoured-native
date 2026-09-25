@@ -261,12 +261,10 @@ enum HonouredLiveActivityFormat {
         }
     }
 
-    /// Fits a Dynamic Island compact slot: "6.2k", "3.2km", "320", "18m", "7h05".
+    /// Fits a Dynamic Island compact slot: "6,249", "3.2km", "320", "18m", "7h05".
     static func shortValueText(_ value: Double, metric: String, displayUnit: String?, locale: Locale = .current) -> String {
         switch metric {
         case "steps":
-            if value >= 10_000 { return "\(Int((value / 1000).rounded(.down)))k" }
-            if value >= 1_000 { return "\(number((value / 100).rounded(.down) / 10, decimals: 1, locale: locale))k" }
             return number(value, decimals: 0, locale: locale)
         case "distance_walking_running", "distance_cycling", "distance_swimming":
             let unit = distanceUnit(displayUnit, locale: locale)
