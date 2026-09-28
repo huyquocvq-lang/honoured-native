@@ -7,7 +7,7 @@ Native iOS and Android shells for the Honoured Lovable web app.
 - iOS: SwiftUI + `WKWebView`
 - Android: Kotlin + Android `WebView`
 - Web app URL: injected from local environment config
-- Native/web communication: whitelisted bridge protocol documented in `docs/bridge.md`
+- Native/web communication: whitelisted bridge protocol documented in `docs/phase1/bridge.md`
 - Billing: RevenueCat backed by StoreKit 2 / Google Play Billing
 - Trial state: Supabase-backed custom trial engine in the Lovable app
 
@@ -109,7 +109,7 @@ Before real billing tests:
 2. Confirm the final App Store bundle identifier.
 3. Set `REVENUECAT_IOS_API_KEY` in `.env` and run `./scripts/sync-env.sh`.
    Leave `REVENUECAT_ENTITLEMENT_ID` empty unless you are testing against an
-   entitlement in your own RevenueCat project; see `docs/billing.md`.
+   entitlement in your own RevenueCat project; see `docs/phase1/billing.md`.
 4. Enable the In-App Purchase capability.
 
 RevenueCat iOS is integrated with Swift Package Manager.
@@ -130,13 +130,13 @@ reports the feature as unsupported there (ActivityKit is weak-linked). The
 - The app and the extension read their version from `MARKETING_VERSION` and
   `CURRENT_PROJECT_VERSION` in `ios/project.yml`; bump them there.
 
-The protocol is in `docs/bridge.md` (*v2 — Live Activities*). The plan, its
-limits and the validation record are in `docs/live-activities-plan.vi.md`.
+The protocol is in `docs/phase1/bridge.md` (*v2 — Live Activities*). The plan, its
+limits and the validation record are in `docs/phase1/live-activities-plan.vi.md`.
 
 ### Google Sign-In
 
 Native shows Google's own UI and returns an ID token; the web app verifies it
-with Supabase (`docs/bridge.md`, *Google Sign-In*). Public client IDs come from
+with Supabase (`docs/phase1/bridge.md`, *Google Sign-In*). Public client IDs come from
 `.env`, never a client secret:
 
 ```dotenv
@@ -285,4 +285,4 @@ Still required for real billing tests:
 - sandbox/internal-track billing tests
 - release signing and store submission
 
-See `docs/billing.md` for RevenueCat dashboard requirements and bridge details.
+See `docs/phase1/billing.md` for RevenueCat dashboard requirements and bridge details.
