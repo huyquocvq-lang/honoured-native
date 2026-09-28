@@ -19,7 +19,7 @@ Milestone 1 và 4 giữ nguyên như bản estimate trước (26 giờ và 27 gi
 | Timezone người dùng | `profiles` không có timezone; `contracts` chưa có lịch Oath | Cần thêm schema để server biết giờ nhắc theo giờ địa phương |
 | Deployment target | iOS 16.0 | Push-to-start chỉ có từ iOS 17.2, nên bắt buộc có fallback |
 
-## Milestone 2 - The Oath: 62-68 giờ, đề xuất 65 giờ
+## Milestone 2 - The Oath: 61-67 giờ, đề xuất 64 giờ
 
 So với bản trước (86 giờ): bỏ Wallet pass (khoảng -25 giờ), thêm hạ tầng push, job hẹn giờ trên server và Live Activity khởi chạy từ xa, đồng thời thu gọn thời gian test và polish.
 
@@ -31,16 +31,16 @@ So với bản trước (86 giờ): bỏ Wallet pass (khoảng -25 giờ), thêm
 | 2 | Oath sheet: 7 ngày, chọn thời hạn (quick pick + Custom 2 ngày-1 năm), toggle tùy biến, giờ nhắc sáng/tối, đếm số buổi trực tiếp, Remove Oath, vuốt xuống để hủy | Web | 7-8 |
 | 3 | Deadline theo từng ngày Oath, khóa sau khi ký, thoát sớm = AMENDED, danh sách Oath đang chạy | Web + Supabase | 4 |
 | 4 | Supabase: bảng lịch Oath, kết quả theo ngày, giờ nhắc, timezone, RLS, đồng bộ web | Supabase | 4-5 |
-| 5 | Chấm điểm cuối ngày: so `health_daily` với target, trạng thái chờ khi dữ liệu chưa đồng bộ, đối soát lại, xử lý khi chưa cấp quyền HealthKit | Supabase + iOS | 7 |
+| 5 | Chấm điểm: đánh HONOURED ngay khi dữ liệu Health đã đồng bộ đạt target, BROKEN sau deadline từ dữ liệu cả ngày, ngày vẫn chờ sau 24 giờ kể từ deadline bị đánh BROKEN, xử lý khi chưa cấp quyền HealthKit | Supabase + iOS | 8 |
 | 6 | Hạ tầng push: capability Push Notifications, đăng ký device token và push-to-start token qua bridge, lưu theo tài khoản, xóa khi đăng xuất | iOS + Supabase | 5 |
 | 7 | Job hẹn giờ: `pg_cron` + edge function tính giờ nhắc theo timezone, ký JWT APNs, gửi push-to-start hoặc push thường, chống gửi trùng, tách sandbox/production | Supabase | 7-8 |
-| 8 | Oath card UI: loại Live Activity mới, layout sáng/tối/kết quả, chữ ký cache trong App Group, vừa giới hạn chiều cao lock screen | iOS widget | 5-6 |
-| 9 | Tiến độ buổi tối và kết quả trên card: nhận token cập nhật khi card được start từ xa, cập nhật từ HealthKit background, kết thúc card theo deadline | iOS + Supabase | 5-6 |
+| 8 | Oath card UI: loại Live Activity mới, một layout chung cho sáng và tối, trạng thái kết quả, Dynamic Island đơn giản (logo vô cực và target) dùng lại từ Contract Live Activity, chữ ký cache trong App Group, vừa giới hạn chiều cao lock screen | iOS widget | 6-7 |
+| 9 | Vòng đời card: hiện HONOURED trên card khi đạt target, đóng card tại deadline (không còn thanh tiến độ) | iOS | 2-3 |
 | 10 | Affirmation luân phiên theo ngày; fallback push thường cho iOS < 17.2 hoặc người dùng tắt Live Activities; chỉ gửi vào ngày Oath | iOS + Supabase | 3 |
 | 11 | Settings: sửa giờ nhắc sau khi ký (ngày, thời hạn, target vẫn khóa) | Web + Supabase | 2 |
 | 12 | Recap tuần/tháng với nội dung theo tỷ lệ kết quả | Web | 3 |
 | 13 | Test trên iPhone thật, edge case (đổi timezone, DST, cài lại app, đổi tài khoản, tắt Live Activities), polish | Tất cả | 6-7 |
-|  | **Tổng** |  | **62-68** |
+|  | **Tổng** |  | **61-67** |
 
 Mức này nằm trong khoảng 49-70 giờ của scope khách. Phần nặng nhất là workstream 6 (app chưa có push nào) và workstream 7 (job gửi APNs theo timezone từng người dùng). Workstream 13 đã thu gọn còn 6-7 giờ: test trên máy thật tập trung vào luồng chính (push-to-start, fallback push, chấm điểm cuối ngày), còn các edge case như DST hay cài lại app chỉ kiểm tra những trường hợp chính.
 
@@ -52,6 +52,18 @@ Mức này nằm trong khoảng 49-70 giờ của scope khách. Phần nặng nh
 4. **Giới hạn thời gian Live Activity.** Một card chỉ hoạt động tối đa 8 giờ. Nếu giờ nhắc tối cách deadline hơn 8 giờ, card sẽ hết hạn trước deadline. Đề xuất giới hạn khoảng cách này trong UI.
 5. **Khách cần cung cấp:** APNs Auth Key (.p8), Key ID, Team ID; bật Push Notifications cho App ID. Key được lưu làm secret trên Lovable Cloud, không commit vào repo.
 6. **Chỉ làm cho iOS.** Oath card và push không có bản Android trong estimate này.
+
+### Quyết định của Mike (28/09/2026)
+
+1. Scrivener giữ trong M3 (36 giờ), theo điều khoản "delivered unless a blocker is proven".
+2. Bỏ thanh tiến độ buổi tối. Card tối giống card sáng (target, câu Because, chữ ký) với dòng "Finish what you signed."; tiến độ xem trong app.
+3. Oath card có Dynamic Island đơn giản (logo vô cực và target), dùng lại Contract Live Activity khi có thể.
+4. Đánh HONOURED ngay khi đạt target, kể cả trước deadline. BROKEN chờ dữ liệu cả ngày sau deadline.
+5. Trạng thái chờ tối đa 24 giờ sau deadline, sau đó đánh BROKEN. Word Tracker cũng vậy nếu app không được mở để xác minh.
+6. Đồng ý các quy tắc: baseline là lần đọc cuối trước khi ngày Oath bắt đầu, dùng lần đọc gần nhất trước deadline, giờ nhắc tối trong vòng 8 giờ trước deadline.
+7. Mike cung cấp APNs key, Key ID và Team ID.
+
+Còn chờ Mike xác nhận: kết quả đã đánh (kể cả BROKEN sau 24 giờ và HONOURED) là cuối cùng; và vế bổ sung của quy tắc baseline (file đổi sau lần đọc cuối thì dùng lần đọc đầu tiên trong ngày).
 
 ## Milestone 3 - Basic Word Tracker: 34-38 giờ, đề xuất 36 giờ
 
@@ -87,10 +99,10 @@ Bảng của khách (23-30 giờ) chưa tính phần tích hợp phía web và S
 | Milestone | Bản trước | Bản mới | Đề xuất |
 |---:|---:|---:|---:|
 | 1 | 26 giờ | không đổi | 26 giờ |
-| 2 | 86 giờ | 62-68 giờ | 65 giờ |
-| 3 | 36 giờ (1 nguồn) | 34-38 giờ (3 nguồn), hoặc 30 giờ nếu tách Scrivener | 36 giờ |
+| 2 | 86 giờ | 61-67 giờ | 64 giờ |
+| 3 | 36 giờ (1 nguồn) | 34-38 giờ (3 nguồn, giữ Scrivener) | 36 giờ |
 | 4 | 27 giờ | không đổi | 27 giờ |
-|  | **175 giờ** |  | **154 giờ** |
+|  | **175 giờ** |  | **153 giờ** |
 
 Thứ tự đề xuất: làm M2 trước M3, vì baseline theo từng ngày Oath của Word Tracker dựa vào mô hình Oath của M2.
 
