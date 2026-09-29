@@ -32,6 +32,8 @@ build/
 
 #Outputs
 outputs/
+output/
+tmp/
 
 # Playwright MCP session logs
 .playwright-mcp/
