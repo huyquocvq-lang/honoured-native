@@ -119,6 +119,8 @@ Notes:
 |---|---|
 | `REQUEST_HEALTH_PERMISSION { metrics?: [...] }` | `HEALTH_PERMISSION_STATUS` — shows the system sheet for the given metrics (all nine if omitted) |
 | `GET_HEALTH_STATUS` | `HEALTH_PERMISSION_STATUS` — no UI |
+| `GET_HEALTH_SOURCES` | `HEALTH_SOURCES` — lists sources contributing step/walking-distance samples and the effective preference |
+| `SET_HEALTH_SOURCE_PREFERENCE { mode, sourceId? }` | `HEALTH_SOURCE_PREFERENCE_ACCEPTED` — persists `automatic` or one returned source ID and starts a sync |
 
 ```json
 {
@@ -166,6 +168,10 @@ Notes:
 ```
 
 A metric is `null` when it is unauthorized or has no samples in the range.
+
+For `steps` and `distance_walking_running`, native applies the saved source preference to statistics, goal evaluation, Live Activities and `health_daily`. `automatic` prefers Apple Watch, then iPhone, then another wrist source, and finally any remaining source. If the chosen source disappears or has no current registration, native falls back to the best available source and reports `fallback: true`; if no source can be resolved it uses HealthKit's aggregate. Other metrics continue to use the aggregate because the V1.2 accuracy scope is step and everyday-distance data. Each non-null `HEALTH_METRICS` value includes a `source` object so the web UI can label the number honestly.
+
+`HEALTH_SOURCES.sources[].id` is an opaque native identifier. Web stores and returns it unchanged; it must not infer device type from the ID. Garmin Connect API, Wear OS and Android sources remain future roadmap work—the source list only describes data currently visible in this iPhone's HealthKit store.
 
 ### Goals and day boundary
 
@@ -422,6 +428,40 @@ This does not revoke Google access or touch other devices. New Google requests g
 
 ---
 
+## Saved login (iOS)
+
+The sign-in form has a "Save password" checkbox, ticked by default. The web view cannot use iOS's own "Save Password?" prompt, which does not appear for forms in a `WKWebView`, so the iOS shell keeps the email and password the person chose to save and returns them to pre-fill the form next time. It works without Associated Domains and is unrelated to the iOS Passwords app.
+
+### Capability
+
+`NATIVE_READY` and `PLATFORM_INFO` carry `capabilities.savedLogin: { protocolVersion: 1, supported }`. `supported` is `false` when the configured web app URL is not HTTPS. No `savedLogin` key (an older shell, Android, a browser): hide the checkbox and send none of the messages below.
+
+### Messages
+
+These travel over the trusted transport of the Google section: accepted only from the main frame of the configured web app origin, anything else dropped without a reply, and each reply delivered only to the document that asked.
+
+| Web → Native | Reply |
+|---|---|
+| `GET_SAVED_LOGIN { requestId }` | `SAVED_LOGIN { found: true, email, password }` or `SAVED_LOGIN { found: false }` |
+| `SAVE_LOGIN { requestId, email, password }` | `LOGIN_SAVED {}`; `ERROR { code: "invalid_saved_login" }` unless both are non-empty strings (email trimmed, at most 320 characters and containing `@`; password unchanged, at most 1024 characters); `ERROR { code: "saved_login_store_failed" }` |
+| `CLEAR_SAVED_LOGIN { requestId }` | `SAVED_LOGIN_CLEARED {}` (idempotent); `ERROR { code: "saved_login_clear_failed" }` |
+
+- One login per device. `SAVE_LOGIN` replaces it. The three messages run in arrival order.
+- Stored as a device-only Keychain item (`WhenUnlockedThisDeviceOnly`): not synced to iCloud, not restored to another device.
+- `CLEAR_AUTH_SESSION` (sign-out) does **not** remove it, since keeping it across sign-outs is the purpose. Only `CLEAR_SAVED_LOGIN` and deleting the app do.
+- The password never enters the event queue, the durable store or a log, and is not replayed on `NATIVE_READY`. Error messages never contain it.
+
+### Rules for the web app
+
+- Show the checkbox only when `capabilities.savedLogin.supported` is `true`.
+- When the sign-in form opens, send `GET_SAVED_LOGIN`. If `found`, fill both fields unless the person has already typed in them.
+- After `signInWithPassword` succeeds, and only then: ticked sends `SAVE_LOGIN` with the email and password just used; unticked sends `CLEAR_SAVED_LOGIN`. A failed sign-in changes nothing.
+- After a password change succeeds, if the saved email matches the account, send `SAVE_LOGIN` with the new password.
+- After account deletion succeeds, send `CLEAR_SAVED_LOGIN`.
+- A native failure never blocks or fails the sign-in itself.
+
+---
+
 ## v2 — Live Activities (iOS 16.2+)
 
 One Live Activity (a "card") per tracked contract occurrence — one contract on one health day — on the Lock Screen and in the Dynamic Island. The contract the person most recently opened or started leads: native gives it relevance score 100 and every other card a lower one, in order of selection. That is a request to iOS, not a guaranteed place in the Dynamic Island when other apps have activities too. Opening another contract never ends a card or cancels a timer, and every card keeps updating whether it leads or not.
@@ -571,8 +611,37 @@ Presentation problems are statuses, not errors. `ERROR` (with the `requestId`) i
 
 ---
 
+## v2 — Landscape signing (iOS)
+
+The iOS shell is portrait-only. The contract screen's full-screen signature pad appears when the phone is held in landscape, so that screen asks native to allow landscape while it is open.
+
+| Web → Native | Reply |
+|---|---|
+| `SET_LANDSCAPE_ALLOWED { allowed }` | `ORIENTATION_STATE { landscapeAllowed }` |
+
+- Send `allowed: true` when the contract screen mounts and `allowed: false` when it unmounts. No other screen should send `true`: the rest of the app is laid out for portrait only.
+- While allowed, the interface follows the phone into landscape left or right, and the page's `(orientation: landscape)` media query matches. Turning landscape on while the phone is already held sideways rotates at once.
+- `allowed: false` returns the interface to portrait immediately, even if the phone is still held sideways.
+- Native drops back to portrait-only whenever a new page commits (reload, navigation). Each page load starts portrait-only until it asks again.
+- `allowed` must be a JSON boolean; anything else replies `ERROR { code: "invalid_landscape_state" }`.
+- iOS only. A shell without this message answers `ERROR` (`Unsupported bridge message`) and stays portrait-only; the web app can ignore the reply. The Android shell is also portrait-locked and does not implement it.
+
+---
+
+## v2 — Icon day verification (iOS)
+
+An Icon (V1.2 M2) is scored per scheduled day on the server (`docs/db/icon_scoring_v1.sql`). For an Icon whose activity Health can measure, the iOS shell asks Supabase which days are pending, reads each one in HealthKit from the start of the Icon day to its cut-off (or to now while the day is open, with the person's Health source preference), and reports the totals with `record_icon_measurements`. It does this after every health upload and whenever the app becomes active. The server stamps HONOURED as soon as a total meets the target; BROKEN once a reading covers the cut-off and an hour has passed for late Watch data; anything still pending 24 hours after the cut-off becomes BROKEN (`no_data` when nothing was ever read). A day the device cannot read, including a declined Health permission, is not reported, so it is never stamped from a zero. There is no web → native message for this.
+
+| Native → Web (broadcast) | When |
+|---|---|
+| `ICON_DAYS_UPDATED { honoured, broken }` | A report stamped at least one Icon day. The web app re-reads `icon_days`. Counts are of this report only. |
+
+Icons whose activity Health cannot measure are self-reported by the web app with the `self_report_icon_day` RPC; native is not involved.
+
+---
+
 ## Message index
 
-Web → Native: `APP_READY` `GET_PLATFORM_INFO` `IDENTIFY_USER` `LOGOUT_USER` `CHECK_ACCESS` `START_PURCHASE` `RESTORE_PURCHASES` `START_SESSION` `SET_AUTH_SESSION` `CLEAR_AUTH_SESSION` `REQUEST_HEALTH_PERMISSION` `GET_HEALTH_STATUS` `QUERY_HEALTH_METRICS` `SET_GOALS` `SET_DAY_RESET_HOUR` `START_TIMER` `CANCEL_TIMER` `GET_TIMER_STATE` `ACTIVITY_COMPLETED` `SET_SOUND_ENABLED` `GET_NOTIFICATION_STATUS` `OPEN_NOTIFICATION_SETTINGS` `SIGN_IN_WITH_APPLE` `SYNC_AUTH_CONTEXT` `SIGN_IN_WITH_GOOGLE` `CANCEL_GOOGLE_SIGN_IN` `CLEAR_GOOGLE_SIGN_IN` `TRACK_CONTRACT` `SYNC_TRACKED_CONTRACTS` `STOP_TRACKING_CONTRACT` `GET_LIVE_ACTIVITY_STATE`
+Web → Native: `APP_READY` `GET_PLATFORM_INFO` `IDENTIFY_USER` `LOGOUT_USER` `CHECK_ACCESS` `START_PURCHASE` `RESTORE_PURCHASES` `START_SESSION` `SET_AUTH_SESSION` `CLEAR_AUTH_SESSION` `REQUEST_HEALTH_PERMISSION` `GET_HEALTH_STATUS` `GET_HEALTH_SOURCES` `SET_HEALTH_SOURCE_PREFERENCE` `QUERY_HEALTH_METRICS` `SET_GOALS` `SET_DAY_RESET_HOUR` `START_TIMER` `CANCEL_TIMER` `GET_TIMER_STATE` `ACTIVITY_COMPLETED` `SET_SOUND_ENABLED` `GET_NOTIFICATION_STATUS` `OPEN_NOTIFICATION_SETTINGS` `SIGN_IN_WITH_APPLE` `SYNC_AUTH_CONTEXT` `SIGN_IN_WITH_GOOGLE` `CANCEL_GOOGLE_SIGN_IN` `CLEAR_GOOGLE_SIGN_IN` `GET_SAVED_LOGIN` `SAVE_LOGIN` `CLEAR_SAVED_LOGIN` `TRACK_CONTRACT` `SYNC_TRACKED_CONTRACTS` `STOP_TRACKING_CONTRACT` `GET_LIVE_ACTIVITY_STATE` `SET_LANDSCAPE_ALLOWED`
 
-Native → Web: `NATIVE_READY` `PLATFORM_INFO` `ERROR` `IDENTIFY_SUCCESS` `IDENTIFY_FAILED` `LOGOUT_SUCCESS` `LOGOUT_FAILED` `ACCESS_STATUS` `PURCHASE_SUCCESS` `PURCHASE_CANCELLED` `PURCHASE_FAILED` `RESTORE_SUCCESS` `RESTORE_FAILED` `AUTH_SESSION_ACCEPTED` `AUTH_SESSION_CLEARED` `AUTH_SESSION_UPDATED` `AUTH_SESSION_INVALID` `HEALTH_PERMISSION_STATUS` `HEALTH_METRICS` `GOALS_ACCEPTED` `DAY_RESET_HOUR_ACCEPTED` `GOAL_REACHED` `HEALTH_DATA_UPDATED` `TIMER_STARTED` `TIMER_CANCELLED` `TIMER_STATE` `TIMER_COMPLETED` `ACTIVITY_COMPLETION_ACCEPTED` `SOUND_STATE` `NOTIFICATION_STATUS` `NOTIFICATION_OPENED` `APPLE_SIGN_IN_SUCCESS` `APPLE_SIGN_IN_FAILED` `APPLE_CREDENTIAL_REVOKED` `AUTH_CONTEXT_SYNCED` `GOOGLE_SIGN_IN_SUCCESS` `GOOGLE_SIGN_IN_FAILED` `GOOGLE_SIGN_IN_CANCEL_ACCEPTED` `GOOGLE_SIGN_IN_CLEARED` `CONTRACT_TRACKING_ACCEPTED` `TRACKED_CONTRACTS_SYNCED` `CONTRACT_TRACKING_STOPPED` `LIVE_ACTIVITY_STATE` `LIVE_ACTIVITY_STATE_CHANGED` `LIVE_ACTIVITY_OPENED`
+Native → Web: `NATIVE_READY` `PLATFORM_INFO` `ERROR` `IDENTIFY_SUCCESS` `IDENTIFY_FAILED` `LOGOUT_SUCCESS` `LOGOUT_FAILED` `ACCESS_STATUS` `PURCHASE_SUCCESS` `PURCHASE_CANCELLED` `PURCHASE_FAILED` `RESTORE_SUCCESS` `RESTORE_FAILED` `AUTH_SESSION_ACCEPTED` `AUTH_SESSION_CLEARED` `AUTH_SESSION_UPDATED` `AUTH_SESSION_INVALID` `HEALTH_PERMISSION_STATUS` `HEALTH_SOURCES` `HEALTH_SOURCE_PREFERENCE_ACCEPTED` `HEALTH_METRICS` `GOALS_ACCEPTED` `DAY_RESET_HOUR_ACCEPTED` `GOAL_REACHED` `HEALTH_DATA_UPDATED` `TIMER_STARTED` `TIMER_CANCELLED` `TIMER_STATE` `TIMER_COMPLETED` `ACTIVITY_COMPLETION_ACCEPTED` `SOUND_STATE` `NOTIFICATION_STATUS` `NOTIFICATION_OPENED` `APPLE_SIGN_IN_SUCCESS` `APPLE_SIGN_IN_FAILED` `APPLE_CREDENTIAL_REVOKED` `AUTH_CONTEXT_SYNCED` `GOOGLE_SIGN_IN_SUCCESS` `GOOGLE_SIGN_IN_FAILED` `GOOGLE_SIGN_IN_CANCEL_ACCEPTED` `GOOGLE_SIGN_IN_CLEARED` `SAVED_LOGIN` `LOGIN_SAVED` `SAVED_LOGIN_CLEARED` `CONTRACT_TRACKING_ACCEPTED` `TRACKED_CONTRACTS_SYNCED` `CONTRACT_TRACKING_STOPPED` `LIVE_ACTIVITY_STATE` `LIVE_ACTIVITY_STATE_CHANGED` `LIVE_ACTIVITY_OPENED` `ORIENTATION_STATE` `ICON_DAYS_UPDATED`

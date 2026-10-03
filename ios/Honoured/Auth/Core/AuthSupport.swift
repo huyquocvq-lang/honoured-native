@@ -151,3 +151,18 @@ final class SerialAsyncQueue {
         }
     }
 }
+
+/// Decides whether a Keychain session read that crossed an async boundary may
+/// still be offered to the current web document. Any auth message received
+/// while the read/refresh was in flight wins over the older bootstrap result.
+struct AuthSessionRestoreGate {
+    private(set) var generation = 0
+
+    mutating func authMessageReceived() {
+        generation += 1
+    }
+
+    func mayRestore(capturedGeneration: Int, boundUserId: String?) -> Bool {
+        generation == capturedGeneration && boundUserId == nil
+    }
+}

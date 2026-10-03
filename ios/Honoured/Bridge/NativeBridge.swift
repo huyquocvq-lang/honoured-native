@@ -26,6 +26,7 @@ final class NativeBridge: NSObject, WKScriptMessageHandler {
 
     /// The user of the last `SET_AUTH_SESSION` on this bridge.
     private var boundAuthUserId: String?
+    private var authSessionRestoreGate = AuthSessionRestoreGate()
 
     /// The exact origin the auth messages must come from. Nil (feature off)
     /// when the configured web app URL is not HTTPS.
@@ -72,11 +73,13 @@ final class NativeBridge: NSObject, WKScriptMessageHandler {
     private static let v2MessageTypes: Set<String> = [
         "SET_AUTH_SESSION", "CLEAR_AUTH_SESSION",
         "REQUEST_HEALTH_PERMISSION", "GET_HEALTH_STATUS", "QUERY_HEALTH_METRICS",
+        "GET_HEALTH_SOURCES", "SET_HEALTH_SOURCE_PREFERENCE",
         "SET_GOALS", "SET_DAY_RESET_HOUR",
         "START_TIMER", "CANCEL_TIMER", "GET_TIMER_STATE",
         "ACTIVITY_COMPLETED", "SET_SOUND_ENABLED",
         "GET_NOTIFICATION_STATUS", "REQUEST_NOTIFICATION_PERMISSION", "OPEN_NOTIFICATION_SETTINGS",
         "SIGN_IN_WITH_APPLE",
+        "SET_LANDSCAPE_ALLOWED",
     ]
 
     /// Called when the WebView starts a new main-frame load. Anything broadcast
@@ -100,6 +103,34 @@ final class NativeBridge: NSObject, WKScriptMessageHandler {
     func webViewDidCommitNavigation() {
         liveActivitySession.pageWillLoad()
         invalidateGoogleDocument()
+        // Landscape belonged to the old page's contract screen; the new page
+        // asks again if it opens one.
+        OrientationLock.shared.setLandscapeAllowed(false)
+    }
+
+    /// Offers the durable native session to a newly loaded page when Supabase's
+    /// web storage has no session to emit. A SET/CLEAR arriving while Keychain
+    /// or the refresh endpoint is awaited always wins, preventing an old native
+    /// token from overwriting a newer login or reviving an explicit logout.
+    func restoreStoredAuthSessionToWeb() {
+        let capturedGeneration = authSessionRestoreGate.generation
+        Task { [weak self] in
+            guard let session = try? await AuthSessionStore.shared.refreshedSessionIfNeeded() else { return }
+            await MainActor.run { [weak self] in
+                guard let self,
+                      self.authSessionRestoreGate.mayRestore(
+                        capturedGeneration: capturedGeneration,
+                        boundUserId: self.boundAuthUserId
+                      ) else { return }
+                self.send(type: "AUTH_SESSION_UPDATED", payload: [
+                    "userId": session.userId,
+                    "accessToken": session.accessToken,
+                    "refreshToken": session.refreshToken,
+                    "expiresAt": session.expiresAt,
+                    "source": "native_restore",
+                ])
+            }
+        }
     }
 
     /// A state hint queued for a page that is not ready describes the account
@@ -132,6 +163,12 @@ final class NativeBridge: NSObject, WKScriptMessageHandler {
             guard isTrustedAuthMessage(message) else { return }
             if !isWebReady { markWebReadyAndFlush() }
             handleGoogle(type: type, payload: payload, requestId: requestID)
+            return
+        }
+        if Self.savedLoginMessageTypes.contains(type) {
+            guard isTrustedAuthMessage(message) else { return }
+            if !isWebReady { markWebReadyAndFlush() }
+            handleSavedLogin(type: type, payload: payload, requestId: requestID)
             return
         }
         let reply: (String, [String: Any]) -> Void = { [weak self] replyType, replyPayload in
@@ -291,6 +328,7 @@ final class NativeBridge: NSObject, WKScriptMessageHandler {
     private func handleV2(type: String, payload: [String: Any], reply: @escaping (String, [String: Any]) -> Void) {
         switch type {
         case "SET_AUTH_SESSION":
+            authSessionRestoreGate.authMessageReceived()
             guard let userId = payload["userId"] as? String, !userId.isEmpty,
                   let accessToken = payload["accessToken"] as? String, !accessToken.isEmpty,
                   let refreshToken = payload["refreshToken"] as? String, !refreshToken.isEmpty,
@@ -323,6 +361,8 @@ final class NativeBridge: NSObject, WKScriptMessageHandler {
                         await GoalMonitor.shared.clear()
                         AppleSignInCoordinator.shared.clear()
                         NotificationCoordinator.shared.cancelAll()
+                        await IconSignatureSync.shared.reset()
+                        await IconCardCoordinator.shared.reset()
                     }
                     try await AuthSessionStore.shared.save(NativeAuthSession(
                         userId: userId,
@@ -339,6 +379,7 @@ final class NativeBridge: NSObject, WKScriptMessageHandler {
                 }
             }
         case "CLEAR_AUTH_SESSION":
+            authSessionRestoreGate.authMessageReceived()
             // Ends every Honoured card and forgets the account's tracking
             // before anything else can run.
             liveActivitySession.unbind()
@@ -351,6 +392,8 @@ final class NativeBridge: NSObject, WKScriptMessageHandler {
             Self.authMutations.enqueue {
                 do {
                     try await AuthSessionStore.shared.clear()
+                    await IconSignatureSync.shared.reset()
+                    await IconCardCoordinator.shared.reset()
                     try await HealthSyncCoordinator.shared.clear()
                     await HealthKitService.shared.resetSyncState()
                     await HealthSyncSettings.shared.reset()
@@ -390,6 +433,23 @@ final class NativeBridge: NSObject, WKScriptMessageHandler {
             Task { @MainActor in
                 reply("HEALTH_PERMISSION_STATUS", await HealthKitService.shared.permissionStatusPayload(for: HealthMetric.allCases))
             }
+        case "GET_HEALTH_SOURCES":
+            Task {
+                reply("HEALTH_SOURCES", await HealthKitService.shared.sourceSettingsPayload())
+            }
+        case "SET_HEALTH_SOURCE_PREFERENCE":
+            guard let preference = HealthSourcePreference.parse(
+                mode: payload["mode"],
+                sourceId: payload["sourceId"]
+            ) else {
+                reply("ERROR", ["message": "mode must be automatic or source with a sourceId", "code": "invalid_health_source_preference"])
+                return
+            }
+            Task {
+                await HealthKitService.shared.setSourcePreference(preference)
+                reply("HEALTH_SOURCE_PREFERENCE_ACCEPTED", await HealthKitService.shared.sourceSettingsPayload())
+                await HealthSyncCoordinator.shared.syncNow()
+            }
         case "QUERY_HEALTH_METRICS":
             let parsed = HealthMetric.parse(payload["metrics"])
             guard parsed.unknown.isEmpty else {
@@ -406,7 +466,11 @@ final class NativeBridge: NSObject, WKScriptMessageHandler {
                 var metrics: [String: Any] = [:]
                 for metric in parsed.metrics {
                     if let value = await HealthKitService.shared.total(for: metric, from: from, to: to) {
-                        metrics[metric.rawValue] = ["value": value, "unit": metric.unitName]
+                        metrics[metric.rawValue] = [
+                            "value": value,
+                            "unit": metric.unitName,
+                            "source": await HealthKitService.shared.sourceMetadata(for: metric)
+                        ]
                     } else {
                         metrics[metric.rawValue] = NSNull()
                     }
@@ -481,6 +545,15 @@ final class NativeBridge: NSObject, WKScriptMessageHandler {
                 // re-adding it under the same identifier swaps the sound in or out.
                 await TestamentTimer.shared.rescheduleNotificationIfRunning()
             }
+        case "SET_LANDSCAPE_ALLOWED":
+            guard let allowed = Self.bool(payload["allowed"]) else {
+                reply("ERROR", ["message": "allowed must be a boolean", "code": "invalid_landscape_state"])
+                return
+            }
+            // Applied here, in arrival order, so a quick open-and-leave of
+            // the contract screen always ends portrait-only.
+            OrientationLock.shared.setLandscapeAllowed(allowed)
+            reply("ORIENTATION_STATE", ["landscapeAllowed": allowed])
         case "ACTIVITY_COMPLETED":
             guard let activityId = payload["activityId"] as? String, !activityId.isEmpty,
                   let source = payload["source"] as? String,

@@ -106,6 +106,17 @@ final class GoogleAuthStateTests: XCTestCase {
 }
 
 final class AuthSupportTests: XCTestCase {
+    func testSessionRestoreRunsOnlyWhenNoAuthMessageWonTheRace() {
+        var gate = AuthSessionRestoreGate()
+        let launchGeneration = gate.generation
+        XCTAssertTrue(gate.mayRestore(capturedGeneration: launchGeneration, boundUserId: nil))
+
+        gate.authMessageReceived()
+        XCTAssertFalse(gate.mayRestore(capturedGeneration: launchGeneration, boundUserId: nil), "a logout or newer login must win")
+        XCTAssertFalse(gate.mayRestore(capturedGeneration: gate.generation, boundUserId: "user-a"), "a page that restored itself needs no native overwrite")
+        XCTAssertTrue(gate.mayRestore(capturedGeneration: gate.generation, boundUserId: nil))
+    }
+
     func testPresentationGateIsExclusiveAndIgnoresStaleReleases() {
         let gate = ProviderPresentationGate()
         let apple = gate.acquire(.apple)

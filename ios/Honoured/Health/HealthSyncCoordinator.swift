@@ -189,16 +189,29 @@ actor HealthSyncCoordinator {
     func drainOnce() async {
         guard !isDraining else { return }
         isDraining = true
-        defer { isDraining = false }
         _ = await attemptFirstQueuedBatch()
+        isDraining = false
+        // Icon days are scored from the readings this upload may have added.
+        await IconVerifier.shared.run()
+        await IconSignatureSync.shared.run()
+        await IconCardCoordinator.shared.refresh()
     }
 
     /// Foreground retry loop. HealthKit observer callbacks must not await this.
     func drainQueue() async {
         guard !isDraining else { return }
         isDraining = true
-        defer { isDraining = false }
+        let finished = await drainUntilSettled()
+        isDraining = false
+        if finished {
+            await IconVerifier.shared.run()
+            await IconSignatureSync.shared.run()
+            await IconCardCoordinator.shared.refresh()
+        }
+    }
 
+    /// False when the retry wait was cancelled.
+    private func drainUntilSettled() async -> Bool {
         while true {
             switch await attemptFirstQueuedBatch() {
             case .uploaded:
@@ -208,10 +221,10 @@ actor HealthSyncCoordinator {
                 do {
                     try await Task.sleep(for: .seconds(delay))
                 } catch {
-                    return
+                    return false
                 }
             case .empty, .terminal:
-                return
+                return true
             }
         }
     }

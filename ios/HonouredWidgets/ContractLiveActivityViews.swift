@@ -268,7 +268,7 @@ private struct ContractHeader: View {
 
 /// The app identity belongs in the card header. Metric identity stays in each
 /// progress row and in the compact/minimal Dynamic Island presentations.
-private struct HonouredBrandMark: View {
+struct HonouredBrandMark: View {
     var width: CGFloat = 32
     var height: CGFloat = 18
 

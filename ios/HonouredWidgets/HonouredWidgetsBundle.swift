@@ -7,5 +7,6 @@ import WidgetKit
 struct HonouredWidgetsBundle: WidgetBundle {
     var body: some Widget {
         ContractLiveActivityWidget()
+        IconLiveActivityWidget()
     }
 }

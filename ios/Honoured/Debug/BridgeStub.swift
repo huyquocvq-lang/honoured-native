@@ -139,6 +139,44 @@ enum BridgeStub {
                 let handled = await UIApplication.shared.open(url)
                 reply("STUB_DEEP_LINK_OPENED", ["handled": handled, "url": url.absoluteString])
             }
+        case "STUB_REQUEST_ORIENTATION":
+            // Turns the interface as turning the phone would. UIKit refuses an
+            // orientation the shell does not allow at that moment.
+            let landscape = payload["orientation"] as? String == "landscape"
+            Task { @MainActor in
+                let scene = UIApplication.shared.connectedScenes.compactMap { $0 as? UIWindowScene }.first
+                scene?.requestGeometryUpdate(.iOS(interfaceOrientations: landscape ? .landscapeRight : .portrait)) { _ in }
+                try? await Task.sleep(nanoseconds: 800_000_000)
+                reply("STUB_ORIENTATION", ["landscape": scene?.interfaceOrientation.isLandscape ?? false])
+            }
+        case "STUB_AUTH_STATE":
+            // Who the Keychain session belongs to, never its tokens.
+            Task {
+                let session = await AuthSessionStore.shared.load()
+                reply("STUB_AUTH_STATE", [
+                    "userId": session?.userId ?? NSNull(),
+                    "expiresAt": session?.expiresAt ?? NSNull()
+                ])
+            }
+        case "STUB_REFRESH_SESSION":
+            // The refresh restore depends on, reporting only its outcome.
+            Task {
+                let outcome: String
+                do {
+                    outcome = try await AuthSessionStore.shared.refreshedSessionIfNeeded() == nil ? "none" : "session"
+                } catch AuthSessionStore.SessionRefreshError.invalidSession {
+                    outcome = "invalid_session"
+                } catch {
+                    outcome = "error: \(error)"
+                }
+                reply("STUB_REFRESH_RESULT", ["outcome": outcome])
+            }
+        case "STUB_ICON_CARD":
+            let phase = payload["phase"] as? String ?? ""
+            Task { @MainActor in
+                let outcome = await IconCardStub.apply(phase: phase)
+                reply("STUB_ICON_CARD", ["phase": phase, "outcome": outcome])
+            }
         case "STUB_RELOAD":
             // A real main-frame navigation, to check that a Google result for
             // the old page never reaches the new one.
@@ -241,6 +279,8 @@ enum BridgeStub {
     <button onclick="req('SET_DAY_RESET_HOUR',{hour:4},['DAY_RESET_HOUR_ACCEPTED'])">SET_DAY_RESET_HOUR 4</button>
     <button onclick="req('SET_SOUND_ENABLED',{enabled:true},['SOUND_STATE'])">SET_SOUND_ENABLED true</button>
     <button onclick="req('SET_SOUND_ENABLED',{enabled:false},['SOUND_STATE'])">SET_SOUND_ENABLED false</button>
+    <button onclick="req('SET_LANDSCAPE_ALLOWED',{allowed:true},['ORIENTATION_STATE'])">SET_LANDSCAPE_ALLOWED true</button>
+    <button onclick="req('SET_LANDSCAPE_ALLOWED',{allowed:false},['ORIENTATION_STATE'])">SET_LANDSCAPE_ALLOWED false</button>
     <button onclick="req('SIGN_IN_WITH_APPLE',{},['APPLE_SIGN_IN_SUCCESS','APPLE_SIGN_IN_FAILED'],120000)">SIGN_IN_WITH_APPLE</button>
     <button onclick="req('GET_HEALTH_STATUS',{},['HEALTH_PERMISSION_STATUS'])">GET_HEALTH_STATUS</button>
     <button onclick="req('REQUEST_HEALTH_PERMISSION',{},['HEALTH_PERMISSION_STATUS'],60000)">REQUEST_HEALTH_PERMISSION</button>
@@ -270,8 +310,12 @@ enum BridgeStub {
       }
       return out;
     };
+    // Every event this page received, for checks on broadcasts that may land
+    // before a scenario starts waiting.
+    const seen = [];
     window.addEventListener('honoured:native', (e) => {
       const { type, payload } = e.detail;
+      seen.push({ type, payload });
       log('◀ ' + type + ' ' + JSON.stringify(redact(type, payload)));
       if (payload && payload.requestId && pending.has(payload.requestId)) {
         const p = pending.get(payload.requestId);
@@ -471,6 +515,121 @@ enum BridgeStub {
         const c = (await req('SYNC_AUTH_CONTEXT', { userId: null }, ['AUTH_CONTEXT_SYNCED'])).payload.authContextId;
         const r = await req('SIGN_IN_WITH_GOOGLE', { intent: 'sign_in', authContextId: c }, ['GOOGLE_SIGN_IN_SUCCESS', 'GOOGLE_SIGN_IN_FAILED'], 10000);
         check('the new page can sign in once the old UI has closed', r.type === 'GOOGLE_SIGN_IN_SUCCESS' && r.payload.requestId && r.payload.authContextId === c);
+        log('SCENARIO DONE');
+      },
+      // The contract screen's landscape signing pad: portrait-only until the
+      // page asks, landscape while it does, portrait again when it stops or
+      // the page reloads. The web app checks (orientation: landscape).
+      async orientation() {
+        const landscape = () => matchMedia('(orientation: landscape)').matches;
+        const turn = async (orientation) => {
+          await req('STUB_REQUEST_ORIENTATION', { orientation }, ['STUB_ORIENTATION']);
+          await sleep(300);
+          return landscape();
+        };
+        if (sessionStorage.getItem('orientation') === 'reloaded') {
+          sessionStorage.removeItem('orientation');
+          await sleep(800);
+          check('a reload returns the shell to portrait', !landscape());
+          check('the reloaded page cannot turn landscape until it asks', !(await turn('landscape')));
+          log('SCENARIO DONE');
+          return;
+        }
+        check('starts in portrait', !landscape());
+        check('portrait-only refuses landscape', !(await turn('landscape')));
+        let r = await req('SET_LANDSCAPE_ALLOWED', { allowed: 1 }, ['ORIENTATION_STATE']);
+        check('a non-boolean is rejected', r.type === 'ERROR' && r.payload.code === 'invalid_landscape_state');
+        r = await req('SET_LANDSCAPE_ALLOWED', { allowed: true }, ['ORIENTATION_STATE']);
+        check('ORIENTATION_STATE landscapeAllowed true with requestId', r.type === 'ORIENTATION_STATE' && r.payload.landscapeAllowed === true && !!r.payload.requestId);
+        check('allowed -> the page turns landscape', await turn('landscape'));
+        r = await req('SET_LANDSCAPE_ALLOWED', { allowed: false }, ['ORIENTATION_STATE']);
+        await sleep(800);
+        check('not allowed -> back to portrait at once', r.payload.landscapeAllowed === false && !landscape());
+        check('portrait-only again refuses landscape', !(await turn('landscape')));
+        await req('SET_LANDSCAPE_ALLOWED', { allowed: true }, ['ORIENTATION_STATE']);
+        check('landscape again before the reload', await turn('landscape'));
+        sessionStorage.setItem('orientation', 'reloaded');
+        log('reloading in landscape');
+        post('STUB_RELOAD', {});
+        await sleep(10000);
+      },
+      // Session restore on a cold start (V1.2 M1-02). Each run is its own
+      // launch; terminate the app between them, in this order:
+      // auth-restore-setup, auth-restore-check, auth-restore-cleared,
+      // auth-restore-setup, auth-restore-race,
+      // auth-restore-expired-setup, auth-restore-expired-check.
+      async 'auth-restore-setup'() {
+        await req('CLEAR_AUTH_SESSION', {}, ['AUTH_SESSION_CLEARED']);
+        const r = await req('SET_AUTH_SESSION', { userId: 'stub-restore-user-a', accessToken: 'stub-access-a', refreshToken: 'stub-refresh-a', expiresAt: Math.floor(Date.now() / 1000) + 7200 }, ['AUTH_SESSION_ACCEPTED']);
+        check('session for user A accepted', r.type === 'AUTH_SESSION_ACCEPTED' && r.payload.userId === 'stub-restore-user-a');
+        const s = await req('STUB_AUTH_STATE', {}, ['STUB_AUTH_STATE']);
+        check('Keychain holds user A', s.payload.userId === 'stub-restore-user-a');
+        log('SCENARIO DONE');
+      },
+      async 'auth-restore-check'() {
+        const r = seen.find((e) => e.type === 'AUTH_SESSION_UPDATED') || await waitFor(['AUTH_SESSION_UPDATED'], 6000);
+        check('cold start offers the stored session to the new page (source native_restore)', r.type === 'AUTH_SESSION_UPDATED' && r.payload.source === 'native_restore');
+        check('restored session is user A with its own tokens and expiry', r.payload.userId === 'stub-restore-user-a' && r.payload.accessToken === 'stub-access-a' && r.payload.refreshToken === 'stub-refresh-a' && typeof r.payload.expiresAt === 'number');
+        check('restore is a broadcast, not a reply', !r.payload.requestId);
+        await sleep(1500);
+        check('exactly one restore per page load', seen.filter((e) => e.type === 'AUTH_SESSION_UPDATED').length === 1);
+        const c = await req('CLEAR_AUTH_SESSION', {}, ['AUTH_SESSION_CLEARED']);
+        const s = await req('STUB_AUTH_STATE', {}, ['STUB_AUTH_STATE']);
+        check('logout clears the stored session', c.type === 'AUTH_SESSION_CLEARED' && s.payload.userId === null);
+        log('SCENARIO DONE');
+      },
+      async 'auth-restore-cleared'() {
+        await sleep(4000);
+        check('after logout and a relaunch nothing is restored', !seen.some((e) => e.type === 'AUTH_SESSION_UPDATED'));
+        const s = await req('STUB_AUTH_STATE', {}, ['STUB_AUTH_STATE']);
+        check('Keychain is still empty after the relaunch', s.payload.userId === null);
+        log('SCENARIO DONE');
+      },
+      async 'auth-restore-race'() {
+        // SET_AUTH_SESSION for user B went out while the page was still
+        // loading (see the bottom of this script); A is in the Keychain.
+        await sleep(4000);
+        check('the page login during load is accepted (user B)', seen.some((e) => e.type === 'AUTH_SESSION_ACCEPTED' && e.payload.userId === 'stub-race-user-b'));
+        check('the older stored session (user A) is never offered', !seen.some((e) => e.type === 'AUTH_SESSION_UPDATED'));
+        const s = await req('STUB_AUTH_STATE', {}, ['STUB_AUTH_STATE']);
+        check('Keychain holds user B, not A', s.payload.userId === 'stub-race-user-b');
+        await req('CLEAR_AUTH_SESSION', {}, ['AUTH_SESSION_CLEARED']);
+        log('SCENARIO DONE');
+      },
+      async 'auth-restore-expired-setup'() {
+        await req('CLEAR_AUTH_SESSION', {}, ['AUTH_SESSION_CLEARED']);
+        const r = await req('SET_AUTH_SESSION', { userId: 'stub-expired-user', accessToken: 'stub-access-x', refreshToken: 'stub-refresh-not-valid', expiresAt: Math.floor(Date.now() / 1000) - 60 }, ['AUTH_SESSION_ACCEPTED']);
+        check('expired session stored', r.type === 'AUTH_SESSION_ACCEPTED');
+        log('SCENARIO DONE');
+      },
+      async 'auth-restore-expired-check'() {
+        // An expired session must be refreshed before it is offered. The stub
+        // keeps the backend off, so here the refresh cannot succeed at all.
+        await sleep(8000);
+        check('an expired session that cannot be refreshed is never offered to the page', !seen.some((e) => e.type === 'AUTH_SESSION_UPDATED'));
+        const r = await req('STUB_REFRESH_SESSION', {}, ['STUB_REFRESH_RESULT'], 15000);
+        check('the refresh restore depends on did not produce a session', r.payload.outcome !== 'session');
+        log('refresh outcome: ' + r.payload.outcome);
+        await req('CLEAR_AUTH_SESSION', {}, ['AUTH_SESSION_CLEARED']);
+        log('SCENARIO DONE');
+      },
+      // A sample Icon card (V1.2 M2-08) through every phase. It is left
+      // running so the Lock Screen and Dynamic Island can be inspected; run
+      // icon-card-end to remove it.
+      async 'icon-card'() {
+        const step = async (phase) => (await req('STUB_ICON_CARD', { phase }, ['STUB_ICON_CARD'])).payload.outcome;
+        check('an Icon card starts', await step('start') === 'started');
+        check('one Icon card is running', await step('count') === '1');
+        check('evening update reaches it', await step('evening') === 'updated 1');
+        check('BROKEN result reaches it', await step('broken') === 'updated 1');
+        check('HONOURED result reaches it', await step('honoured') === 'updated 1');
+        check('still exactly one card after every update', await step('count') === '1');
+        log('SCENARIO DONE');
+      },
+      async 'icon-card-end'() {
+        const r = await req('STUB_ICON_CARD', { phase: 'end' }, ['STUB_ICON_CARD']);
+        const c = await req('STUB_ICON_CARD', { phase: 'count' }, ['STUB_ICON_CARD']);
+        check('the Icon card is gone', r.payload.outcome === 'ended' && c.payload.outcome === '0');
         log('SCENARIO DONE');
       },
       async 'timer-foreground'() {
@@ -982,6 +1141,11 @@ enum BridgeStub {
       },
     };
 
+    // The race check needs its login on the wire while the page is loading,
+    // before native gets the chance to restore the stored session.
+    if (scenario === 'auth-restore-race') {
+      post('SET_AUTH_SESSION', { requestId: 'race-login', userId: 'stub-race-user-b', accessToken: 'stub-access-b', refreshToken: 'stub-refresh-b', expiresAt: Math.floor(Date.now() / 1000) + 7200 });
+    }
     post('APP_READY', {});
     const exitWhenDone = __EXIT_WHEN_DONE__;
     if (scenario && scenarios[scenario]) {

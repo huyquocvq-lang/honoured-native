@@ -30,6 +30,12 @@ actor HealthKitService {
     private let store = HKHealthStore()
     private let defaults = UserDefaults.standard
     private let syncFloorKey = "healthkit.sync.floor"
+    private let sourcePreferenceModeKey = "healthkit.source.preference.mode"
+    private let sourcePreferenceIdKey = "healthkit.source.preference.id"
+
+    private static let sourceSelectableMetrics: Set<HealthMetric> = [
+        .steps, .distanceWalkingRunning
+    ]
 
     nonisolated var isAvailable: Bool {
         HKHealthStore.isHealthDataAvailable()
@@ -63,6 +69,62 @@ actor HealthKitService {
         return ["available": true, "perMetric": perMetric]
     }
 
+    // MARK: - Data source preference
+
+    func setSourcePreference(_ preference: HealthSourcePreference) {
+        defaults.set(preference.payload["mode"], forKey: sourcePreferenceModeKey)
+        switch preference {
+        case .automatic:
+            defaults.removeObject(forKey: sourcePreferenceIdKey)
+        case .source(let id):
+            defaults.set(id, forKey: sourcePreferenceIdKey)
+        }
+    }
+
+    func sourceSettingsPayload() async -> [String: Any] {
+        guard isAvailable else {
+            return ["available": false, "sources": [], "preference": sourcePreference().payload]
+        }
+        let sources = await availableSources(for: Array(Self.sourceSelectableMetrics))
+        let resolution = HealthSourceSelector.resolve(preference: sourcePreference(), available: sources)
+        return [
+            "available": true,
+            "sources": sources.map(Self.sourcePayload),
+            "preference": sourcePreference().payload,
+            "effectiveSourceId": resolution.selected.map { $0.id as Any } ?? NSNull(),
+            "effectiveSourceName": resolution.selected.map { $0.name as Any } ?? NSNull(),
+            "fallback": resolution.requestedSourceMissing,
+            "appliesTo": Self.sourceSelectableMetrics.map(\.rawValue).sorted()
+        ]
+    }
+
+    func sourceMetadata(for metric: HealthMetric) async -> [String: Any] {
+        guard Self.sourceSelectableMetrics.contains(metric) else {
+            return [
+                "mode": "aggregate",
+                "effectiveSourceId": NSNull(),
+                "effectiveSourceName": "Apple Health",
+                "fallback": false
+            ]
+        }
+        let resolution = await sourceResolution(for: metric)
+        guard let selected = resolution.selected else {
+            return [
+                "mode": "aggregate",
+                "effectiveSourceId": NSNull(),
+                "effectiveSourceName": "Apple Health",
+                "fallback": resolution.requestedSourceMissing
+            ]
+        }
+        return [
+            "mode": "source",
+            "effectiveSourceId": selected.id,
+            "effectiveSourceName": selected.name,
+            "kind": selected.kind.rawValue,
+            "fallback": resolution.requestedSourceMissing
+        ]
+    }
+
     // MARK: - Totals over a range
 
     /// Source-deduplicated total (or average, for heart rate) over the range, the
@@ -86,9 +148,19 @@ actor HealthKitService {
         }
 
         let range = HKQuery.predicateForSamples(withStart: from, end: to, options: .strictStartDate)
+        let resolution = await sourceResolution(for: metric)
+        let predicate: NSPredicate
+        if let selected = resolution.selected,
+           let source = await healthKitSource(for: selected, metric: metric) {
+            predicate = NSCompoundPredicate(andPredicateWithSubpredicates: [
+                range, HKQuery.predicateForObjects(from: source)
+            ])
+        } else {
+            predicate = range
+        }
         let options: HKStatisticsOptions = metric.aggregation == .average ? .discreteAverage : .cumulativeSum
         let descriptor = HKStatisticsQueryDescriptor(
-            predicate: .quantitySample(type: type, predicate: range),
+            predicate: .quantitySample(type: type, predicate: predicate),
             options: options
         )
         do {
@@ -152,6 +224,65 @@ actor HealthKitService {
     private static func isAsleep(_ sample: HKCategorySample) -> Bool {
         guard let value = HKCategoryValueSleepAnalysis(rawValue: sample.value) else { return false }
         return HKCategoryValueSleepAnalysis.allAsleepValues.contains(value)
+    }
+
+    private func sourcePreference() -> HealthSourcePreference {
+        if defaults.string(forKey: sourcePreferenceModeKey) == "source",
+           let id = defaults.string(forKey: sourcePreferenceIdKey), !id.isEmpty {
+            return .source(id)
+        }
+        return .automatic
+    }
+
+    private func sourceResolution(for metric: HealthMetric) async -> HealthSourceResolution {
+        guard Self.sourceSelectableMetrics.contains(metric) else {
+            return HealthSourceResolution(selected: nil, requestedSourceMissing: false)
+        }
+        return HealthSourceSelector.resolve(
+            preference: sourcePreference(),
+            available: await availableSources(for: [metric])
+        )
+    }
+
+    private func availableSources(for metrics: [HealthMetric]) async -> [HealthSourceDescriptor] {
+        var byId: [String: HealthSourceDescriptor] = [:]
+        for metric in metrics {
+            for source in await sources(for: metric.objectType) {
+                let descriptor = HealthSourceDescriptor.make(
+                    name: source.name,
+                    bundleIdentifier: source.bundleIdentifier
+                )
+                byId[descriptor.id] = descriptor
+            }
+        }
+        return Array(byId.values).sorted {
+            $0.name.localizedCaseInsensitiveCompare($1.name) == .orderedAscending
+        }
+    }
+
+    private func healthKitSource(for descriptor: HealthSourceDescriptor, metric: HealthMetric) async -> HKSource? {
+        await sources(for: metric.objectType).first {
+            HealthSourceDescriptor.make(name: $0.name, bundleIdentifier: $0.bundleIdentifier).id == descriptor.id
+        }
+    }
+
+    private func sources(for type: HKObjectType) async -> [HKSource] {
+        guard let sampleType = type as? HKSampleType else { return [] }
+        return await withCheckedContinuation { continuation in
+            let query = HKSourceQuery(sampleType: sampleType, samplePredicate: nil) { _, sources, _ in
+                continuation.resume(returning: Array(sources ?? []))
+            }
+            store.execute(query)
+        }
+    }
+
+    private static func sourcePayload(_ source: HealthSourceDescriptor) -> [String: String] {
+        [
+            "id": source.id,
+            "name": source.name,
+            "bundleIdentifier": source.bundleIdentifier,
+            "kind": source.kind.rawValue
+        ]
     }
 
     // MARK: - Incremental reads

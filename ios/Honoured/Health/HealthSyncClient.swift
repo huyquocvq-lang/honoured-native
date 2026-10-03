@@ -58,12 +58,39 @@ actor SupabaseHealthClient {
         }
     }
 
+    /// The caller's pending Icon days of measured Icons (`icon_days_to_measure`).
+    func iconDaysToMeasure(session: NativeAuthSession) async throws -> [IconDayToMeasure] {
+        guard let baseURL = AppConfig.supabaseURL, !AppConfig.supabaseAnonKey.isEmpty else {
+            throw SyncError.notConfigured
+        }
+        let data = try await rpc("icon_days_to_measure", body: EmptyBody(), baseURL: baseURL, session: session)
+        return try IconDayToMeasure.decodeList(from: data)
+    }
+
+    /// Reports Icon day readings; the server stamps what they settle.
+    func recordIconMeasurements(
+        _ readings: [IconMeasurementPayload],
+        session: NativeAuthSession
+    ) async throws -> IconMeasurementSummary {
+        guard let baseURL = AppConfig.supabaseURL, !AppConfig.supabaseAnonKey.isEmpty else {
+            throw SyncError.notConfigured
+        }
+        let data = try await rpc(
+            "record_icon_measurements",
+            body: IconMeasurementsRequest(rows: readings),
+            baseURL: baseURL,
+            session: session
+        )
+        return try JSONDecoder().decode(IconMeasurementSummary.self, from: data)
+    }
+
+    @discardableResult
     private func rpc<T: Encodable>(
         _ name: String,
         body: T,
         baseURL: URL,
         session: NativeAuthSession
-    ) async throws {
+    ) async throws -> Data {
         let url = baseURL.appendingPathComponent("rest/v1/rpc/\(name)")
         var request = URLRequest(url: url)
         request.httpMethod = "POST"
@@ -72,12 +99,13 @@ actor SupabaseHealthClient {
         request.setValue("Bearer \(session.accessToken)", forHTTPHeaderField: "Authorization")
         request.httpBody = try JSONEncoder().encode(body)
 
-        let (_, response) = try await URLSession.shared.data(for: request)
+        let (data, response) = try await URLSession.shared.data(for: request)
         guard let http = response as? HTTPURLResponse else { throw SyncError.invalidResponse }
         guard (200...299).contains(http.statusCode) else {
             if http.statusCode == 401 { throw SyncError.invalidSession }
             throw SyncError.http(http.statusCode)
         }
+        return data
     }
 
     private struct SamplesBody: Codable {
@@ -86,6 +114,8 @@ actor SupabaseHealthClient {
     }
     private struct SamplesRequest: Codable { let batch: SamplesBody }
     private struct DailyRequest: Codable { let rows: [HealthDailyPayload] }
+    private struct EmptyBody: Encodable {}
+    private struct IconMeasurementsRequest: Encodable { let rows: [IconMeasurementPayload] }
 
     enum SyncError: LocalizedError {
         case notConfigured, invalidResponse, invalidSession, http(Int)

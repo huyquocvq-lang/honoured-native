@@ -40,6 +40,13 @@ final class HonouredAppDelegate: NSObject, UIApplicationDelegate {
         return true
     }
 
+    func application(
+        _ application: UIApplication,
+        supportedInterfaceOrientationsFor window: UIWindow?
+    ) -> UIInterfaceOrientationMask {
+        OrientationLock.shared.supportedOrientations
+    }
+
     /// The SwiftUI App lifecycle is scene-based, so UIKit routes active/background
     /// transitions to the scene rather than to this delegate. The notifications
     /// fire in both lifecycles.
@@ -53,6 +60,9 @@ final class HonouredAppDelegate: NSObject, UIApplicationDelegate {
                 Task {
                     await TestamentTimer.shared.reconcile()
                     await HealthBackgroundDeliveryCoordinator.shared.retryPendingCollection()
+                    await IconVerifier.shared.run()
+                    await IconSignatureSync.shared.run()
+                    await IconCardCoordinator.shared.refresh()
                 }
             },
             center.addObserver(

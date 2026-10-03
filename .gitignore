@@ -37,3 +37,7 @@ tmp/
 
 # Playwright MCP session logs
 .playwright-mcp/
+
+# doc
+docs/
+.codex-tmp/

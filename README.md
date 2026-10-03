@@ -179,7 +179,11 @@ card variants as PNG files.
 A Debug build started with `-HonouredBridgeStub` loads a test page instead of
 the web app (see `ios/Honoured/Debug/BridgeStub.swift`). `-HonouredBridgeScenario`
 runs one of its scripted checks, for example `google` (with
-`-HonouredFakeGoogle success`), `google-reload` (with `-HonouredFakeGoogle slow`),
+`-HonouredFakeGoogle success`), `google-reload` (with `-HonouredFakeGoogle slow`), `orientation`,
+the session-restore sequence `auth-restore-setup`, `auth-restore-check`,
+`auth-restore-cleared`, `auth-restore-setup`, `auth-restore-race`,
+`auth-restore-expired-setup`, `auth-restore-expired-check` (one launch each),
+`icon-card` (leaves a sample Icon card running) and `icon-card-end`,
 `live-activities-multiple`,
 `live-activities-focus-race`, `live-activities-health`, `live-activities-timer`,
 `live-activities-account`, `live-activities-deeplink` or

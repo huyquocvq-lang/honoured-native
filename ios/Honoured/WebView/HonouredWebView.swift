@@ -76,6 +76,7 @@ struct HonouredWebView: UIViewRepresentable {
         func webView(_ webView: WKWebView, didFinish navigation: WKNavigation!) {
             Task { @MainActor in state.markLoaded() }
             bridge.send(type: "NATIVE_READY", payload: bridge.readyPayload())
+            bridge.restoreStoredAuthSessionToWeb()
         }
 
         func webView(_ webView: WKWebView, didFail navigation: WKNavigation!, withError error: Error) {
