@@ -180,8 +180,8 @@ struct IconActivityAttributes: ActivityAttributes {
 enum IconCopy {
     static let title = "Icon"
     /// One affirmation per Icon day, in turn. The first two come from the
-    /// scope; the rest are drafts awaiting the client's approval (O-12). Each
-    /// fits one Lock Screen line beside the signature and the cut-off.
+    /// scope; the client approved the rest (O-12). Each fits one Lock Screen
+    /// line beside the signature and the cut-off.
     static let affirmations = [
         "You've got this.",
         "You're closer than you think.",
