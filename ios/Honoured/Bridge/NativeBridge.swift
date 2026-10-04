@@ -352,7 +352,8 @@ final class NativeBridge: NSObject, WKScriptMessageHandler {
             Self.authMutations.enqueue {
                 do {
                     let previousUserId = await AuthSessionStore.shared.load()?.userId
-                    if let previousUserId, previousUserId != userId {
+                    let accountChanged = previousUserId != nil && previousUserId != userId
+                    if accountChanged {
                         try await HealthSyncCoordinator.shared.clear()
                         await HealthKitService.shared.resetSyncState()
                         await HealthSyncSettings.shared.reset()
@@ -371,6 +372,10 @@ final class NativeBridge: NSObject, WKScriptMessageHandler {
                         expiresAt: expiresAt
                     ))
                     reply("AUTH_SESSION_ACCEPTED", ["userId": userId, "liveActivityBridgeSessionId": liveActivitySessionId])
+                    // After the save: the previous account's push tokens go
+                    // first, then this account's are registered.
+                    if accountChanged { await PushTokenRegistry.shared.forgetAccount() }
+                    await PushTokenRegistry.shared.scheduleSync()
                     HealthBackgroundObserver.shared.enableBackgroundDelivery()
                     HealthBackgroundRefresh.shared.schedule()
                     await HealthSyncCoordinator.shared.syncNow()
@@ -392,6 +397,10 @@ final class NativeBridge: NSObject, WKScriptMessageHandler {
             Self.authMutations.enqueue {
                 do {
                     try await AuthSessionStore.shared.clear()
+                    // After the clear, so no registration can find the session
+                    // again. Needs no session itself: the install stops getting
+                    // pushes even when the web app has already revoked it.
+                    await PushTokenRegistry.shared.forgetAccount()
                     await IconSignatureSync.shared.reset()
                     await IconCardCoordinator.shared.reset()
                     try await HealthSyncCoordinator.shared.clear()

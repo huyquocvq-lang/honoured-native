@@ -35,9 +35,10 @@ final class IconCardPlanTests: XCTestCase {
     func testMorningCardOpensWithTheAffirmationAndGoesStaleAtTheEveningReminder() {
         let now = morning.addingTimeInterval(600)
         let actions = IconCardPlan.actions(days: [day()], running: [], started: [], now: now, canStart: true)
-        guard case let .start(facts, state, stale)? = actions.first, actions.count == 1 else {
+        guard case let .start(facts, state, stale, slot)? = actions.first, actions.count == 1 else {
             return XCTFail("expected one start, got \(actions)")
         }
+        XCTAssertEqual(slot, .morning)
         XCTAssertEqual(facts.iconDay, "2026-10-06")
         XCTAssertEqual(state.phase, .morning)
         XCTAssertEqual(state.line, IconCopy.affirmation(sessionNumber: 5))
@@ -50,23 +51,71 @@ final class IconCardPlanTests: XCTestCase {
         XCTAssertEqual(IconCardPlan.actions(days: [day()], running: [], started: [], now: now, canStart: false), [])
     }
 
-    func testAStartedCardIsNeverStartedAgain() {
-        let key = IconCardPlan.key(contractId: "c1", iconDay: "2026-10-06")
+    private var key: String { IconCardPlan.key(contractId: "c1", iconDay: "2026-10-06") }
+    private var morningShown: String { IconCardPlan.startedKey(key, slot: .morning) }
+    private var eveningShown: String { IconCardPlan.startedKey(key, slot: .evening) }
+    private var afterGrace: Date { evening.addingTimeInterval(IconCardPlan.eveningGrace + 60) }
+
+    func testAStartedAppearanceIsNeverStartedAgain() {
         let now = morning.addingTimeInterval(600)
-        XCTAssertEqual(IconCardPlan.actions(days: [day()], running: [], started: [key], now: now, canStart: true), [],
-                       "a card the person swiped away stays away")
+        XCTAssertEqual(IconCardPlan.actions(days: [day()], running: [], started: [morningShown], now: now, canStart: true), [],
+                       "a morning card the person swiped away stays away")
     }
 
-    func testAfterTheEveningReminderTheCardShowsTheEveningLine() {
-        let now = evening.addingTimeInterval(60)
+    func testAtTheEveningReminderTheMorningCardWaitsForTheServersCard() {
         let running = card("a", state: .morning(sessionNumber: 5, at: morning), stale: evening)
-        let actions = IconCardPlan.actions(days: [day()], running: [running], started: ["x"], now: now, canStart: false)
-        guard case let .update(id, state, stale)? = actions.first, actions.count == 1 else {
-            return XCTFail("expected one update, got \(actions)")
+        let now = evening.addingTimeInterval(60)
+        XCTAssertEqual(IconCardPlan.actions(days: [day()], running: [running], started: [morningShown], now: now, canStart: true), [],
+                       "the server push-starts the evening card within a minute; the stale date shows the evening line meanwhile")
+    }
+
+    func testAfterTheGraceTheMorningCardMakesWayForAFreshEveningCard() {
+        // iOS ends a card 8 hours after it starts: a 07:00 card is gone before 20:00.
+        let running = card("a", state: .morning(sessionNumber: 5, at: morning), stale: evening)
+        let actions = IconCardPlan.actions(days: [day()], running: [running], started: [morningShown], now: afterGrace, canStart: true)
+        guard actions.count == 2, actions[0] == .end(id: "a"),
+              case let .start(_, state, stale, slot) = actions[1] else {
+            return XCTFail("expected the morning card to end and an evening card to start, got \(actions)")
+        }
+        XCTAssertEqual(slot, .evening)
+        XCTAssertEqual(state.phase, .evening)
+        XCTAssertEqual(state.line, IconCopy.eveningLine)
+        XCTAssertNil(stale)
+    }
+
+    func testInTheBackgroundTheMorningCardStaysThroughTheEvening() {
+        let running = card("a", state: .morning(sessionNumber: 5, at: morning), stale: evening)
+        XCTAssertEqual(IconCardPlan.actions(days: [day()], running: [running], started: [morningShown], now: afterGrace, canStart: false), [],
+                       "closing it without opening another would leave nothing")
+    }
+
+    func testTheServersEveningCardIsKeptAndTheMorningCardClosed() {
+        let morningCard = card("a", state: .morning(sessionNumber: 5, at: morning), stale: evening)
+        let eveningCard = card("b", state: .evening(at: evening))
+        let now = evening.addingTimeInterval(60)
+        XCTAssertEqual(IconCardPlan.actions(days: [day()], running: [morningCard, eveningCard], started: [morningShown, eveningShown],
+                                            now: now, canStart: true), [.end(id: "a")])
+    }
+
+    func testASwipedAwayMorningCardDoesNotStopTheEveningCard() {
+        let actions = IconCardPlan.actions(days: [day()], running: [], started: [morningShown], now: afterGrace, canStart: true)
+        guard case let .start(_, state, _, slot)? = actions.first, actions.count == 1 else {
+            return XCTFail("expected the evening card, got \(actions)")
+        }
+        XCTAssertEqual(slot, .evening)
+        XCTAssertEqual(state.phase, .evening)
+        XCTAssertEqual(IconCardPlan.actions(days: [day()], running: [], started: [morningShown, eveningShown], now: afterGrace, canStart: true), [],
+                       "a swiped-away evening card stays away")
+    }
+
+    func testAnHonouredDayKeepsItsCardThroughTheEvening() {
+        let running = card("a", state: .morning(sessionNumber: 5, at: morning), stale: evening)
+        let actions = IconCardPlan.actions(days: [day(status: .honoured)], running: [running], started: [morningShown], now: afterGrace, canStart: true)
+        guard case let .update(id, state, _)? = actions.first, actions.count == 1 else {
+            return XCTFail("expected the card to show the result, got \(actions)")
         }
         XCTAssertEqual(id, "a")
-        XCTAssertEqual(state.phase, .evening)
-        XCTAssertNil(stale)
+        XCTAssertEqual(state.result, .honoured)
     }
 
     func testAnUnchangedCardIsLeftAlone() {
@@ -113,11 +162,14 @@ final class IconCardPlanTests: XCTestCase {
         XCTAssertEqual(IconCardPlan.actions(days: [off], running: [], started: [], now: morning.addingTimeInterval(600), canStart: true), [])
     }
 
-    func testEveningOnlyOpensAtTheEveningReminderWithoutAStaleDate() {
+    func testEveningOnlyOpensAfterTheEveningReminderWithoutAStaleDate() {
         let eveningOnly = day(morningAt: .some(nil))
         XCTAssertEqual(IconCardPlan.actions(days: [eveningOnly], running: [], started: [], now: morning.addingTimeInterval(600), canStart: true), [])
-        let actions = IconCardPlan.actions(days: [eveningOnly], running: [], started: [], now: evening.addingTimeInterval(60), canStart: true)
-        guard case let .start(_, state, stale)? = actions.first else { return XCTFail("expected a start") }
+        XCTAssertEqual(IconCardPlan.actions(days: [eveningOnly], running: [], started: [], now: evening.addingTimeInterval(60), canStart: true), [],
+                       "left to the server's push during the grace period")
+        let actions = IconCardPlan.actions(days: [eveningOnly], running: [], started: [], now: afterGrace, canStart: true)
+        guard case let .start(_, state, stale, slot)? = actions.first else { return XCTFail("expected a start") }
+        XCTAssertEqual(slot, .evening)
         XCTAssertEqual(state.phase, .evening)
         XCTAssertNil(stale)
     }

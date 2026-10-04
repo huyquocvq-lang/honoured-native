@@ -2,8 +2,14 @@ import Foundation
 
 // Which Icon cards should exist right now (V1.2 M2-09, local lifecycle).
 // Pure: the coordinator feeds it the server's Icon days and the running cards
-// and applies the result through ActivityKit. Push-to-start (M2-07) will open
+// and applies the result through ActivityKit. The icon-push job (M2-07) opens
 // the same cards from the server; this keeps them right whenever the app runs.
+//
+// A day's card appears twice, as the scope describes: at the morning reminder
+// and again at the evening one. iOS ends a Live Activity 8 hours after it
+// starts, so the morning card cannot be trusted to reach the cut-off; the
+// evening gets a fresh card (the evening reminder is set within 8 hours of
+// the cut-off).
 
 /// One Icon day as the server schedules it, with what its card shows.
 struct IconCardDay: Equatable {
@@ -35,8 +41,13 @@ struct RunningIconCard: Equatable {
     var key: String { IconCardPlan.key(contractId: contractId, iconDay: iconDay) }
 }
 
+/// The two appearances of a day's card.
+enum IconCardSlot: String, Equatable {
+    case morning, evening
+}
+
 enum IconCardAction: Equatable {
-    case start(IconCardFacts, IconLiveActivityState, staleDate: Date?)
+    case start(IconCardFacts, IconLiveActivityState, staleDate: Date?, slot: IconCardSlot)
     case update(id: String, IconLiveActivityState, staleDate: Date?)
     case end(id: String)
 }
@@ -44,9 +55,18 @@ enum IconCardAction: Equatable {
 enum IconCardPlan {
     static func key(contractId: String, iconDay: String) -> String { contractId + "\u{1F}" + iconDay }
 
+    /// Remembers one appearance of a card as started.
+    static func startedKey(_ key: String, slot: IconCardSlot) -> String { key + "\u{1F}" + slot.rawValue }
+
+    /// The server push-starts the evening card within a minute of the
+    /// reminder; the app opens it itself only after this, so the two never
+    /// both open one.
+    static let eveningGrace: TimeInterval = 3 * 60
+
     /// - Parameters:
-    ///   - started: keys of cards already started once. A card the person
-    ///     swiped away, or one that closed, is never started again.
+    ///   - started: `startedKey`s of the appearances already started. A card
+    ///     the person swiped away, or one that closed, is not started again
+    ///     for that appearance.
     ///   - canStart: ActivityKit only starts a card while the app is in the foreground.
     static func actions(
         days: [IconCardDay], running: [RunningIconCard], started: Set<String>, now: Date, canStart: Bool
@@ -57,11 +77,33 @@ enum IconCardPlan {
             wanted[day.key] = day
         }
 
+        // Evening and result cards come first, so beside one of them it is the
+        // morning card that closes.
+        let ordered = running.enumerated().sorted { a, b in
+            let ra = a.element.state.phase == .morning ? 1 : 0
+            let rb = b.element.state.phase == .morning ? 1 : 0
+            return ra != rb ? ra < rb : a.offset < b.offset
+        }.map(\.element)
+
         var kept = Set<String>()
-        for card in running {
+        for card in ordered {
             guard let day = wanted[card.key], !kept.contains(card.key) else {
                 // Day over, stamped BROKEN or amended, Icon gone, or a duplicate.
                 actions.append(.end(id: card.id))
+                continue
+            }
+            if day.status == .pending, card.state.phase == .morning,
+               let evening = day.eveningAt, now >= evening {
+                // The evening needs a fresh card. Until the grace period is
+                // over the server's push is on its way, and while the app
+                // cannot open one the morning card stays: its stale date
+                // already shows the evening line.
+                let eveningShown = started.contains(startedKey(day.key, slot: .evening))
+                if now >= evening.addingTimeInterval(eveningGrace) && (canStart || eveningShown) {
+                    actions.append(.end(id: card.id))
+                } else {
+                    kept.insert(card.key)
+                }
                 continue
             }
             kept.insert(card.key)
@@ -73,13 +115,23 @@ enum IconCardPlan {
         }
 
         if canStart {
-            for day in wanted.values.sorted(by: { $0.deadlineAt < $1.deadlineAt })
-            where !kept.contains(day.key) && !started.contains(day.key) {
+            for day in wanted.values.sorted(by: { $0.deadlineAt < $1.deadlineAt }) where !kept.contains(day.key) {
+                let due = Self.slot(of: day, at: now)
+                if due == .evening, let evening = day.eveningAt, now < evening.addingTimeInterval(eveningGrace) {
+                    continue
+                }
+                guard !started.contains(startedKey(day.key, slot: due)) else { continue }
                 let (state, stale) = desired(for: day, now: now, keeping: nil)
-                actions.append(.start(day.facts, state, staleDate: stale))
+                actions.append(.start(day.facts, state, staleDate: stale, slot: due))
             }
         }
         return actions
+    }
+
+    /// The appearance due now: the evening one from the evening reminder on.
+    static func slot(of day: IconCardDay, at now: Date) -> IconCardSlot {
+        if let evening = day.eveningAt, now >= evening { return .evening }
+        return .morning
     }
 
     /// From the first reminder until the cut-off, unless the day ended otherwise.

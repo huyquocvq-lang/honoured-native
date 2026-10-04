@@ -99,6 +99,7 @@ targets:
       - Honoured/Health/HealthSourcePreference.swift
       - Honoured/Health/IconMeasurement.swift
       - Honoured/LiveActivities/IconSignatureImage.swift
+      - Honoured/Notifications/PushTokenSupport.swift
       - HonouredWidgets/ContractLiveActivityViews.swift
       - HonouredWidgets/LiveActivityPreviewStates.swift
       - HonouredWidgets/IconLiveActivityViews.swift

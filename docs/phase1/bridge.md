@@ -84,6 +84,7 @@ Rules:
   account-isolation check.
 - Native refreshes only when the app is not active (background task, HealthKit observer wake). Supabase's refresh-token reuse window covers the rare overlap with a foreground refresh.
 - `CLEAR_AUTH_SESSION` wipes the Keychain entry, the offline sync queue and all HealthKit anchors, so a different user signing in on the same device starts from a clean read.
+- iOS: an accepted session also registers this install's push tokens for the Icon card (see "v2 — Icon push"). `CLEAR_AUTH_SESSION` removes them, and a session for a different user removes the previous account's before registering its own. Removal needs no session, so it still works after supabase-js has signed out.
 - Native needs `SupabaseURL` and `SupabaseAnonKey` in `Info.plist`, injected through `Config.xcconfig` the same way as `RevenueCatAPIKey`.
 
 ---
@@ -637,6 +638,17 @@ An Icon (V1.2 M2) is scored per scheduled day on the server (`docs/db/icon_scori
 | `ICON_DAYS_UPDATED { honoured, broken }` | A report stamped at least one Icon day. The web app re-reads `icon_days`. Counts are of this report only. |
 
 Icons whose activity Health cannot measure are self-reported by the web app with the `self_report_icon_day` RPC; native is not involved.
+
+---
+
+## v2 — Icon push (iOS)
+
+The Icon card (V1.2 M2-06/M2-07) opens, changes and closes from the server through APNs, so it works while the app is closed. There is no web → native message for it; setup and server behaviour are in `docs/phase2/icon-push.md`.
+
+- Native registers its tokens with `register_push_token` under the stored session: the APNs device token, the ActivityKit push-to-start token (iOS 17.2+) and the update token of each Icon card. It sends them again when one changes, when the session changes and once a day.
+- Each install has a random installation id in the Keychain (this device only). Once `CLEAR_AUTH_SESSION` has cleared the session, or a session for another user has been stored, native calls `unregister_push_tokens` with that id, as anon, before registering anything again, and retries until it succeeds.
+- The card appears at the morning reminder and again, as a fresh card, at the evening one (iOS ends a Live Activity 8 hours after it starts). A card the server started counts as shown: if the person swipes it away, the app does not open it again until the next appearance.
+- Below iOS 17.2, or with Live Activities turned off, the server sends a quiet notification instead. In the foreground it is not shown.
 
 ---
 

@@ -24,6 +24,10 @@ final class HonouredAppDelegate: NSObject, UIApplicationDelegate {
         // signed-in account before a finished timer is reported to them. It
         // only ends or adopts cards; a background launch never creates one.
         LiveActivityCoordinator.shared.applicationDidFinishLaunching()
+        // Before anything else can start an Icon card: ActivityKit hands its
+        // push tokens only to observers that already exist.
+        PushTokenRegistry.shared.start()
+        application.registerForRemoteNotifications()
         observeLifecycle()
         #if DEBUG
         LiveActivityPulseProbe.runIfRequested()
@@ -47,6 +51,10 @@ final class HonouredAppDelegate: NSObject, UIApplicationDelegate {
         OrientationLock.shared.supportedOrientations
     }
 
+    func application(_ application: UIApplication, didRegisterForRemoteNotificationsWithDeviceToken deviceToken: Data) {
+        PushTokenRegistry.shared.setDeviceToken(deviceToken)
+    }
+
     /// The SwiftUI App lifecycle is scene-based, so UIKit routes active/background
     /// transitions to the scene rather than to this delegate. The notifications
     /// fire in both lifecycles.
@@ -58,6 +66,7 @@ final class HonouredAppDelegate: NSObject, UIApplicationDelegate {
             ) { _ in
                 LiveActivityCoordinator.shared.applicationDidBecomeActive()
                 Task {
+                    await PushTokenRegistry.shared.scheduleSync()
                     await TestamentTimer.shared.reconcile()
                     await HealthBackgroundDeliveryCoordinator.shared.retryPendingCollection()
                     await IconVerifier.shared.run()

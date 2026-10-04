@@ -5,11 +5,13 @@ import ActivityKit
 #endif
 
 /// Keeps Icon cards in step with the person's Icon days whenever the app runs
-/// (V1.2 M2-09, local lifecycle). Once the app is in the foreground after an
-/// Icon day's first reminder, its card opens; it turns to the evening line at
-/// the evening reminder on its own (stale date), shows HONOURED when the day is
-/// stamped and closes at the cut-off. `IconCardPlan` decides; this applies it.
-/// Push-to-start (M2-07) will open the same cards without the app.
+/// (V1.2 M2-09, local lifecycle). Once the app is in the foreground after a
+/// reminder, that appearance of the day's card opens: the morning card, then a
+/// fresh evening card (iOS ends a card 8 hours after it starts). It shows
+/// HONOURED when the day is stamped and closes at the cut-off. `IconCardPlan`
+/// decides; this applies it. The icon-push job (M2-07) opens, updates and
+/// closes the same cards without the app, through the tokens
+/// `PushTokenRegistry` registers.
 @MainActor
 final class IconCardCoordinator {
     static let shared = IconCardCoordinator()
@@ -50,22 +52,33 @@ final class IconCardCoordinator {
         let canStart = UIApplication.shared.applicationState == .active
             && ActivityAuthorizationInfo().areActivitiesEnabled
         var started = startedCards(for: session.userId, now: now)
+        // Cards the server started count as shown too.
+        for activity in activities {
+            let facts = activity.attributes.facts
+            let key = IconCardPlan.key(contractId: facts.contractId, iconDay: facts.iconDay)
+            started[IconCardPlan.startedKey(key, slot: Self.slot(of: activity.content.state))] = facts.deadline
+        }
         let actions = IconCardPlan.actions(
             days: days, running: running, started: Set(started.keys), now: now, canStart: canStart
         )
         for action in actions {
             switch action {
-            case let .start(facts, state, staleDate):
+            case let .start(facts, state, staleDate, slot):
+                let attributes = IconActivityAttributes(facts: facts)
+                let content = ActivityContent(state: state, staleDate: staleDate)
+                let activity: Activity<IconActivityAttributes>
                 do {
-                    _ = try Activity.request(
-                        attributes: IconActivityAttributes(facts: facts),
-                        content: ActivityContent(state: state, staleDate: staleDate)
-                    )
+                    // With a push token the icon-push job can update and close the card.
+                    activity = try Activity.request(attributes: attributes, content: content, pushType: .token)
                 } catch {
+                    // A build without push still shows the card while the app runs.
                     // Too many activities or Live Activities turned off: try again next time.
-                    continue
+                    guard let local = try? Activity.request(attributes: attributes, content: content) else { continue }
+                    activity = local
                 }
-                started[IconCardPlan.key(contractId: facts.contractId, iconDay: facts.iconDay)] = facts.deadline
+                PushTokenRegistry.shared.observeCard(activity)
+                let key = IconCardPlan.key(contractId: facts.contractId, iconDay: facts.iconDay)
+                started[IconCardPlan.startedKey(key, slot: slot)] = facts.deadline
             case let .update(id, state, staleDate):
                 await activities.first { $0.id == id }?.update(ActivityContent(state: state, staleDate: staleDate))
             case let .end(id):
@@ -74,6 +87,22 @@ final class IconCardCoordinator {
         }
         saveStartedCards(started, for: session.userId)
         #endif
+    }
+
+    /// A card ActivityKit reports, including one the server started while the
+    /// app was not running: once shown, an appearance the person swipes away
+    /// is not started again.
+    func noteShown(_ facts: IconCardFacts, state: IconLiveActivityState) async {
+        guard let userId = await AuthSessionStore.shared.load()?.userId else { return }
+        var started = startedCards(for: userId, now: Date())
+        let key = IconCardPlan.key(contractId: facts.contractId, iconDay: facts.iconDay)
+        started[IconCardPlan.startedKey(key, slot: Self.slot(of: state))] = facts.deadline
+        saveStartedCards(started, for: userId)
+    }
+
+    /// A morning card is the morning appearance; any other is the evening one.
+    private static func slot(of state: IconLiveActivityState) -> IconCardSlot {
+        state.phase == .morning ? .morning : .evening
     }
 
     /// Sign-out or account switch: close every card and forget what was shown.
