@@ -7,8 +7,8 @@ import ActivityKit
 // morning and evening reminder times and closing on the day's result.
 // Compiled into the app and the widget extension, so it stays free of app
 // services. Every field is a plain value: the app builds a card for a local
-// start, and the push-to-start job (M2-07) will build the same JSON on the
-// server.
+// start, and the push job (M2-07, public.icon_push_plan in the database)
+// builds the same JSON on the server; dates are Unix seconds in both.
 
 /// What stays the same for one Icon day.
 struct IconCardFacts: Codable, Hashable {
@@ -55,6 +55,44 @@ struct IconCardFacts: Codable, Hashable {
     /// `TUE · 5 OF 17`
     var sessionLabel: String { "\(weekday) · \(sessionNumber) OF \(totalSessions)" }
 
+    // Dates travel as Unix seconds: the push-to-start job writes this JSON and
+    // ActivityKit decodes it with its own decoder, so nothing may depend on a
+    // date decoding strategy. Decoding goes through `init` to apply the limits.
+    private enum CodingKeys: String, CodingKey {
+        case contractId, iconDay, weekday, sessionNumber, totalSessions
+        case targetValue, targetUnit, activityName, because, deadline
+    }
+
+    init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        self.init(
+            contractId: try c.decode(String.self, forKey: .contractId),
+            iconDay: try c.decode(String.self, forKey: .iconDay),
+            weekday: try c.decode(String.self, forKey: .weekday),
+            sessionNumber: try c.decode(Int.self, forKey: .sessionNumber),
+            totalSessions: try c.decode(Int.self, forKey: .totalSessions),
+            targetValue: try c.decode(String.self, forKey: .targetValue),
+            targetUnit: try c.decode(String.self, forKey: .targetUnit),
+            activityName: try c.decode(String.self, forKey: .activityName),
+            because: try c.decode(String.self, forKey: .because),
+            deadline: Date(timeIntervalSince1970: try c.decode(Double.self, forKey: .deadline))
+        )
+    }
+
+    func encode(to encoder: Encoder) throws {
+        var c = encoder.container(keyedBy: CodingKeys.self)
+        try c.encode(contractId, forKey: .contractId)
+        try c.encode(iconDay, forKey: .iconDay)
+        try c.encode(weekday, forKey: .weekday)
+        try c.encode(sessionNumber, forKey: .sessionNumber)
+        try c.encode(totalSessions, forKey: .totalSessions)
+        try c.encode(targetValue, forKey: .targetValue)
+        try c.encode(targetUnit, forKey: .targetUnit)
+        try c.encode(activityName, forKey: .activityName)
+        try c.encode(because, forKey: .because)
+        try c.encode(deadline.timeIntervalSince1970, forKey: .deadline)
+    }
+
     private static func cut(_ text: String, to limit: Int) -> String {
         let trimmed = text.trimmingCharacters(in: .whitespacesAndNewlines)
         guard trimmed.count > limit else { return trimmed }
@@ -83,6 +121,32 @@ struct IconLiveActivityState: Codable, Hashable {
     var line: String
     var result: Result?
     var updatedAt: Date
+
+    init(phase: Phase, line: String, result: Result?, updatedAt: Date) {
+        self.phase = phase
+        self.line = line
+        self.result = result
+        self.updatedAt = updatedAt
+    }
+
+    // Unix seconds, like `IconCardFacts`; a push may omit `result`.
+    private enum CodingKeys: String, CodingKey { case phase, line, result, updatedAt }
+
+    init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        phase = try c.decode(Phase.self, forKey: .phase)
+        line = try c.decode(String.self, forKey: .line)
+        result = try c.decodeIfPresent(Result.self, forKey: .result)
+        updatedAt = Date(timeIntervalSince1970: try c.decode(Double.self, forKey: .updatedAt))
+    }
+
+    func encode(to encoder: Encoder) throws {
+        var c = encoder.container(keyedBy: CodingKeys.self)
+        try c.encode(phase, forKey: .phase)
+        try c.encode(line, forKey: .line)
+        try c.encodeIfPresent(result, forKey: .result)
+        try c.encode(updatedAt.timeIntervalSince1970, forKey: .updatedAt)
+    }
 
     /// A morning card is stale from the evening reminder on (its `staleDate`),
     /// so the widget can switch to the evening line while the app is not running.

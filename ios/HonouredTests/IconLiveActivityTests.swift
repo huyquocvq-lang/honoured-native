@@ -69,6 +69,29 @@ final class IconLiveActivityTests: XCTestCase {
         XCTAssertEqual(try JSONDecoder().decode(IconLiveActivityState.self, from: JSONEncoder().encode(state)), state)
     }
 
+    /// The exact JSON the push job sends as `attributes` and `content-state`.
+    func testDecodesTheServerPushPayload() throws {
+        let attributes = Data("""
+        {"facts":{"contractId":"local-1","iconDay":"2026-10-06","weekday":"TUE","sessionNumber":5,"totalSessions":92,
+                  "targetValue":"10,000","targetUnit":"STEPS","activityName":"Walking","because":"Spring","deadline":1791295200}}
+        """.utf8)
+        let state = Data(#"{"phase":"evening","line":"Finish what you signed.","updatedAt":1791280800}"#.utf8)
+        struct Attributes: Decodable { let facts: IconCardFacts }
+        let facts = try JSONDecoder().decode(Attributes.self, from: attributes).facts
+        XCTAssertEqual(facts.sessionLabel, "TUE · 5 OF 92")
+        XCTAssertEqual(facts.deadline, Date(timeIntervalSince1970: 1_791_295_200))
+        let decoded = try JSONDecoder().decode(IconLiveActivityState.self, from: state)
+        XCTAssertEqual(decoded.phase, .evening)
+        XCTAssertNil(decoded.result)
+        XCTAssertEqual(decoded.updatedAt, Date(timeIntervalSince1970: 1_791_280_800))
+        // Dates stay Unix seconds whatever strategy a decoder uses.
+        let other = JSONDecoder()
+        other.dateDecodingStrategy = .iso8601
+        XCTAssertEqual(try other.decode(IconLiveActivityState.self, from: state).updatedAt, decoded.updatedAt)
+        let encoded = try JSONSerialization.jsonObject(with: JSONEncoder().encode(facts)) as? [String: Any]
+        XCTAssertEqual(encoded?["deadline"] as? Double, 1_791_295_200)
+    }
+
     // MARK: - Signature cache
 
     func testSignatureFileNameIsStableAndPathFree() {
