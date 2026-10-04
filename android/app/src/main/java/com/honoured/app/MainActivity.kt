@@ -1,6 +1,7 @@
 package com.honoured.app
 
 import android.Manifest
+import android.content.ActivityNotFoundException
 import android.content.Intent
 import android.content.pm.PackageManager
 import android.graphics.Color
@@ -250,7 +251,12 @@ class MainActivity : AppCompatActivity() {
             return if (uri.host == AppConfig.WEB_APP_HOST || uri.scheme == "about") {
                 false
             } else if (request.isForMainFrame) {
-                startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(uri.toString())))
+                // A link with no handler on the device (e.g. mailto: without a
+                // mail app) is dropped instead of crashing the shell.
+                try {
+                    startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(uri.toString())))
+                } catch (e: ActivityNotFoundException) {
+                }
                 true
             } else {
                 false
