@@ -49,6 +49,15 @@ enum IconCardPreviewStates {
     static let evening = IconLiveActivityState.evening(at: now)
     static let honoured = IconLiveActivityState.result(.honoured, at: now)
     static let broken = IconLiveActivityState.result(.broken, at: now)
+    static let eveningWithSteps = IconLiveActivityState(
+        phase: .evening, line: IconCopy.eveningLine, result: nil, updatedAt: now, value: 6_240
+    )
+    static let honouredWithSteps = IconLiveActivityState(
+        phase: .result, line: IconCopy.resultLine(.honoured), result: .honoured, updatedAt: now, value: 12_382
+    )
+    static let eveningWithMinutes = IconLiveActivityState(
+        phase: .evening, line: IconCopy.eveningLine, result: nil, updatedAt: now, value: 18
+    )
 
     static var all: [(String, IconCardFacts, IconLiveActivityState)] {
         [
@@ -56,6 +65,9 @@ enum IconCardPreviewStates {
             ("morning-next-affirmation", facts, morningSecond),
             ("evening", facts, evening),
             ("honoured", facts, honoured),
+            ("evening-with-steps", facts, eveningWithSteps),
+            ("honoured-with-steps", facts, honouredWithSteps),
+            ("evening-with-minutes", midnightFacts, eveningWithMinutes),
             ("broken", facts, broken),
             ("midnight-cutoff", midnightFacts, evening),
             ("long-text", longFacts, morning),

@@ -121,16 +121,21 @@ struct IconLiveActivityState: Codable, Hashable {
     var line: String
     var result: Result?
     var updatedAt: Date
+    /// The day's Health total so far, in the metric's canonical unit (count,
+    /// meters, kcal, minutes), for the Dynamic Island. Nil when unknown or
+    /// when the activity is self-reported; never zero for "no reading".
+    var value: Double?
 
-    init(phase: Phase, line: String, result: Result?, updatedAt: Date) {
+    init(phase: Phase, line: String, result: Result?, updatedAt: Date, value: Double? = nil) {
         self.phase = phase
         self.line = line
         self.result = result
         self.updatedAt = updatedAt
+        self.value = value
     }
 
-    // Unix seconds, like `IconCardFacts`; a push may omit `result`.
-    private enum CodingKeys: String, CodingKey { case phase, line, result, updatedAt }
+    // Unix seconds, like `IconCardFacts`; a push may omit `result` and `value`.
+    private enum CodingKeys: String, CodingKey { case phase, line, result, updatedAt, value }
 
     init(from decoder: Decoder) throws {
         let c = try decoder.container(keyedBy: CodingKeys.self)
@@ -138,6 +143,7 @@ struct IconLiveActivityState: Codable, Hashable {
         line = try c.decode(String.self, forKey: .line)
         result = try c.decodeIfPresent(Result.self, forKey: .result)
         updatedAt = Date(timeIntervalSince1970: try c.decode(Double.self, forKey: .updatedAt))
+        value = try c.decodeIfPresent(Double.self, forKey: .value)
     }
 
     func encode(to encoder: Encoder) throws {
@@ -146,6 +152,7 @@ struct IconLiveActivityState: Codable, Hashable {
         try c.encode(line, forKey: .line)
         try c.encodeIfPresent(result, forKey: .result)
         try c.encode(updatedAt.timeIntervalSince1970, forKey: .updatedAt)
+        try c.encodeIfPresent(value, forKey: .value)
     }
 
     /// A morning card is stale from the evening reminder on (its `staleDate`),
@@ -195,6 +202,30 @@ enum IconCopy {
 
     static func affirmation(sessionNumber: Int) -> String {
         affirmations[(max(sessionNumber, 1) - 1) % affirmations.count]
+    }
+
+    /// The day's Health total in the Dynamic Island's compact slot, in the
+    /// unit of the target: `6,240` steps, `3.2km`, `320` kcal, `18m`. Nil when
+    /// the target's unit is not one Health measures. Written like the target
+    /// on the card (`IconTargetText`), so the two never mix separators.
+    static func shortValue(_ value: Double, targetUnit: String, locale: Locale = Locale(identifier: "en_US")) -> String? {
+        let unit = targetUnit.lowercased()
+        let metric: String
+        var displayUnit: String?
+        switch unit {
+        case "steps", "step":
+            metric = "steps"
+        case "km", "mi":
+            metric = "distance_walking_running"
+            displayUnit = unit
+        case "kcal", "cal", "cals", "calories":
+            metric = "active_energy"
+        case "min", "mins", "minutes", "hr", "hrs", "hours":
+            metric = "exercise_minutes"
+        default:
+            return nil
+        }
+        return HonouredLiveActivityFormat.shortValueText(value, metric: metric, displayUnit: displayUnit, locale: locale)
     }
 
     static func resultLine(_ result: IconLiveActivityState.Result) -> String {

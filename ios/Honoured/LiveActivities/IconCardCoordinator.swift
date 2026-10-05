@@ -34,7 +34,7 @@ final class IconCardCoordinator {
         guard let baseURL = AppConfig.supabaseURL, !AppConfig.supabaseAnonKey.isEmpty,
               let session = try? await AuthSessionStore.shared.refreshedSessionIfNeeded(),
               session.userId == stored.userId,
-              let days = try? await fetchDays(baseURL: baseURL, session: session) else {
+              var days = try? await fetchDays(baseURL: baseURL, session: session) else {
             // Offline or the session needs the web app: leave the cards as they are.
             return
         }
@@ -42,6 +42,7 @@ final class IconCardCoordinator {
         guard await AuthSessionStore.shared.load()?.userId == session.userId else { return }
 
         let now = Date()
+        days = await withCurrentReadings(days, now: now)
         let activities = Activity<IconActivityAttributes>.activities
         let running = activities.map {
             RunningIconCard(
@@ -87,6 +88,26 @@ final class IconCardCoordinator {
         }
         saveStartedCards(started, for: session.userId)
         #endif
+    }
+
+    /// The day's Health total read on this device for each day that has a card
+    /// now, so the Dynamic Island shows the current figure (client, Oct 5),
+    /// also after HONOURED. A failed read (a locked device) leaves `reading`
+    /// nil so the card keeps its total, and "nothing recorded" is never zero.
+    private func withCurrentReadings(_ days: [IconCardDay], now: Date) async -> [IconCardDay] {
+        var out = days
+        for index in out.indices {
+            let day = out[index]
+            guard IconCardPlan.isShowable(day, now: now),
+                  let raw = day.metric, let metric = HealthMetric(rawValue: raw),
+                  let start = day.startsAt else { continue }
+            let end = min(now, day.deadlineAt)
+            guard end > start else { continue }
+            if case .value(let total) = await HealthKitService.shared.readTotal(for: metric, from: start, to: end) {
+                out[index].reading = total
+            }
+        }
+        return out
     }
 
     /// A card ActivityKit reports, including one the server started while the
@@ -145,8 +166,8 @@ final class IconCardCoordinator {
         let rows = try await get(
             baseURL: baseURL, path: "rest/v1/icon_days", session: session,
             query: [
-                "select": "contract_id,day,session_number,deadline_at,morning_at,evening_at,status,"
-                    + "contracts!inner(client_id,primary_activity,primary_target,because,status)",
+                "select": "contract_id,day,session_number,deadline_at,morning_at,evening_at,status,measured_value,"
+                    + "contracts!inner(client_id,primary_activity,primary_target,because,status,icon_metric,icon_timezone)",
                 "contracts.status": "eq.active",
                 "deadline_at": "gt.\(IconTimestamp.format(now))",
                 "order": "deadline_at.asc",

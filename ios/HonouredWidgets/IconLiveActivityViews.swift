@@ -76,11 +76,23 @@ struct IconLockScreenView: View {
 
 private struct IconTargetLine: View {
     let facts: IconCardFacts
+    /// The day's Health total so far, shown before the target ("6,240 / 10,000").
+    /// The Lock Screen leaves it out: the card shows no progress (client, Sep 28).
+    var valueText: String? = nil
 
     var body: some View {
         // One line whatever the text size: the target shrinks a little before
         // it would wrap, and the activity name gives way first.
         HStack(alignment: .firstTextBaseline, spacing: 6) {
+            if let valueText {
+                (Text(valueText).foregroundColor(HonouredPalette.gold) + Text(" /").foregroundColor(HonouredPalette.muted))
+                    .font(.system(.title3, design: .serif).weight(.semibold))
+                    .monospacedDigit()
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.6)
+                    .layoutPriority(3)
+                    .privacySensitive()
+            }
             Text(facts.targetValue)
                 .font(.system(.title3, design: .serif).weight(.semibold))
                 .lineLimit(1)
@@ -132,7 +144,7 @@ private struct IconMomentLine: View {
     }
 }
 
-// MARK: - Dynamic Island: the mark and the target, nothing more.
+// MARK: - Dynamic Island: the mark and the day's Health total so far.
 
 struct IconCompactLeadingView: View {
     var body: some View {
@@ -147,18 +159,36 @@ struct IconCompactTrailingView: View {
 
     var body: some View {
         Group {
-            switch state.result {
-            case .honoured?:
-                Image(systemName: "checkmark").foregroundStyle(HonouredPalette.gold)
-                    .accessibilityLabel("Honoured")
-            case .broken?:
-                Image(systemName: "xmark").foregroundStyle(IconPalette.broken)
-                    .accessibilityLabel("Broken")
-            case nil:
-                Text(facts.targetValue)
+            if let value = state.value, let text = IconCopy.shortValue(value, targetUnit: facts.targetUnit) {
+                // The current reading, before and after HONOURED (client, Oct 5);
+                // gold once the day is kept.
+                Text(text)
+                    .monospacedDigit()
                     .lineLimit(1)
-                    .minimumScaleFactor(0.7)
+                    .minimumScaleFactor(0.6)
                     .frame(maxWidth: 64, alignment: .trailing)
+                    .foregroundStyle(state.result == .honoured ? HonouredPalette.gold : HonouredPalette.ink)
+                    .privacySensitive()
+                    .accessibilityLabel("\(facts.activityName), \(text) \(facts.targetUnit.lowercased())")
+            } else {
+                switch state.result {
+                case .honoured?:
+                    // No reading on the card yet: the target, which the day reached.
+                    Text(facts.targetValue)
+                        .lineLimit(1)
+                        .minimumScaleFactor(0.7)
+                        .frame(maxWidth: 64, alignment: .trailing)
+                        .foregroundStyle(HonouredPalette.gold)
+                        .accessibilityLabel("Honoured")
+                case .broken?:
+                    Image(systemName: "xmark").foregroundStyle(IconPalette.broken)
+                        .accessibilityLabel("Broken")
+                case nil:
+                    Text(facts.targetValue)
+                        .lineLimit(1)
+                        .minimumScaleFactor(0.7)
+                        .frame(maxWidth: 64, alignment: .trailing)
+                }
             }
         }
         .font(.system(.body, design: .rounded).weight(.semibold))
@@ -205,7 +235,10 @@ struct IconExpandedBottomView: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 6) {
-            IconTargetLine(facts: facts)
+            IconTargetLine(
+                facts: facts,
+                valueText: state.value.flatMap { IconCopy.shortValue($0, targetUnit: facts.targetUnit) }
+            )
             HStack {
                 IconMomentLine(state: state, isStale: isStale)
                 Spacer(minLength: 6)

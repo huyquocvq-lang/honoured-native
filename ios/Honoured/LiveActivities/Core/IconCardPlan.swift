@@ -22,6 +22,17 @@ struct IconCardDay: Equatable {
     var eveningAt: Date?
     var deadlineAt: Date
     var status: Status
+    /// Canonical Health metric of a measured Icon (`steps`, …); nil when self-reported.
+    var metric: String? = nil
+    /// Start of the Icon day in the Icon's time zone, where its Health total begins.
+    var startsAt: Date? = nil
+    /// The day's Health total read on this device just now; nil when the read
+    /// failed (a locked device) or found nothing.
+    var reading: Double? = nil
+    /// The last total this account reported (`icon_days.measured_value`). The
+    /// server stops taking reports once the day is stamped, so it can be
+    /// behind a card the app kept updating.
+    var reportedValue: Double? = nil
 
     /// Cards are identified by contract and Icon day.
     var key: String { IconCardPlan.key(contractId: facts.contractId, iconDay: facts.iconDay) }
@@ -109,7 +120,7 @@ enum IconCardPlan {
             kept.insert(card.key)
             let (state, stale) = desired(for: day, now: now, keeping: card.state)
             if state.phase != card.state.phase || state.result != card.state.result
-                || state.line != card.state.line || stale != card.staleDate {
+                || state.line != card.state.line || state.value != card.state.value || stale != card.staleDate {
                 actions.append(.update(id: card.id, state, staleDate: stale))
             }
         }
@@ -142,8 +153,19 @@ enum IconCardPlan {
     }
 
     /// The morning card goes stale at the evening reminder; the widget then
-    /// shows the evening line without the app having to run.
+    /// shows the evening line without the app having to run. The Health total
+    /// rides along in every phase, HONOURED included; without a new reading
+    /// the card keeps the one it shows, and a new card starts from the last
+    /// reported one.
     static func desired(
+        for day: IconCardDay, now: Date, keeping current: IconLiveActivityState?
+    ) -> (IconLiveActivityState, Date?) {
+        var (state, stale) = phaseState(for: day, now: now, keeping: current)
+        state.value = day.reading ?? current?.value ?? day.reportedValue
+        return (state, stale)
+    }
+
+    private static func phaseState(
         for day: IconCardDay, now: Date, keeping current: IconLiveActivityState?
     ) -> (IconLiveActivityState, Date?) {
         if day.status == .honoured {
@@ -171,6 +193,8 @@ enum IconCardRows {
             let primary_activity: String
             let primary_target: String?
             let because: String
+            var icon_metric: String? = nil
+            var icon_timezone: String? = nil
         }
 
         let contract_id: String
@@ -180,6 +204,7 @@ enum IconCardRows {
         let morning_at: String?
         let evening_at: String?
         let status: String
+        var measured_value: Double? = nil
         let contracts: Contract
     }
 
@@ -202,9 +227,23 @@ enum IconCardRows {
                 facts: facts,
                 morningAt: row.morning_at.flatMap(IconTimestamp.parse),
                 eveningAt: row.evening_at.flatMap(IconTimestamp.parse),
-                deadlineAt: deadline, status: status
+                deadlineAt: deadline, status: status,
+                metric: row.contracts.icon_metric,
+                startsAt: row.contracts.icon_timezone.flatMap { startOfDay(row.day, timeZone: $0) },
+                reportedValue: row.measured_value
             )
         }
+    }
+
+    /// Midnight that starts `day` (`yyyy-MM-dd`) in the Icon's time zone.
+    static func startOfDay(_ day: String, timeZone identifier: String) -> Date? {
+        guard let zone = TimeZone(identifier: identifier) else { return nil }
+        let formatter = DateFormatter()
+        formatter.locale = Locale(identifier: "en_US_POSIX")
+        formatter.calendar = Calendar(identifier: .gregorian)
+        formatter.timeZone = zone
+        formatter.dateFormat = "yyyy-MM-dd"
+        return formatter.date(from: day)
     }
 }
 

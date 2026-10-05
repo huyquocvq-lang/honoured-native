@@ -83,6 +83,9 @@ final class IconLiveActivityTests: XCTestCase {
         let decoded = try JSONDecoder().decode(IconLiveActivityState.self, from: state)
         XCTAssertEqual(decoded.phase, .evening)
         XCTAssertNil(decoded.result)
+        XCTAssertNil(decoded.value, "a push without a reading")
+        let withValue = Data(#"{"phase":"result","line":"HONOURED","result":"honoured","updatedAt":1791280800,"value":12382}"#.utf8)
+        XCTAssertEqual(try JSONDecoder().decode(IconLiveActivityState.self, from: withValue).value, 12_382)
         XCTAssertEqual(decoded.updatedAt, Date(timeIntervalSince1970: 1_791_280_800))
         // Dates stay Unix seconds whatever strategy a decoder uses.
         let other = JSONDecoder()
@@ -90,6 +93,25 @@ final class IconLiveActivityTests: XCTestCase {
         XCTAssertEqual(try other.decode(IconLiveActivityState.self, from: state).updatedAt, decoded.updatedAt)
         let encoded = try JSONSerialization.jsonObject(with: JSONEncoder().encode(facts)) as? [String: Any]
         XCTAssertEqual(encoded?["deadline"] as? Double, 1_791_295_200)
+    }
+
+    func testTheReadingRoundTripsAndIsLeftOutWhenUnknown() throws {
+        let state = IconCardPreviewStates.eveningWithSteps
+        XCTAssertEqual(try JSONDecoder().decode(IconLiveActivityState.self, from: JSONEncoder().encode(state)), state)
+        let json = try JSONSerialization.jsonObject(with: JSONEncoder().encode(IconCardPreviewStates.evening)) as? [String: Any]
+        XCTAssertNil(json?["value"])
+    }
+
+    func testShortValueFollowsTheTargetUnit() {
+        let locale = Locale(identifier: "en_US")
+        XCTAssertEqual(IconCopy.shortValue(6_240, targetUnit: "STEPS", locale: locale), "6,240")
+        XCTAssertEqual(IconCopy.shortValue(3_210, targetUnit: "KM", locale: locale), "3.2km")
+        XCTAssertEqual(IconCopy.shortValue(3_219, targetUnit: "MI", locale: locale), "2mi")
+        XCTAssertEqual(IconCopy.shortValue(320, targetUnit: "KCAL", locale: locale), "320")
+        XCTAssertEqual(IconCopy.shortValue(18.4, targetUnit: "MIN", locale: locale), "18m")
+        XCTAssertEqual(IconCopy.shortValue(65, targetUnit: "HRS", locale: locale), "65m")
+        XCTAssertNil(IconCopy.shortValue(12, targetUnit: "REPS", locale: locale), "nothing Health measures")
+        XCTAssertNil(IconCopy.shortValue(12, targetUnit: "", locale: locale))
     }
 
     // MARK: - Signature cache

@@ -8,7 +8,7 @@ final class IconCardPlanTests: XCTestCase {
 
     private func day(
         contract: String = "c1", iconDay: String = "2026-10-06", status: IconCardDay.Status = .pending,
-        morningAt: Date?? = nil, eveningAt: Date?? = nil
+        morningAt: Date?? = nil, eveningAt: Date?? = nil, reading: Double? = nil, reported: Double? = nil
     ) -> IconCardDay {
         let facts = IconCardFacts(
             contractId: contract, iconDay: iconDay, weekday: "TUE", sessionNumber: 5, totalSessions: 17,
@@ -18,7 +18,7 @@ final class IconCardPlanTests: XCTestCase {
             facts: facts,
             morningAt: morningAt ?? morning,
             eveningAt: eveningAt ?? evening,
-            deadlineAt: cutoff, status: status
+            deadlineAt: cutoff, status: status, reading: reading, reportedValue: reported
         )
     }
 
@@ -174,6 +174,76 @@ final class IconCardPlanTests: XCTestCase {
         XCTAssertNil(stale)
     }
 
+    // MARK: - Health total in the Dynamic Island
+
+    func testTheCardShowsTheDaysHealthTotalAndFollowsIt() {
+        let now = morning.addingTimeInterval(1200)
+        let running = card("a", state: .morning(sessionNumber: 5, at: morning), stale: evening)
+        let actions = IconCardPlan.actions(days: [day(reading: 4_200)], running: [running], started: [], now: now, canStart: true)
+        guard case let .update(id, state, stale)? = actions.first, actions.count == 1 else {
+            return XCTFail("expected the reading to update the card, got \(actions)")
+        }
+        XCTAssertEqual(id, "a")
+        XCTAssertEqual(state.value, 4_200)
+        XCTAssertEqual(state.phase, .morning)
+        XCTAssertEqual(stale, evening)
+    }
+
+    func testWithoutANewReadingTheCardKeepsItsTotal() {
+        let now = morning.addingTimeInterval(1200)
+        var current = IconLiveActivityState.morning(sessionNumber: 5, at: morning)
+        current.value = 4_200
+        let running = card("a", state: current, stale: evening)
+        XCTAssertEqual(IconCardPlan.actions(days: [day()], running: [running], started: [], now: now, canStart: true), [],
+                       "a failed read (locked device) changes nothing")
+        XCTAssertEqual(IconCardPlan.actions(days: [day(reading: 4_200)], running: [running], started: [], now: now, canStart: true), [])
+    }
+
+    func testAfterHonouredTheCardStillFollowsTheTotal() {
+        let now = morning.addingTimeInterval(6 * 3600)
+        var current = IconLiveActivityState.result(.honoured, at: morning)
+        current.value = 10_400
+        let running = card("a", state: current)
+        let actions = IconCardPlan.actions(days: [day(status: .honoured, reading: 12_382)], running: [running], started: [], now: now, canStart: true)
+        guard case let .update(_, state, _)? = actions.first, actions.count == 1 else {
+            return XCTFail("expected one update, got \(actions)")
+        }
+        XCTAssertEqual(state.result, .honoured)
+        XCTAssertEqual(state.line, "HONOURED")
+        XCTAssertEqual(state.value, 12_382)
+    }
+
+    func testANewCardStartsWithTheTotal() {
+        let actions = IconCardPlan.actions(days: [day(reading: 2_000)], running: [], started: [], now: morning.addingTimeInterval(600), canStart: true)
+        guard case let .start(_, state, _, _)? = actions.first else { return XCTFail("expected a start") }
+        XCTAssertEqual(state.value, 2_000)
+    }
+
+    func testAfterHonouredAFailedReadKeepsTheCardsTotal() {
+        // The server stops taking reports once the day is stamped, so its
+        // total can be behind the card; a locked device must not roll it back.
+        let now = morning.addingTimeInterval(6 * 3600)
+        var current = IconLiveActivityState.result(.honoured, at: morning)
+        current.value = 12_382
+        let running = card("a", state: current)
+        let days = [day(status: .honoured, reported: 10_050)]
+        XCTAssertEqual(IconCardPlan.actions(days: days, running: [running], started: [], now: now, canStart: true), [])
+    }
+
+    func testWithoutAReadingANewCardStartsFromTheReportedTotal() {
+        let days = [day(reported: 3_000)]
+        let actions = IconCardPlan.actions(days: days, running: [], started: [], now: morning.addingTimeInterval(600), canStart: true)
+        guard case let .start(_, state, _, _)? = actions.first else { return XCTFail("expected a start") }
+        XCTAssertEqual(state.value, 3_000)
+    }
+
+    func testAReadingWinsOverTheReportedTotal() {
+        let days = [day(reading: 3_400, reported: 3_000)]
+        let actions = IconCardPlan.actions(days: days, running: [], started: [], now: morning.addingTimeInterval(600), canStart: true)
+        guard case let .start(_, state, _, _)? = actions.first else { return XCTFail("expected a start") }
+        XCTAssertEqual(state.value, 3_400)
+    }
+
     // MARK: - Server rows and text
 
     func testDecodesIconDaysWithTheirContract() throws {
@@ -193,6 +263,26 @@ final class IconCardPlanTests: XCTestCase {
         XCTAssertEqual(first.deadlineAt, IconTimestamp.parse("2026-10-06T14:00:00Z"))
         XCTAssertNil(first.eveningAt)
         XCTAssertEqual(first.status, .pending)
+        XCTAssertNil(first.metric, "rows from before the reading was selected")
+        XCTAssertNil(first.reportedValue)
+        XCTAssertNil(first.reading)
+    }
+
+    func testDecodesTheMetricTheDayStartAndTheLastReading() throws {
+        let json = Data("""
+        [{"contract_id":"uuid-1","day":"2026-10-06","session_number":5,
+          "deadline_at":"2026-10-06T13:00:00+00:00","morning_at":null,"evening_at":null,
+          "status":"honoured","measured_value":12382,
+          "contracts":{"client_id":"local-1","primary_activity":"Walking","primary_target":"10000 steps","because":"Spring",
+                       "status":"active","icon_metric":"steps","icon_timezone":"Australia/Sydney"}}]
+        """.utf8)
+        let first = try XCTUnwrap(try IconCardRows.days(from: json, totals: [:]).first)
+        XCTAssertEqual(first.metric, "steps")
+        XCTAssertEqual(first.reportedValue, 12_382)
+        XCTAssertNil(first.reading, "the server's report is not this device's reading")
+        // Midnight in Sydney (UTC+11 since the 4 Oct clock change).
+        XCTAssertEqual(first.startsAt, IconTimestamp.parse("2026-10-05T13:00:00Z"))
+        XCTAssertEqual(first.status, .honoured)
     }
 
     func testTargetTextSplitsNumberAndUnit() {
