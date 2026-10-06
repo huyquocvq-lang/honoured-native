@@ -9,7 +9,9 @@ import Foundation
 // and again at the evening one. iOS ends a Live Activity 8 hours after it
 // starts, so the morning card cannot be trusted to reach the cut-off; the
 // evening gets a fresh card (the evening reminder is set within 8 hours of
-// the cut-off).
+// the cut-off). Without one, a card that would run out first is renewed: by
+// the app whenever it is open, unseen, and otherwise by the server's push
+// (icon_push_v5.sql) shortly before the 8 hours (client, Oct 6).
 
 /// One Icon day as the server schedules it, with what its card shows.
 struct IconCardDay: Equatable {
@@ -48,6 +50,9 @@ struct RunningIconCard: Equatable {
     var iconDay: String
     var state: IconLiveActivityState
     var staleDate: Date?
+    /// False once iOS ended it at its 8 hours: it lingers on the Lock Screen
+    /// but can no longer change. A card that was removed is not listed.
+    var isActive: Bool = true
 
     var key: String { IconCardPlan.key(contractId: contractId, iconDay: iconDay) }
 }
@@ -74,6 +79,13 @@ enum IconCardPlan {
     /// both open one.
     static let eveningGrace: TimeInterval = 3 * 60
 
+    /// iOS ends a Live Activity 8 hours after it starts.
+    static let cardLifetime: TimeInterval = 8 * 3600
+
+    /// In the foreground a card at least this old is swapped for a fresh one
+    /// if it would run out before the cut-off.
+    static let renewAfter: TimeInterval = 3600
+
     /// - Parameters:
     ///   - started: `startedKey`s of the appearances already started. A card
     ///     the person swiped away, or one that closed, is not started again
@@ -89,11 +101,15 @@ enum IconCardPlan {
         }
 
         // Evening and result cards come first, so beside one of them it is the
-        // morning card that closes.
-        let ordered = running.enumerated().sorted { a, b in
+        // morning card that closes; otherwise the newer card stays.
+        let ordered = running.filter(\.isActive).enumerated().sorted { a, b in
             let ra = a.element.state.phase == .morning ? 1 : 0
             let rb = b.element.state.phase == .morning ? 1 : 0
-            return ra != rb ? ra < rb : a.offset < b.offset
+            if ra != rb { return ra < rb }
+            if a.element.state.updatedAt != b.element.state.updatedAt {
+                return a.element.state.updatedAt > b.element.state.updatedAt
+            }
+            return a.offset < b.offset
         }.map(\.element)
 
         var kept = Set<String>()
@@ -118,7 +134,15 @@ enum IconCardPlan {
                 continue
             }
             kept.insert(card.key)
-            let (state, stale) = desired(for: day, now: now, keeping: card.state)
+            var (state, stale) = desired(for: day, now: now, keeping: card.state)
+            if canStart && needsRenewal(card.state, day: day, now: now) {
+                // A fresh card, unseen: the island hides the app's own card
+                // while the app is open.
+                state.updatedAt = now
+                actions.append(.start(day.facts, state, staleDate: stale, slot: slot(of: state)))
+                actions.append(.end(id: card.id))
+                continue
+            }
             if state.phase != card.state.phase || state.result != card.state.result
                 || state.line != card.state.line || state.value != card.state.value || stale != card.staleDate {
                 actions.append(.update(id: card.id, state, staleDate: stale))
@@ -131,12 +155,37 @@ enum IconCardPlan {
                 if due == .evening, let evening = day.eveningAt, now < evening.addingTimeInterval(eveningGrace) {
                     continue
                 }
-                guard !started.contains(startedKey(day.key, slot: due)) else { continue }
+                if started.contains(startedKey(day.key, slot: due)) {
+                    // Shown already. A card iOS ended at its 8 hours comes back;
+                    // one the person removed stays away.
+                    guard let lapsed = running.first(where: { !$0.isActive && $0.key == day.key }) else { continue }
+                    var (state, stale) = desired(for: day, now: now, keeping: lapsed.state)
+                    state.updatedAt = now
+                    actions.append(.start(day.facts, state, staleDate: stale, slot: due))
+                    continue
+                }
                 let (state, stale) = desired(for: day, now: now, keeping: nil)
                 actions.append(.start(day.facts, state, staleDate: stale, slot: due))
             }
         }
         return actions
+    }
+
+    /// Whether the app should swap this card for a fresh one: it is an hour
+    /// old or more and would run out before the cut-off, with no evening card
+    /// coming first. `updatedAt` is when the card's line began, never before
+    /// the card started, so a card is never renewed early; when it is late,
+    /// the server's renewal covers it.
+    static func needsRenewal(_ state: IconLiveActivityState, day: IconCardDay, now: Date) -> Bool {
+        let runsOut = state.updatedAt.addingTimeInterval(cardLifetime)
+        guard now.timeIntervalSince(state.updatedAt) >= renewAfter, runsOut < day.deadlineAt else { return false }
+        if day.status == .pending, let evening = day.eveningAt, evening > now, evening <= runsOut { return false }
+        return true
+    }
+
+    /// A morning card is the morning appearance; any other is the evening one.
+    static func slot(of state: IconLiveActivityState) -> IconCardSlot {
+        state.phase == .morning ? .morning : .evening
     }
 
     /// The appearance due now: the evening one from the evening reminder on.

@@ -44,10 +44,15 @@ final class IconCardCoordinator {
         let now = Date()
         days = await withCurrentReadings(days, now: now)
         let activities = Activity<IconActivityAttributes>.activities
-        let running = activities.map {
-            RunningIconCard(
-                id: $0.id, contractId: $0.attributes.facts.contractId, iconDay: $0.attributes.facts.iconDay,
-                state: $0.content.state, staleDate: $0.content.staleDate
+        let running = activities.compactMap { activity -> RunningIconCard? in
+            // Removed: by the person, the app or the server. Ended but still
+            // listed: iOS closed it at its 8 hours.
+            guard activity.activityState != .dismissed else { return nil }
+            return RunningIconCard(
+                id: activity.id, contractId: activity.attributes.facts.contractId,
+                iconDay: activity.attributes.facts.iconDay,
+                state: activity.content.state, staleDate: activity.content.staleDate,
+                isActive: activity.activityState != .ended
             )
         }
         let canStart = UIApplication.shared.applicationState == .active
@@ -57,7 +62,7 @@ final class IconCardCoordinator {
         for activity in activities {
             let facts = activity.attributes.facts
             let key = IconCardPlan.key(contractId: facts.contractId, iconDay: facts.iconDay)
-            started[IconCardPlan.startedKey(key, slot: Self.slot(of: activity.content.state))] = facts.deadline
+            started[IconCardPlan.startedKey(key, slot: IconCardPlan.slot(of: activity.content.state))] = facts.deadline
         }
         let actions = IconCardPlan.actions(
             days: days, running: running, started: Set(started.keys), now: now, canStart: canStart
@@ -117,13 +122,8 @@ final class IconCardCoordinator {
         guard let userId = await AuthSessionStore.shared.load()?.userId else { return }
         var started = startedCards(for: userId, now: Date())
         let key = IconCardPlan.key(contractId: facts.contractId, iconDay: facts.iconDay)
-        started[IconCardPlan.startedKey(key, slot: Self.slot(of: state))] = facts.deadline
+        started[IconCardPlan.startedKey(key, slot: IconCardPlan.slot(of: state))] = facts.deadline
         saveStartedCards(started, for: userId)
-    }
-
-    /// A morning card is the morning appearance; any other is the evening one.
-    private static func slot(of state: IconLiveActivityState) -> IconCardSlot {
-        state.phase == .morning ? .morning : .evening
     }
 
     /// Sign-out or account switch: close every card and forget what was shown.
