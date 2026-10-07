@@ -17,8 +17,8 @@ settings:
     SWIFT_VERSION: 5.9
     # The app and its widget extension must ship the same version and build,
     # so both Info.plist files read these.
-    MARKETING_VERSION: 1.0.5
-    CURRENT_PROJECT_VERSION: 1
+    MARKETING_VERSION: 1.0.6
+    CURRENT_PROJECT_VERSION: 3
     # Shared container for Icon card signatures: the App Group entitlement of
     # the app and the widget, and HonouredAppGroup in both Info.plist files.
     HONOURED_APP_GROUP: group.$(HONOURED_BUNDLE_ID:default=com.honoured.app)
