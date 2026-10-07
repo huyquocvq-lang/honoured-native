@@ -171,6 +171,12 @@ final class NativeBridge: NSObject, WKScriptMessageHandler {
             handleSavedLogin(type: type, payload: payload, requestId: requestID)
             return
         }
+        if Self.sessionRefreshMessageTypes.contains(type) {
+            guard isTrustedAuthMessage(message) else { return }
+            if !isWebReady { markWebReadyAndFlush() }
+            handleSessionRefresh(type: type, payload: payload, requestId: requestID)
+            return
+        }
         let reply: (String, [String: Any]) -> Void = { [weak self] replyType, replyPayload in
             self?.send(type: replyType, payload: replyPayload, requestId: requestID)
         }
@@ -378,7 +384,9 @@ final class NativeBridge: NSObject, WKScriptMessageHandler {
                     await PushTokenRegistry.shared.scheduleSync()
                     HealthBackgroundObserver.shared.enableBackgroundDelivery()
                     HealthBackgroundRefresh.shared.schedule()
-                    await HealthSyncCoordinator.shared.syncNow()
+                    // Not awaited: an upload that keeps retrying would hold
+                    // every later sign-in, refresh or sign-out behind it.
+                    Task { await HealthSyncCoordinator.shared.syncNow() }
                 } catch {
                     reply("ERROR", ["message": error.localizedDescription, "code": "auth_session_store_failed"])
                 }

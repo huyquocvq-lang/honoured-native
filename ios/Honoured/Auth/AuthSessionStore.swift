@@ -78,9 +78,75 @@ actor AuthSessionStore {
         }
     }
 
+    /// A refresh: the session as stored, and Supabase's own response (with the
+    /// user) for the page.
+    struct RefreshResult: Sendable {
+        let session: NativeAuthSession
+        let response: Data
+    }
+
+    /// What `REFRESH_AUTH_SESSION` hands back to the page.
+    enum WebRefreshOutcome {
+        /// Supabase's token response, for the page to use as its own refresh.
+        case refreshed(Data)
+        /// The page refreshes for itself (`WebRefreshPolicy`).
+        case declined(String)
+        /// Offline or a server error: the page should retry later.
+        case failed
+    }
+
+    private var refreshes = RefreshCoalescer<RefreshResult>()
+
     func refreshedSessionIfNeeded(force: Bool = false) async throws -> NativeAuthSession? {
         guard let current = load() else { return nil }
         guard force || current.expiresAt <= Date().timeIntervalSince1970 + 60 else { return current }
+        return try await refresh(current).session
+    }
+
+    /// A refresh the page handed over. The stored session is the newest copy
+    /// (native refreshes in the background too), so it is refreshed instead
+    /// of the page's, which may already have been used.
+    func refreshForWeb(userId: String) async -> WebRefreshOutcome {
+        let current = load()
+        if case .decline(let reason) = WebRefreshPolicy.decide(storedUserId: current?.userId, requestUserId: userId) {
+            return .declined(reason)
+        }
+        guard let current else { return .declined("no_session") }
+        do {
+            return .refreshed(try await refresh(current).response)
+        } catch SessionRefreshError.invalidSession {
+            // Native's copy is dead; the page may hold a newer sign-in.
+            return .declined("invalid_session")
+        } catch SessionRefreshError.superseded {
+            return .declined("superseded")
+        } catch SessionRefreshError.notConfigured {
+            return .declined("not_configured")
+        } catch {
+            return .failed
+        }
+    }
+
+    /// Refreshes `current` once, however many callers ask meanwhile, and
+    /// stores the result unless the session changed in between.
+    private func refresh(_ current: NativeAuthSession) async throws -> RefreshResult {
+        let task = refreshes.task(for: current.refreshToken) {
+            Task { try await Self.requestRefresh(of: current) }
+        }
+        defer { refreshes.finished(current.refreshToken) }
+        let result = try await task.value
+        // Another caller sharing this refresh may have stored it already.
+        if let stored = load(), stored.refreshToken == result.session.refreshToken { return result }
+        // The network call suspended this actor: the web app may have signed
+        // out, switched account or saved a newer session meanwhile. Only the
+        // session this refresh started from may be replaced.
+        guard let stored = load(), stored.userId == current.userId, stored.refreshToken == current.refreshToken else {
+            throw SessionRefreshError.superseded
+        }
+        try save(result.session)
+        return result
+    }
+
+    private static func requestRefresh(of current: NativeAuthSession) async throws -> RefreshResult {
         guard let baseURL = AppConfig.supabaseURL, !AppConfig.supabaseAnonKey.isEmpty else {
             throw SessionRefreshError.notConfigured
         }
@@ -119,14 +185,7 @@ actor AuthSessionStore {
             refreshToken: refreshed.refreshToken,
             expiresAt: expiresAt
         )
-        // The network call suspended this actor: the web app may have signed
-        // out, switched account or saved a newer session meanwhile. Only the
-        // session this refresh started from may be replaced.
-        guard let stored = load(), stored.userId == current.userId, stored.refreshToken == current.refreshToken else {
-            throw SessionRefreshError.superseded
-        }
-        try save(session)
-        return session
+        return RefreshResult(session: session, response: data)
     }
 
     private struct RefreshRequest: Codable {

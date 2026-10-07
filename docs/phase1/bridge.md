@@ -463,6 +463,34 @@ These travel over the trusted transport of the Google section: accepted only fro
 
 ---
 
+## Session refresh (iOS)
+
+The page and native share one Supabase session. Supabase rotates the refresh token on every refresh, and a refresh with a token that was already used revokes the whole session, so two refreshers holding copies of the same token sign the person out and stop native's background work. Native refreshes on its own (background HealthKit uploads, Icon checks, push registration), so inside the app it is the only refresher: the page hands every refresh to native, which refreshes its own copy (the newest) once, however many callers ask at the same time, and returns Supabase's response.
+
+### Capability
+
+`NATIVE_READY` and `PLATFORM_INFO` carry `capabilities.sessionRefresh: { protocolVersion: 1, supported }`. `supported` is `false` when the configured web app URL is not HTTPS. No `sessionRefresh` key (an older shell, Android, a browser): the page refreshes for itself as before.
+
+### Message
+
+Same trusted transport as Google Sign-In: accepted only from the main frame of the configured web app origin, anything else dropped without a reply, each reply delivered only to the document that asked, never queued, stored or logged.
+
+| Web → Native | Reply |
+|---|---|
+| `REFRESH_AUTH_SESSION { requestId, userId }` | `AUTH_SESSION_REFRESHED { session }`: Supabase's token response (`access_token`, `refresh_token`, `expires_in`, `expires_at`, `token_type`, `user`), already stored by native; `AUTH_REFRESH_DECLINED { reason }`: refresh for yourself; `ERROR { code: "auth_refresh_failed" }` (offline or a server error: retry later); `ERROR { code: "invalid_refresh_request" }` without a `userId` |
+
+`reason` is `no_session` (native holds none), `other_user` (native holds another person's: a sign-in it has not stored yet), `invalid_session` (native's copy was revoked; the page may hold a newer sign-in), `superseded` (the session changed while refreshing) or `not_configured`.
+
+### Rules for the web app
+
+- When `capabilities.sessionRefresh.supported` is `true`, every Supabase refresh-token request (`POST /auth/v1/token?grant_type=refresh_token`) is sent as `REFRESH_AUTH_SESSION` with the signed-in user's id instead of over the network. `AUTH_SESSION_REFRESHED` is used as that request's response; `AUTH_REFRESH_DECLINED` sends the original request to Supabase; an `ERROR` or no reply is answered as a retryable failure (HTTP 503), never by sending the page's own token.
+- Before the capability is known (the page loading), the refresh waits for `NATIVE_READY`, so the page's stored token is never used first.
+- The `SET_AUTH_SESSION` that follows (`TOKEN_REFRESHED`) carries the same tokens and is harmless.
+
+`SET_AUTH_SESSION` no longer waits for the health upload it starts, so a retrying upload cannot hold later session messages.
+
+---
+
 ## v2 — Live Activities (iOS 16.2+)
 
 One Live Activity (a "card") per tracked contract occurrence — one contract on one health day — on the Lock Screen and in the Dynamic Island. The contract the person most recently opened or started leads: native gives it relevance score 100 and every other card a lower one, in order of selection. That is a request to iOS, not a guaranteed place in the Dynamic Island when other apps have activities too. Opening another contract never ends a card or cancels a timer, and every card keeps updating whether it leads or not.
