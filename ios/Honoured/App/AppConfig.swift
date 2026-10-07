@@ -21,6 +21,13 @@ enum AppConfig {
         return url
     }
 
+    /// The domain of this build's `webcredentials:` associated domain
+    /// (HONOURED_WEB_HOST, from HONOURED_WEB_APP_URL). Empty in a build
+    /// without it.
+    static var webCredentialsHost: String {
+        infoString("HonouredWebCredentialsHost")
+    }
+
     static var revenueCatAPIKey: String {
         infoString("RevenueCatAPIKey")
     }

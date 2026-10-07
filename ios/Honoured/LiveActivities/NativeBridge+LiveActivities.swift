@@ -14,7 +14,7 @@ extension NativeBridge {
     func readyPayload() -> [String: Any] {
         var capabilities = LiveActivityCoordinator.shared.capabilities()
         capabilities["googleSignIn"] = googleSignInCapability()
-        capabilities["savedLogin"] = savedLoginCapability()
+        capabilities["webCredentials"] = webCredentialsCapability()
         capabilities["sessionRefresh"] = sessionRefreshCapability()
         return [
             "platform": "ios",

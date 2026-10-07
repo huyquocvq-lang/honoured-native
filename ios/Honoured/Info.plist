@@ -51,6 +51,8 @@
 	<string>$(GOOGLE_WEB_CLIENT_ID)</string>
 	<key>HonouredWebAppURL</key>
 	<string>$(HONOURED_WEB_APP_URL)</string>
+	<key>HonouredWebCredentialsHost</key>
+	<string>$(HONOURED_WEB_HOST)</string>
 	<key>ITSAppUsesNonExemptEncryption</key>
 	<false/>
 	<key>LSRequiresIPhoneOS</key>

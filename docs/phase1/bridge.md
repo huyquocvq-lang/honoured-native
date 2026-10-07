@@ -429,37 +429,34 @@ This does not revoke Google access or touch other devices. New Google requests g
 
 ---
 
-## Saved login (iOS)
+## Passwords (iOS)
 
-The sign-in form has a "Save password" checkbox, ticked by default. The web view cannot use iOS's own "Save Password?" prompt, which does not appear for forms in a `WKWebView`, so the iOS shell keeps the email and password the person chose to save and returns them to pre-fill the form next time. It works without Associated Domains and is unrelated to the iOS Passwords app.
+The sign-in and sign-up forms use the person's Passwords (iCloud Keychain): the keyboard offers the saved email and password for the web app's domain, unlocked with Face ID or Touch ID, and after a successful sign-in, sign-up or password change the app offers to save them. Filling needs nothing from the page beyond standard form markup. Saving does: a `WKWebView` never shows iOS's own "Save Password?" prompt, so the page asks native, which shows the system prompt (`ASCredentialDataManager.save` on iOS 26.2+, `SecAddSharedWebCredential` before).
+
+Both need the domain association: the app's `com.apple.developer.associated-domains` entitlement lists `webcredentials:<web app host>` (`HONOURED_WEB_HOST`, derived from `HONOURED_WEB_APP_URL` by `scripts/sync-env.sh`; Associated Domains enabled on the App ID), and the web app serves `https://<host>/.well-known/apple-app-site-association` with `{"webcredentials":{"apps":["<Team ID>.<bundle id>"]}}`, HTTP 200, `application/json`, no redirect. Apple's CDN caches that file and devices read it at install, so a change is tested by reinstalling the app. Another bundle id, team or domain needs its own entries.
+
+This replaced the "Save password" checkbox of builds up to 1.0.6 (3) (`GET_SAVED_LOGIN`, `SAVE_LOGIN`, `CLEAR_SAVED_LOGIN`, `capabilities.savedLogin`), which kept the login in a device-only Keychain item; newer builds no longer answer those messages and delete that item on launch.
 
 ### Capability
 
-`NATIVE_READY` and `PLATFORM_INFO` carry `capabilities.savedLogin: { protocolVersion: 1, supported }`. `supported` is `false` when the configured web app URL is not HTTPS. No `savedLogin` key (an older shell, Android, a browser): hide the checkbox and send none of the messages below.
+`NATIVE_READY` and `PLATFORM_INFO` carry `capabilities.webCredentials: { protocolVersion: 1, supported }`. `supported` is `true` only when the web app URL is HTTPS and its host is this build's associated domain. No `webCredentials` key (an older shell, Android, a browser): send nothing.
 
-### Messages
+### Message
 
-These travel over the trusted transport of the Google section: accepted only from the main frame of the configured web app origin, anything else dropped without a reply, and each reply delivered only to the document that asked.
+Same trusted transport as Google Sign-In: accepted only from the main frame of the configured web app origin, anything else dropped without a reply, each reply delivered only to the document that asked.
 
 | Web → Native | Reply |
 |---|---|
-| `GET_SAVED_LOGIN { requestId }` | `SAVED_LOGIN { found: true, email, password }` or `SAVED_LOGIN { found: false }` |
-| `SAVE_LOGIN { requestId, email, password }` | `LOGIN_SAVED {}`; `ERROR { code: "invalid_saved_login" }` unless both are non-empty strings (email trimmed, at most 320 characters and containing `@`; password unchanged, at most 1024 characters); `ERROR { code: "saved_login_store_failed" }` |
-| `CLEAR_SAVED_LOGIN { requestId }` | `SAVED_LOGIN_CLEARED {}` (idempotent); `ERROR { code: "saved_login_clear_failed" }` |
+| `SAVE_WEB_CREDENTIAL { requestId, email, password }` | `WEB_CREDENTIAL_SAVED {}`; `ERROR { code: "web_credential_not_saved" }` (declined or failed); `ERROR { code: "invalid_web_credential" }` unless both are non-empty strings (email trimmed, at most 320 characters and containing `@`; password unchanged, at most 1024 characters); `ERROR { code: "web_credentials_unavailable" }` |
 
-- One login per device. `SAVE_LOGIN` replaces it. The three messages run in arrival order.
-- Stored as a device-only Keychain item (`WhenUnlockedThisDeviceOnly`): not synced to iCloud, not restored to another device.
-- `CLEAR_AUTH_SESSION` (sign-out) does **not** remove it, since keeping it across sign-outs is the purpose. Only `CLEAR_SAVED_LOGIN` and deleting the app do.
-- The password never enters the event queue, the durable store or a log, and is not replayed on `NATIVE_READY`. Error messages never contain it.
+- iOS asks the person before saving; nothing is stored by the app. The reply can take as long as the person leaves the prompt open.
+- The password never enters the event queue, the durable store or a log, and error messages never contain it.
 
 ### Rules for the web app
 
-- Show the checkbox only when `capabilities.savedLogin.supported` is `true`.
-- When the sign-in form opens, send `GET_SAVED_LOGIN`. If `found`, fill both fields unless the person has already typed in them.
-- After `signInWithPassword` succeeds, and only then: ticked sends `SAVE_LOGIN` with the email and password just used; unticked sends `CLEAR_SAVED_LOGIN`. A failed sign-in changes nothing.
-- After a password change succeeds, if the saved email matches the account, send `SAVE_LOGIN` with the new password.
-- After account deletion succeeds, send `CLEAR_SAVED_LOGIN`.
-- A native failure never blocks or fails the sign-in itself.
+- Email fields: `type="email"` with `autocomplete="username"`; password fields: `type="password"` with `autocomplete="current-password"` (sign-in) or `"new-password"` (sign-up, new password). A password shown as text is not paired with its email while shown.
+- When `capabilities.webCredentials.supported` is `true`, send `SAVE_WEB_CREDENTIAL` with the email and password just used, without waiting for the reply: after `signInWithPassword` succeeds (skipped when the password was filled from Passwords, which already has it), after a sign-up succeeds, and after a password change succeeds.
+- A native failure or a declined prompt never blocks or fails the sign-in itself.
 
 ---
 

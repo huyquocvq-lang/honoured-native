@@ -19,6 +19,7 @@ final class HonouredAppDelegate: NSObject, UIApplicationDelegate {
         NotificationSound.migrateDefaultToDisabledIfNeeded()
         NotificationSound.configureAudioSession()
         AppleSignInCoordinator.shared.observeRevocation()
+        LegacySavedLogin.remove()
         AppleSignInCoordinator.shared.checkCredentialStateIfNeeded()
         // Queued before the timer reconcile below, so cards are matched to the
         // signed-in account before a finished timer is reported to them. It

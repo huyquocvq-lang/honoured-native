@@ -165,10 +165,10 @@ final class NativeBridge: NSObject, WKScriptMessageHandler {
             handleGoogle(type: type, payload: payload, requestId: requestID)
             return
         }
-        if Self.savedLoginMessageTypes.contains(type) {
+        if Self.webCredentialMessageTypes.contains(type) {
             guard isTrustedAuthMessage(message) else { return }
             if !isWebReady { markWebReadyAndFlush() }
-            handleSavedLogin(type: type, payload: payload, requestId: requestID)
+            handleWebCredentials(type: type, payload: payload, requestId: requestID)
             return
         }
         if Self.sessionRefreshMessageTypes.contains(type) {
