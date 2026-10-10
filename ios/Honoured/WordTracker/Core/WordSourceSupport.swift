@@ -10,6 +10,13 @@ enum WordSourceSupport {
         }
     }
 
+    /// Whether a resolved source lies in a trash folder, such as Files'
+    /// Recently Deleted (`.Trash`). Its bookmark still resolves there, but the
+    /// writer has deleted it, so it counts as missing until it is restored.
+    static func isInTrash(_ url: URL) -> Bool {
+        url.standardizedFileURL.pathComponents.contains { $0 == ".Trash" || $0 == ".Trashes" }
+    }
+
     /// Maps a file-system failure to a code that is safe to send to the page;
     /// anything unrecognised stays generic so no path or message leaks out.
     static func safeError(_ error: Error) -> WordSourceError {

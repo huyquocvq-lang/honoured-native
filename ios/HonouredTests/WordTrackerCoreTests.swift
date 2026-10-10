@@ -127,6 +127,16 @@ final class WordTrackerCoreTests: XCTestCase {
         XCTAssertEqual(WordSourceSupport.safeError(URLError(.notConnectedToInternet)), .providerUnavailable)
     }
 
+    func testSourcesInRecentlyDeletedAreTrashed() {
+        let storage = "/private/var/mobile/Containers/Shared/AppGroup/ID/File Provider Storage"
+        XCTAssertTrue(WordSourceSupport.isInTrash(URL(fileURLWithPath: storage + "/.Trash/Chapter.docx")))
+        XCTAssertTrue(WordSourceSupport.isInTrash(URL(fileURLWithPath: storage + "/.Trash/Novel.scriv", isDirectory: true)))
+        XCTAssertTrue(WordSourceSupport.isInTrash(URL(fileURLWithPath: "/Volumes/Card/.Trashes/501/Chapter.txt")))
+        XCTAssertFalse(WordSourceSupport.isInTrash(URL(fileURLWithPath: storage + "/Writing/Chapter.docx")))
+        XCTAssertFalse(WordSourceSupport.isInTrash(URL(fileURLWithPath: storage + "/Trash talk.txt")))
+        XCTAssertFalse(WordSourceSupport.isInTrash(URL(fileURLWithPath: storage + "/.Trash/../Chapter.docx")))
+    }
+
     /// Acceptance: the same text gives the same count in every supported format.
     func testEveryFormatCountsTheSameText() throws {
         let fixture = "Chapter one.\nIt’s a mother-in-law's café\t2026!"

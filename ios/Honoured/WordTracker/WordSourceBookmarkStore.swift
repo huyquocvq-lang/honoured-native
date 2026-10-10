@@ -59,20 +59,24 @@ enum WordSourceBookmarkStore {
     }
 
     /// A stale bookmark still resolves to the file's new location; the caller
-    /// refreshes it with `refresh(_:url:)` once it has access.
+    /// refreshes it with `refresh(_:url:)` once it has access. A file in
+    /// Recently Deleted is missing, and its bookmark is left as it was, so
+    /// the source resolves again once the file is recovered.
     static func resolve(_ source: StoredWordSource) throws -> (url: URL, isStale: Bool) {
         var stale = false
+        let url: URL
         do {
-            let url = try URL(
+            url = try URL(
                 resolvingBookmarkData: source.bookmark,
                 options: [.withoutUI],
                 relativeTo: nil,
                 bookmarkDataIsStale: &stale
             )
-            return (url, stale)
         } catch {
             throw WordSourceError.missing
         }
+        guard !WordSourceSupport.isInTrash(url) else { throw WordSourceError.missing }
+        return (url, stale)
     }
 
     static func remove(userId: String, contractId: String) {
