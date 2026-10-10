@@ -135,6 +135,44 @@ final class NotificationCoordinator: NSObject, UNUserNotificationCenterDelegate 
         center.removeDeliveredNotifications(withIdentifiers: identifiers)
     }
 
+    /// Replaces every word Icon reminder with `reminders`, scheduling those
+    /// still ahead. A day no longer listed (counted, settled or removed) also
+    /// loses a reminder already shown in Notification Center. The person is
+    /// asked for permission only when there is something to remind and they
+    /// have never been asked. Tapping one just opens the app, which reads the
+    /// count when it becomes active.
+    func replaceWordReminders(_ reminders: [WordReminder], now: Date = Date()) async -> (scheduled: Int, authorized: Bool) {
+        let keep = Set(reminders.map(\.identifier))
+        let pending = await center.pendingNotificationRequests().map(\.identifier)
+        let delivered = await center.deliveredNotifications().map(\.request.identifier)
+        center.removePendingNotificationRequests(withIdentifiers: pending.filter { $0.hasPrefix(WordReminder.identifierPrefix) })
+        center.removeDeliveredNotifications(withIdentifiers: delivered.filter {
+            $0.hasPrefix(WordReminder.identifierPrefix) && !keep.contains($0)
+        })
+        let upcoming = reminders.filter { $0.fireAt > now }
+        guard !upcoming.isEmpty else { return (0, await isAuthorized()) }
+        guard await requestPermissionIfNeeded() else { return (0, false) }
+
+        var scheduled = 0
+        for reminder in upcoming {
+            let content = UNMutableNotificationContent()
+            content.title = "Icon"
+            if let subtitle = reminder.subtitle { content.subtitle = subtitle }
+            content.body = "Open Honoured to check your words before the cut-off."
+            content.sound = nil
+            content.threadIdentifier = WordReminder.identifierPrefix + reminder.contractId
+            let trigger = UNTimeIntervalNotificationTrigger(
+                timeInterval: max(reminder.fireAt.timeIntervalSinceNow, 1), repeats: false
+            )
+            if (try? await center.add(UNNotificationRequest(
+                identifier: reminder.identifier, content: content, trigger: trigger
+            ))) != nil {
+                scheduled += 1
+            }
+        }
+        return (scheduled, true)
+    }
+
     func cancelAll() {
         center.removeAllPendingNotificationRequests()
         center.removeAllDeliveredNotifications()

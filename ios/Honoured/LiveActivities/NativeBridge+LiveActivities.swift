@@ -16,6 +16,8 @@ extension NativeBridge {
         capabilities["googleSignIn"] = googleSignInCapability()
         capabilities["webCredentials"] = webCredentialsCapability()
         capabilities["sessionRefresh"] = sessionRefreshCapability()
+        capabilities["savedLogin"] = savedLoginCapability()
+        capabilities["wordTracker"] = wordTrackerCapability()
         return [
             "platform": "ios",
             "bridgeVersion": AppConfig.bridgeVersion,
