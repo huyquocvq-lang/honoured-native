@@ -25,8 +25,14 @@ final class NativeBridge: NSObject, WKScriptMessageHandler {
     var signOutGoogleAfterPresentation = false
 
     /// The user of the last `SET_AUTH_SESSION` on this bridge.
-    private var boundAuthUserId: String?
+    private(set) var boundAuthUserId: String?
     private var authSessionRestoreGate = AuthSessionRestoreGate()
+
+    /// Retains the document picker delegate for the one word-source selection
+    /// that may be presented at a time.
+    var wordSourceSelection: WordSourceSelection?
+    /// `userId|contractId` of the word-source reads still running.
+    var wordReadsInFlight: Set<String> = []
 
     /// The exact origin the auth messages must come from. Nil (feature off)
     /// when the configured web app URL is not HTTPS.
@@ -169,6 +175,12 @@ final class NativeBridge: NSObject, WKScriptMessageHandler {
             guard isTrustedAuthMessage(message) else { return }
             if !isWebReady { markWebReadyAndFlush() }
             handleSavedLogin(type: type, payload: payload, requestId: requestID)
+            return
+        }
+        if Self.wordTrackerMessageTypes.contains(type) {
+            guard isTrustedAuthMessage(message) else { return }
+            if !isWebReady { markWebReadyAndFlush() }
+            handleWordTracker(type: type, payload: payload, requestId: requestID)
             return
         }
         let reply: (String, [String: Any]) -> Void = { [weak self] replyType, replyPayload in

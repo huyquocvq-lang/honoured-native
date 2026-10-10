@@ -15,6 +15,7 @@ extension NativeBridge {
         var capabilities = LiveActivityCoordinator.shared.capabilities()
         capabilities["googleSignIn"] = googleSignInCapability()
         capabilities["savedLogin"] = savedLoginCapability()
+        capabilities["wordTracker"] = wordTrackerCapability()
         return [
             "platform": "ios",
             "bridgeVersion": AppConfig.bridgeVersion,

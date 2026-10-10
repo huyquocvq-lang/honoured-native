@@ -85,5 +85,26 @@
 		<string>UIInterfaceOrientationLandscapeLeft</string>
 		<string>UIInterfaceOrientationLandscapeRight</string>
 	</array>
+	<key>UTImportedTypeDeclarations</key>
+	<array>
+		<dict>
+			<key>UTTypeConformsTo</key>
+			<array>
+				<string>com.apple.package</string>
+				<string>public.composite-content</string>
+			</array>
+			<key>UTTypeDescription</key>
+			<string>Scrivener Project</string>
+			<key>UTTypeIdentifier</key>
+			<string>com.literatureandlatte.scrivener3.scriv</string>
+			<key>UTTypeTagSpecification</key>
+			<dict>
+				<key>public.filename-extension</key>
+				<array>
+					<string>scriv</string>
+				</array>
+			</dict>
+		</dict>
+	</array>
 </dict>
 </plist>
