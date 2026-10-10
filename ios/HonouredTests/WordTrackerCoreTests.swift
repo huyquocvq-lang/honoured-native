@@ -193,6 +193,63 @@ final class WordTrackerCoreTests: XCTestCase {
         }
     }
 
+    func testReadingReportsWhenTheCountedContentLastChanged() throws {
+        let dir = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString, isDirectory: true)
+        try FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: dir) }
+        let earlier = Date(timeIntervalSince1970: 1_790_000_000)
+        let later = earlier.addingTimeInterval(3600)
+        func stamp(_ url: URL, _ date: Date) throws {
+            try FileManager.default.setAttributes([.modificationDate: date], ofItemAtPath: url.path)
+        }
+
+        let text = dir.appendingPathComponent("draft.txt")
+        try Data("one two".utf8).write(to: text)
+        try stamp(text, earlier)
+        XCTAssertEqual(try WordDocumentReader.read(url: text, kind: .text), WordSourceReading(count: 2, modifiedAt: earlier))
+
+        // A package is as new as its newest file.
+        let package = dir.appendingPathComponent("draft.rtfd", isDirectory: true)
+        let attributed = NSAttributedString(string: "one two three")
+        try attributed.fileWrapper(
+            from: NSRange(location: 0, length: attributed.length),
+            documentAttributes: [.documentType: NSAttributedString.DocumentType.rtfd]
+        ).write(to: package, options: [], originalContentsURL: nil)
+        let packageFiles = try FileManager.default.contentsOfDirectory(at: package, includingPropertiesForKeys: nil)
+        for file in packageFiles { try stamp(file, earlier) }
+        try stamp(try XCTUnwrap(packageFiles.first), later)
+        XCTAssertEqual(try WordDocumentReader.read(url: package, kind: .richTextDirectory).modifiedAt, later)
+
+        // Scrivener: the binder and the Draft documents date the count; a
+        // newer Research note does not.
+        let project = dir.appendingPathComponent("Novel.scriv", isDirectory: true)
+        try FileManager.default.createDirectory(at: project, withIntermediateDirectories: true)
+        let binder = project.appendingPathComponent("Novel.scrivx")
+        try Data("""
+        <ScrivenerProject><Binder>
+          <BinderItem UUID="DRAFT-1" Type="DraftFolder"><Children>
+            <BinderItem UUID="SCENE-1" Type="Text"/>
+          </Children></BinderItem>
+          <BinderItem UUID="NOTES-1" Type="ResearchFolder"><Children>
+            <BinderItem UUID="NOTE-1" Type="Text"/>
+          </Children></BinderItem>
+        </Binder></ScrivenerProject>
+        """.utf8).write(to: binder)
+        var contents: [String: URL] = [:]
+        for id in ["SCENE-1", "NOTE-1"] {
+            let folder = project.appendingPathComponent("Files/Data/\(id)", isDirectory: true)
+            try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
+            contents[id] = folder.appendingPathComponent("content.rtf")
+            try rtf("four words of text").write(to: try XCTUnwrap(contents[id]))
+        }
+        try stamp(binder, earlier)
+        try stamp(try XCTUnwrap(contents["SCENE-1"]), earlier)
+        try stamp(try XCTUnwrap(contents["NOTE-1"]), later)
+        XCTAssertEqual(try WordDocumentReader.read(url: project, kind: .scrivener), WordSourceReading(count: 4, modifiedAt: earlier))
+        try stamp(try XCTUnwrap(contents["SCENE-1"]), later)
+        XCTAssertEqual(try WordDocumentReader.read(url: project, kind: .scrivener).modifiedAt, later)
+    }
+
     func testANonZipWordFileIsMalformed() throws {
         let file = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString + ".docx")
         try Data("not a zip".utf8).write(to: file)

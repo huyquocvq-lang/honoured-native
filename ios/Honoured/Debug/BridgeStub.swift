@@ -1248,7 +1248,7 @@ enum BridgeStub {
           r = await wState(wContract(ext));
           check(ext + ' state selected with the same id', r.payload.status === 'selected' && r.payload.sourceId === ids[ext] && r.payload.sourceKind === wKinds[ext]);
           r = await wRead(wContract(ext), ids[ext]);
-          check(ext + ' read -> only count, readAt and revision', r.type === 'WORD_READING_UPDATED' && Number.isInteger(r.payload.count) && r.payload.sourceId === ids[ext] && wOnly(r.payload, ['contractId', 'sourceId', 'sourceKind', 'count', 'readAt', 'revision']) && Math.abs(Date.parse(r.payload.readAt) - Date.now()) < 10000);
+          check(ext + ' read -> only count, readAt, modifiedAt and revision', r.type === 'WORD_READING_UPDATED' && Number.isInteger(r.payload.count) && r.payload.sourceId === ids[ext] && wOnly(r.payload, ['contractId', 'sourceId', 'sourceKind', 'count', 'readAt', 'modifiedAt', 'revision']) && Math.abs(Date.parse(r.payload.readAt) - Date.now()) < 10000 && Date.parse(r.payload.modifiedAt) <= Date.parse(r.payload.readAt) + 1000);
           counts[ext] = r.payload.count;
         }
         log('COUNTS ' + JSON.stringify(counts));

@@ -2,32 +2,46 @@ import Foundation
 import UIKit
 import ZIPFoundation
 
-/// Reads a coordinated snapshot and returns only a count. No adapter exposes
-/// manuscript text outside this file and no failure includes a path or title.
+/// One coordinated snapshot of a source: its count, and when the counted
+/// content last changed. Neither carries any manuscript text.
+struct WordSourceReading: Equatable {
+    let count: Int
+    /// The newest modification date among the files the count read; nil when
+    /// the provider reports none.
+    let modifiedAt: Date?
+}
+
+/// Reads a coordinated snapshot and returns only a count and a date. No
+/// adapter exposes manuscript text outside this file and no failure includes a
+/// path or title.
 enum WordDocumentReader {
     static let maximumSourceBytes: Int64 = 100 * 1024 * 1024
     static let maximumExpandedBytes: UInt32 = 32 * 1024 * 1024
 
     static func count(url: URL, kind: WordSourceKind) throws -> Int {
+        try read(url: url, kind: kind).count
+    }
+
+    static func read(url: URL, kind: WordSourceKind) throws -> WordSourceReading {
         var coordinatorError: NSError?
-        var result: Result<Int, Error>?
+        var result: Result<WordSourceReading, Error>?
         let coordinator = NSFileCoordinator()
         coordinator.coordinate(readingItemAt: url, options: [.withoutChanges], error: &coordinatorError) { safeURL in
-            result = Result { try countCoordinated(url: safeURL, kind: kind) }
+            result = Result { try readCoordinated(url: safeURL, kind: kind) }
         }
         if coordinatorError != nil { throw WordSourceError.providerUnavailable }
         guard let result else { throw WordSourceError.providerUnavailable }
         return try result.get()
     }
 
-    private static func countCoordinated(url: URL, kind: WordSourceKind) throws -> Int {
+    private static func readCoordinated(url: URL, kind: WordSourceKind) throws -> WordSourceReading {
         switch kind {
         case .text:
             let data = try boundedData(url)
             guard let text = WordSourceSupport.decodePlainText(data) else {
                 throw WordSourceError.malformedDocument
             }
-            return WordCount.count(text)
+            return WordSourceReading(count: WordCount.count(text), modifiedAt: newestModification([url]))
         case .richText:
             let data = try boundedData(url)
             let value = try NSAttributedString(
@@ -35,21 +49,26 @@ enum WordDocumentReader {
                 options: [.documentType: NSAttributedString.DocumentType.rtf],
                 documentAttributes: nil
             )
-            return WordCount.count(value.string)
+            return WordSourceReading(count: WordCount.count(value.string), modifiedAt: newestModification([url]))
         case .richTextDirectory:
             // Attachments load with the text, so the whole package is bounded.
-            try checkPackageSize(url)
+            let files = try packageFiles(url)
             let value = try NSAttributedString(
                 url: url,
                 options: [.documentType: NSAttributedString.DocumentType.rtfd],
                 documentAttributes: nil
             )
-            return WordCount.count(value.string)
+            return WordSourceReading(count: WordCount.count(value.string), modifiedAt: newestModification(files))
         case .word:
-            return try countWord(url)
+            return WordSourceReading(count: try countWord(url), modifiedAt: newestModification([url]))
         case .scrivener:
-            return try countScrivener(url)
+            let (count, files) = try countScrivener(url)
+            return WordSourceReading(count: count, modifiedAt: newestModification(files))
         }
+    }
+
+    private static func newestModification(_ files: [URL]) -> Date? {
+        files.compactMap { try? $0.resourceValues(forKeys: [.contentModificationDateKey]).contentModificationDate }.max()
     }
 
     private static func boundedData(_ url: URL) throws -> Data {
@@ -59,18 +78,22 @@ enum WordDocumentReader {
         return try Data(contentsOf: url, options: [.mappedIfSafe])
     }
 
-    private static func checkPackageSize(_ root: URL) throws {
+    /// The package's regular files, refusing a package over the size bound.
+    private static func packageFiles(_ root: URL) throws -> [URL] {
         let keys: [URLResourceKey] = [.fileSizeKey, .isRegularFileKey]
-        guard let files = FileManager.default.enumerator(at: root, includingPropertiesForKeys: keys) else {
+        guard let enumerator = FileManager.default.enumerator(at: root, includingPropertiesForKeys: keys) else {
             throw WordSourceError.malformedDocument
         }
+        var files: [URL] = []
         var total: Int64 = 0
-        for case let file as URL in files {
+        for case let file as URL in enumerator {
             let values = try file.resourceValues(forKeys: Set(keys))
             guard values.isRegularFile == true else { continue }
             total += Int64(values.fileSize ?? 0)
             if total > maximumSourceBytes { throw WordSourceError.documentTooLarge }
+            files.append(file)
         }
+        return files
     }
 
     private static func countWord(_ url: URL) throws -> Int {
@@ -109,7 +132,9 @@ enum WordDocumentReader {
         return WordCount.count(text)
     }
 
-    private static func countScrivener(_ root: URL) throws -> Int {
+    /// The Draft total, and the files it was read from: the binder, which
+    /// decides what is in the Draft, and each counted document.
+    private static func countScrivener(_ root: URL) throws -> (count: Int, files: [URL]) {
         let values = try root.resourceValues(forKeys: [.isDirectoryKey])
         guard values.isDirectory == true else { throw WordSourceError.malformedDocument }
         let project = try FileManager.default.contentsOfDirectory(
@@ -122,12 +147,14 @@ enum WordDocumentReader {
         }
         let dataRoot = root.appendingPathComponent("Files/Data", isDirectory: true)
         var total = 0
+        var files = [project]
         for id in ids {
             let folder = dataRoot.appendingPathComponent(id, isDirectory: true)
             let candidates = ["content.rtf", "content.txt"]
             for name in candidates {
                 let file = folder.appendingPathComponent(name)
                 guard FileManager.default.fileExists(atPath: file.path) else { continue }
+                files.append(file)
                 if name.hasSuffix(".rtf") {
                     let value = try NSAttributedString(
                         data: boundedData(file),
@@ -141,7 +168,7 @@ enum WordDocumentReader {
                 break
             }
         }
-        return total
+        return (total, files)
     }
 }
 

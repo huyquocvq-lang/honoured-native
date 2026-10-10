@@ -153,7 +153,8 @@ extension NativeBridge {
     }
 
     /// Reads the count off the main thread. Only the count, the source's
-    /// opaque id and kind, a time and a random revision leave this function.
+    /// opaque id and kind, the read and modification times and a random
+    /// revision leave this function.
     nonisolated private static func readWordSource(
         userId: String, contractId: String, expectedSourceId: String
     ) -> (String, [String: Any]) {
@@ -168,13 +169,21 @@ extension NativeBridge {
             // A moved or renamed file is still the same source. If the new
             // bookmark cannot be written, this read still goes ahead.
             if isStale { try? WordSourceBookmarkStore.refresh(source, url: url) }
-            let count = try WordDocumentReader.count(url: url, kind: source.kind)
-            return ("WORD_READING_UPDATED", [
+            let reading = try WordDocumentReader.read(url: url, kind: source.kind)
+            var body: [String: Any] = [
                 "contractId": contractId, "sourceId": source.sourceId,
-                "sourceKind": source.kind.rawValue, "count": count,
+                "sourceKind": source.kind.rawValue, "count": reading.count,
                 "readAt": ISO8601DateFormatter().string(from: Date()),
                 "revision": UUID().uuidString.lowercased(),
-            ])
+            ]
+            // Lets the server accept a read just after the cut-off when the
+            // words in it were already saved before it. Rounded up to the
+            // second, so it never reads as earlier than the change.
+            if let modifiedAt = reading.modifiedAt {
+                let seconds = modifiedAt.timeIntervalSince1970.rounded(.up)
+                body["modifiedAt"] = ISO8601DateFormatter().string(from: Date(timeIntervalSince1970: seconds))
+            }
+            return ("WORD_READING_UPDATED", body)
         } catch {
             return ("WORD_SOURCE_ERROR", [
                 "contractId": contractId, "code": WordSourceSupport.safeError(error).rawValue, "recoverable": true,
