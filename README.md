@@ -187,7 +187,12 @@ the session-restore sequence `auth-restore-setup`, `auth-restore-check`,
 `live-activities-multiple`,
 `live-activities-focus-race`, `live-activities-health`, `live-activities-timer`,
 `live-activities-account`, `live-activities-deeplink` or
-`live-activities-restore-setup` followed by `live-activities-restore-check`;
+`live-activities-restore-setup` followed by `live-activities-restore-check`,
+or the Word Tracker runs `word-tracker`, then `word-tracker-check` and
+`word-tracker-delete` (each `PICK <name>` line is answered in the Files picker,
+from documents placed in On My iPhone; the scenarios say which), and
+`word-reminders`, which lists the word reminders iOS holds (for instance the
+ones the web app set);
 add `-HonouredStubExitWhenDone` to quit when it finishes. Build with ad-hoc
 signing (`CODE_SIGN_IDENTITY=- CODE_SIGNING_REQUIRED=NO`) to run it:
 

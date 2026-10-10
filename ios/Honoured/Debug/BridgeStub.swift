@@ -1,6 +1,7 @@
 #if DEBUG
 import Foundation
 import UIKit
+import UserNotifications
 import WebKit
 #if canImport(ActivityKit)
 import ActivityKit
@@ -171,6 +172,24 @@ enum BridgeStub {
                 }
                 reply("STUB_REFRESH_RESULT", ["outcome": outcome])
             }
+        case "STUB_WORD_REMINDERS":
+            // The word reminders iOS holds: identifiers, and when each pending one fires.
+            Task {
+                let center = UNUserNotificationCenter.current()
+                let pending = await center.pendingNotificationRequests()
+                    .filter { $0.identifier.hasPrefix(WordReminder.identifierPrefix) }
+                let delivered = await center.deliveredNotifications().map(\.request.identifier)
+                var firesAt: [String: Any] = [:]
+                for request in pending {
+                    let date = (request.trigger as? UNTimeIntervalNotificationTrigger)?.nextTriggerDate()
+                    firesAt[request.identifier] = date.map { LiveActivityProtocol.iso8601.string(from: $0) } ?? NSNull()
+                }
+                reply("STUB_WORD_REMINDERS", [
+                    "pending": pending.map(\.identifier).sorted(),
+                    "firesAt": firesAt,
+                    "delivered": delivered.filter { $0.hasPrefix(WordReminder.identifierPrefix) }.sorted()
+                ])
+            }
         case "STUB_ICON_CARD":
             let phase = payload["phase"] as? String ?? ""
             Task { @MainActor in
@@ -291,6 +310,10 @@ enum BridgeStub {
     <button onclick="fake('steps=6400,exercise_minutes=12')">LA · fake Health 80% / 40%</button>
     <button onclick="laList()">LA · list ActivityKit cards</button>
     <button onclick="laState()">GET_LIVE_ACTIVITY_STATE</button>
+    <button onclick="wAuth('stub-word-user-a')">WT · sign in stub-word-user-a</button>
+    <button onclick="req('SELECT_WORD_SOURCE',{contractId:'c-word'},W,180000)">WT · SELECT_WORD_SOURCE c-word</button>
+    <button onclick="wState('c-word')">WT · GET_WORD_SOURCE_STATE c-word</button>
+    <button onclick="wState('c-word').then((s) => wRead('c-word', s.payload.sourceId || ''))">WT · READ_WORD_SOURCE c-word</button>
     <pre id="log"></pre>
     <script>
     const scenario = '__SCENARIO__';
@@ -406,6 +429,29 @@ enum BridgeStub {
       await laReset('stub-user-a');
       await req('SET_GOALS', { goals: [...goalsFor(demo.walk), ...goalsFor(demo.exercise)] }, ['GOALS_ACCEPTED']);
       await fake('steps=2000,exercise_minutes=5');
+    }
+
+    // ---- Word Tracker (V1.2 M3) ----
+    // The Files picker needs a person or a script tapping the simulator: a
+    // `PICK <name>` line asks for that file (or button) to be chosen.
+    const W = ['WORD_SOURCE_SELECTED', 'WORD_SOURCE_STATE', 'WORD_READING_UPDATED', 'WORD_SOURCE_ERROR', 'WORD_SOURCES_CLEARED', 'WORD_REMINDERS_SET'];
+    const wReq = (type, payload, timeoutMs) => req(type, payload, W, timeoutMs);
+    const wAuth = (userId) => req('SET_AUTH_SESSION', { userId, accessToken: 'stub-access-token', refreshToken: 'stub-refresh-token', expiresAt: Math.floor(Date.now() / 1000) + 3600 }, ['AUTH_SESSION_ACCEPTED']);
+    const wState = (contractId) => wReq('GET_WORD_SOURCE_STATE', { contractId });
+    const wRead = (contractId, sourceId) => wReq('READ_WORD_SOURCE', { contractId, sourceId }, 30000);
+    const wKinds = { docx: 'word', txt: 'text', rtf: 'rich_text', rtfd: 'rich_text_directory', scriv: 'scrivener' };
+    const wContract = (ext) => 'c-word-' + ext;
+    // Files hides extensions, so every fixture has its own name.
+    const wFile = (ext) => ({ docx: 'Chapter-word.docx', txt: 'Chapter-text.txt', rtf: 'Chapter-rich.rtf', rtfd: 'Chapter-package.rtfd', scriv: 'Novel.scriv' })[ext];
+    const wUuid = (id) => typeof id === 'string' && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/.test(id);
+    // Nothing but these keys (and the requestId) may leave native.
+    const wOnly = (payload, keys) => Object.keys(payload).sort().join() === [...keys, 'requestId'].sort().join();
+    const wHeld = async () => (await req('STUB_WORD_REMINDERS', {}, ['STUB_WORD_REMINDERS'])).payload;
+    async function wPick(contractId, name, extra = {}) {
+      const selected = req('SELECT_WORD_SOURCE', { contractId, ...extra }, W, 180000);
+      await sleep(1500);
+      log('PICK ' + name);
+      return selected;
     }
 
     async function sha256Hex(text) {
@@ -1137,6 +1183,213 @@ enum BridgeStub {
         await req('STUB_OPEN_DEEP_LINK', { url: 'honoured://contract/c-link/extra?day=bad' }, ['STUB_DEEP_LINK_OPENED']);
         check('a malformed link is ignored', (await none).type === 'TIMEOUT');
         await req('CLEAR_AUTH_SESSION', {}, ['AUTH_SESSION_CLEARED']);
+        log('SCENARIO DONE');
+      },
+      // Word Tracker (V1.2 M3). Needs the wFile documents and Notes.md, all
+      // the same chapter, in a folder of On My iPhone; each PICK line is
+      // answered in the Files picker.
+      async 'word-tracker'() {
+        const info = await req('GET_PLATFORM_INFO', {}, ['PLATFORM_INFO']);
+        const cap = info.payload.capabilities && info.payload.capabilities.wordTracker;
+        check('capability wordTracker v1, supported, five source kinds', !!cap && cap.protocolVersion === 1 && cap.supported === true && cap.sourceKinds.join() === 'word,text,rich_text,rich_text_directory,scrivener');
+
+        await req('CLEAR_AUTH_SESSION', {}, ['AUTH_SESSION_CLEARED']);
+        let r = await wState(wContract('docx'));
+        check('no bound session -> invalid_payload', r.type === 'WORD_SOURCE_ERROR' && r.payload.code === 'invalid_payload' && r.payload.recoverable === false);
+        await wAuth('stub-word-user-a');
+        r = await wReq('CLEAR_WORD_SOURCES', {});
+        check('CLEAR_WORD_SOURCES -> WORD_SOURCES_CLEARED', r.type === 'WORD_SOURCES_CLEARED');
+
+        r = await wReq('GET_WORD_SOURCE_STATE', {});
+        check('missing contractId -> invalid_payload', r.payload.code === 'invalid_payload');
+        r = await wState('x'.repeat(257));
+        check('contractId over 256 characters -> invalid_payload', r.payload.code === 'invalid_payload');
+        r = await wState(wContract('docx'));
+        check('no source yet -> none, contractId echoed', r.type === 'WORD_SOURCE_STATE' && r.payload.status === 'none' && r.payload.contractId === wContract('docx'));
+        r = await wRead(wContract('docx'), 'not/an/id');
+        check('READ with a malformed sourceId -> invalid_payload', r.payload.code === 'invalid_payload');
+        r = await wRead(wContract('docx'), '00000000-0000-4000-8000-000000000000');
+        check('READ without a source -> missing, recoverable', r.type === 'WORD_SOURCE_ERROR' && r.payload.code === 'missing' && r.payload.recoverable === true);
+        r = await wReq('REMOVE_WORD_SOURCE', { contractId: wContract('docx'), sourceId: '00000000-0000-4000-8000-000000000000' });
+        check('REMOVE without a source -> source_mismatch', r.payload.code === 'source_mismatch');
+        r = await wReq('SELECT_WORD_SOURCE', { contractId: wContract('docx'), sourceId: 42 });
+        check('SELECT with a non-string sourceId -> invalid_payload, no picker', r.payload.code === 'invalid_payload');
+        r = await wReq('SET_WORD_REMINDERS', { reminders: 'soon' });
+        check('SET_WORD_REMINDERS with a non-list -> invalid_payload', r.payload.code === 'invalid_payload');
+        r = await wReq('SET_WORD_REMINDERS', { reminders: Array.from({ length: 33 }, (_, i) => ({ contractId: 'c-' + i, day: today(), at: inHours(1) })) });
+        check('33 reminders -> invalid_payload', r.payload.code === 'invalid_payload');
+
+        const frame = document.createElement('iframe');
+        frame.srcdoc = '<script>window.webkit.messageHandlers.honouredNative.postMessage({type:"GET_WORD_SOURCE_STATE",payload:{requestId:"word-iframe",contractId:"c-word-docx"}})</' + 'script>';
+        const iframeReply = new Promise((resolve) => { pending.set('word-iframe', { expected: W.concat('ERROR'), resolve }); setTimeout(() => resolve({ type: 'TIMEOUT' }), 2000); });
+        document.body.appendChild(frame);
+        check('same-origin iframe gets no reply', (await iframeReply).type === 'TIMEOUT');
+        frame.remove();
+
+        r = await wPick(wContract('cancel'), 'Cancel');
+        check('closing the picker -> cancelled, recoverable', r.type === 'WORD_SOURCE_ERROR' && r.payload.code === 'cancelled' && r.payload.recoverable === true && r.payload.contractId === wContract('cancel'));
+
+        const first = req('SELECT_WORD_SOURCE', { contractId: wContract('docx') }, W, 180000);
+        await sleep(1500);
+        r = await wReq('SELECT_WORD_SOURCE', { contractId: wContract('txt') });
+        check('a second SELECT while the picker is up -> in_progress', r.payload.code === 'in_progress' && r.payload.contractId === wContract('txt'));
+        log('PICK ' + wFile('docx'));
+        const ids = {};
+        for (const ext of Object.keys(wKinds)) {
+          r = ext === 'docx' ? await first : await wPick(wContract(ext), wFile(ext));
+          check(ext + ' -> WORD_SOURCE_SELECTED ' + wKinds[ext] + ' with only an opaque id', r.type === 'WORD_SOURCE_SELECTED' && r.payload.sourceKind === wKinds[ext] && r.payload.contractId === wContract(ext) && wUuid(r.payload.sourceId) && wOnly(r.payload, ['contractId', 'sourceId', 'sourceKind']));
+          ids[ext] = r.payload.sourceId;
+        }
+        r = await wPick(wContract('md'), 'Notes.md');
+        check('a Markdown file -> unsupported_type', r.type === 'WORD_SOURCE_ERROR' && r.payload.code === 'unsupported_type');
+
+        const counts = {};
+        for (const ext of Object.keys(wKinds)) {
+          r = await wState(wContract(ext));
+          check(ext + ' state selected with the same id', r.payload.status === 'selected' && r.payload.sourceId === ids[ext] && r.payload.sourceKind === wKinds[ext]);
+          r = await wRead(wContract(ext), ids[ext]);
+          check(ext + ' read -> only count, readAt and revision', r.type === 'WORD_READING_UPDATED' && Number.isInteger(r.payload.count) && r.payload.sourceId === ids[ext] && wOnly(r.payload, ['contractId', 'sourceId', 'sourceKind', 'count', 'readAt', 'revision']) && Math.abs(Date.parse(r.payload.readAt) - Date.now()) < 10000);
+          counts[ext] = r.payload.count;
+        }
+        log('COUNTS ' + JSON.stringify(counts));
+        check('every format counts the same chapter', new Set(Object.values(counts)).size === 1);
+
+        const a = await wRead(wContract('docx'), ids.docx);
+        const b = await wRead(wContract('docx'), ids.docx);
+        check('each read has its own random revision', wUuid(a.payload.revision) && a.payload.revision !== b.payload.revision);
+        r = await wRead(wContract('docx'), ids.txt);
+        check('READ with another contract\\'s source id -> source_mismatch', r.payload.code === 'source_mismatch');
+        const both = await Promise.all([wRead(wContract('scriv'), ids.scriv), wRead(wContract('scriv'), ids.scriv)]);
+        check('a second read of the same source while one runs -> in_progress', both.some((x) => x.type === 'WORD_READING_UPDATED') && both.some((x) => x.payload.code === 'in_progress'));
+        log('SCENARIO DONE');
+      },
+      // Run after word-tracker, once the docx has been renamed, the rtf moved
+      // to another folder, the txt deleted, the rtfd and Novel.scriv edited,
+      // and Chapter-text-v2.txt added.
+      async 'word-tracker-check'() {
+        await wAuth('stub-word-user-a');
+        const s = {};
+        for (const ext of Object.keys(wKinds)) s[ext] = (await wState(wContract(ext))).payload;
+        check('renamed docx and moved rtf are still selected', s.docx.status === 'selected' && s.rtf.status === 'selected');
+        check('deleted txt -> needs_reconnect, keeping its id', s.txt.status === 'needs_reconnect' && wUuid(s.txt.sourceId));
+        const read = (ext) => wRead(wContract(ext), s[ext].sourceId);
+        const counts = {};
+        let r = await read('docx');
+        counts.docxRenamed = r.payload.count;
+        check('the renamed docx still reads', r.type === 'WORD_READING_UPDATED' && r.payload.sourceId === s.docx.sourceId);
+        r = await read('docx');
+        check('and again once its bookmark is refreshed', r.type === 'WORD_READING_UPDATED');
+        r = await read('rtf');
+        counts.rtfMoved = r.payload.count;
+        check('the moved rtf still reads', r.type === 'WORD_READING_UPDATED');
+        r = await read('txt');
+        check('the deleted txt -> missing, recoverable', r.type === 'WORD_SOURCE_ERROR' && r.payload.code === 'missing' && r.payload.recoverable === true);
+        r = await read('rtfd');
+        counts.rtfdEdited = r.payload.count;
+        r = await read('scriv');
+        counts.scrivEdited = r.payload.count;
+
+        r = await wPick(wContract('txt'), 'Chapter-text-v2.txt', { sourceId: s.txt.sourceId });
+        check('reconnecting keeps the locked source id', r.type === 'WORD_SOURCE_SELECTED' && r.payload.sourceId === s.txt.sourceId);
+        r = await read('txt');
+        counts.txtReconnected = r.payload.count;
+        check('the reconnected txt reads', r.type === 'WORD_READING_UPDATED' && r.payload.sourceId === s.txt.sourceId);
+        log('COUNTS ' + JSON.stringify(counts));
+
+        await wAuth('stub-word-user-b');
+        r = await wState(wContract('docx'));
+        check('another account has no source for the same contract', r.payload.status === 'none');
+        r = await read('docx');
+        check('and cannot read user A\\'s source', r.payload.code === 'missing');
+        await wReq('CLEAR_WORD_SOURCES', {});
+        await wAuth('stub-word-user-a');
+        r = await wState(wContract('docx'));
+        check('B clearing its sources leaves A\\'s', r.payload.status === 'selected' && r.payload.sourceId === s.docx.sourceId);
+
+        r = await wReq('REMOVE_WORD_SOURCE', { contractId: wContract('docx'), sourceId: s.rtf.sourceId });
+        check('REMOVE with another id -> source_mismatch', r.payload.code === 'source_mismatch');
+        r = await wReq('REMOVE_WORD_SOURCE', { contractId: wContract('docx'), sourceId: s.docx.sourceId });
+        const after = await wState(wContract('docx'));
+        check('REMOVE -> none, and it stays removed', r.type === 'WORD_SOURCE_STATE' && r.payload.status === 'none' && after.payload.status === 'none');
+
+        const day = today();
+        const reminders = [
+          { contractId: 'c-word-rtf', day, at: new Date(Date.now() + 600000).toISOString(), subtitle: 'Chapter · 500 words' },
+          { contractId: 'c-word-past', day, at: new Date(Date.now() - 60000).toISOString() },
+        ];
+        const set = req('SET_WORD_REMINDERS', { reminders }, W, 180000);
+        await sleep(1500);
+        log('PICK Allow');
+        r = await set;
+        check('only the future reminder is scheduled, authorized', r.type === 'WORD_REMINDERS_SET' && r.payload.scheduled === 1 && r.payload.authorized === true);
+        let held = await wHeld();
+        check('iOS holds exactly that reminder', held.pending.join() === 'word-reminder.c-word-rtf.' + day);
+        r = await wReq('SET_WORD_REMINDERS', { reminders });
+        held = await wHeld();
+        check('the same list again changes nothing', r.payload.scheduled === 1 && held.pending.length === 1);
+        r = await wReq('SET_WORD_REMINDERS', { reminders: [] });
+        held = await wHeld();
+        check('an empty list cancels it', r.payload.scheduled === 0 && held.pending.length === 0);
+        await wReq('SET_WORD_REMINDERS', { reminders });
+        await wAuth('stub-word-user-b');
+        await sleep(300);
+        check('an account switch cancels every reminder', (await wHeld()).pending.length === 0);
+        await wAuth('stub-word-user-a');
+        await wReq('SET_WORD_REMINDERS', { reminders });
+        await req('CLEAR_AUTH_SESSION', {}, ['AUTH_SESSION_CLEARED']);
+        await sleep(300);
+        check('sign-out cancels every reminder', (await wHeld()).pending.length === 0);
+        await wAuth('stub-word-user-a');
+        r = await wState(wContract('rtf'));
+        check('sign-out keeps the sources', r.payload.status === 'selected' && r.payload.sourceId === s.rtf.sourceId);
+
+        r = await wReq('CLEAR_WORD_SOURCES', {});
+        const states = await Promise.all(Object.keys(wKinds).map((ext) => wState(wContract(ext))));
+        check('CLEAR_WORD_SOURCES removes every source of the account', r.type === 'WORD_SOURCES_CLEARED' && states.every((x) => x.payload.status === 'none'));
+
+        // Left for a check with the app in the background.
+        const at = new Date(Date.now() + 45000);
+        r = await wReq('SET_WORD_REMINDERS', { reminders: [{ contractId: 'c-word-rtf', day, at: at.toISOString(), subtitle: 'Chapter · 500 words' }] });
+        check('a reminder 45 s ahead is scheduled', r.payload.scheduled === 1);
+        log('HOME reminder fires at ' + at.toISOString());
+        log('SCENARIO DONE');
+      },
+      // The word reminders iOS holds, for instance the ones the web app set.
+      async 'word-reminders'() {
+        log('WORD REMINDERS ' + JSON.stringify(await wHeld()));
+        log('SCENARIO DONE');
+      },
+      // A source deleted while the app runs: at DELETE, delete the picked file
+      // in Files (it goes to Recently Deleted), and at RESTORE recover it.
+      // Each step waits up to 90 s for the state to change.
+      async 'word-tracker-delete'() {
+        await wAuth('stub-word-user-a');
+        let r = await wPick(wContract('delete'), 'Chapter-delete.txt');
+        const id = r.payload.sourceId;
+        check('picked as text', r.type === 'WORD_SOURCE_SELECTED' && r.payload.sourceKind === 'text');
+        r = await wRead(wContract('delete'), id);
+        const before = r.payload.count;
+        check('reads before the delete', r.type === 'WORD_READING_UPDATED');
+        const waitWhile = async (status) => {
+          let s;
+          for (let i = 0; i < 90; i++) {
+            s = await wState(wContract('delete'));
+            if (s.payload.status !== status) break;
+            await sleep(1000);
+          }
+          return s;
+        };
+        log('DELETE Chapter-delete.txt');
+        let s = await waitWhile('selected');
+        check('a deleted file -> needs_reconnect, same id', s.payload.status === 'needs_reconnect' && s.payload.sourceId === id);
+        r = await wRead(wContract('delete'), id);
+        check('and its read -> missing, recoverable', r.payload.code === 'missing' && r.payload.recoverable === true);
+        log('RESTORE Chapter-delete.txt');
+        s = await waitWhile('needs_reconnect');
+        check('a recovered file is selected again, same id', s.payload.status === 'selected' && s.payload.sourceId === id);
+        r = await wRead(wContract('delete'), id);
+        check('and reads the same count', r.type === 'WORD_READING_UPDATED' && r.payload.count === before);
+        await wReq('CLEAR_WORD_SOURCES', {});
         log('SCENARIO DONE');
       },
     };
