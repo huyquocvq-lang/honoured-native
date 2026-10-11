@@ -1,38 +1,5 @@
 import Foundation
 
-struct HealthSamplePayload: Codable {
-    let sampleUuid: String
-    let metric: String
-    let value: Double
-    let unit: String
-    let startedAt: String
-    let endedAt: String
-    let sourceName: String
-}
-
-struct HealthDeletionPayload: Codable {
-    let sampleUuid: String
-    let metric: String
-    let deletedAt: String
-}
-
-struct HealthDailyPayload: Codable {
-    let day: String
-    let metric: String
-    let total: Double
-    let unit: String
-}
-
-struct PendingHealthBatch: Codable, Identifiable {
-    let id: UUID
-    let userId: String
-    let createdAt: Date
-    let samples: [HealthSamplePayload]
-    let deletions: [HealthDeletionPayload]
-    let daily: [HealthDailyPayload]
-    var attempts: Int
-}
-
 actor SupabaseHealthClient {
     static let shared = SupabaseHealthClient()
 

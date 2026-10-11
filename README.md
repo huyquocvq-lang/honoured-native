@@ -192,7 +192,9 @@ or the Word Tracker runs `word-tracker`, then `word-tracker-check` and
 `word-tracker-delete` (each `PICK <name>` line is answered in the Files picker,
 from documents placed in On My iPhone; the scenarios say which), and
 `word-reminders`, which lists the word reminders iOS holds (for instance the
-ones the web app set);
+ones the web app set), and `health-sync`, which runs one health collection with
+the stored session and posts its daily totals to the real backend, reporting
+the HTTP status (it never refreshes the session or prints tokens);
 add `-HonouredStubExitWhenDone` to quit when it finishes. Build with ad-hoc
 signing (`CODE_SIGN_IDENTITY=- CODE_SIGNING_REQUIRED=NO`) to run it:
 
@@ -204,6 +206,10 @@ xcrun simctl launch --console-pty booted <bundle id> \
 
 The stub signs in with a fake session and fake Health totals, never reaches
 Supabase, and is compiled out of Release builds.
+
+Outside the stub, a Debug build also takes `-HonouredHealthRefreshSeconds <n>`,
+which shortens the hour after which unchanged daily Health totals are uploaded
+again, so that refresh can be checked without waiting.
 
 ## Android development
 

@@ -172,6 +172,36 @@ enum BridgeStub {
                 }
                 reply("STUB_REFRESH_RESULT", ["outcome": outcome])
             }
+        case "STUB_HEALTH_SYNC":
+            // One collection pass with the stored session and real HealthKit
+            // data, then one upload of the first queued batch, reporting each
+            // step. Never refreshes the session and never prints tokens.
+            Task {
+                let session = await AuthSessionStore.shared.load()
+                let outcome = await HealthSyncCoordinator.shared.collectAndEnqueue()
+                let batch = await OfflineHealthQueue.shared.first()
+                var upload: Any = "skipped"
+                if let batch, let session {
+                    if session.expiresAt <= Date().timeIntervalSince1970 {
+                        upload = "skipped: stored session expired"
+                    } else {
+                        // AppConfig hides the backend while the stub runs, so
+                        // the daily totals go straight to the real RPC here.
+                        upload = await diagnosticDailyUpload(batch.daily, session: session)
+                    }
+                }
+                reply("STUB_HEALTH_SYNC", [
+                    "hasSession": session != nil,
+                    "userId": session?.userId ?? NSNull(),
+                    "expiresAt": session?.expiresAt ?? NSNull(),
+                    "outcome": "\(outcome)",
+                    "batch": batch.map { [
+                        "samples": $0.samples.count, "deletions": $0.deletions.count,
+                        "daily": $0.daily.count, "attempts": $0.attempts, "userId": $0.userId
+                    ] as [String: Any] } ?? NSNull(),
+                    "upload": upload
+                ])
+            }
         case "STUB_WORD_REMINDERS":
             // The word reminders iOS holds: identifiers, and when each pending one fires.
             Task {
@@ -207,6 +237,32 @@ enum BridgeStub {
             DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) { exit(0) }
         default:
             reply("ERROR", ["message": "Unknown stub message \(type)", "code": "not_implemented"])
+        }
+    }
+
+    /// Posts daily totals to upsert_health_daily and reports the status and the
+    /// server's message. Real data only (no fake totals while it runs).
+    private static func diagnosticDailyUpload(_ rows: [HealthDailyPayload], session: NativeAuthSession) async -> [String: Any] {
+        let base = Bundle.main.object(forInfoDictionaryKey: "SupabaseURL") as? String ?? ""
+        let key = Bundle.main.object(forInfoDictionaryKey: "SupabaseAnonKey") as? String ?? ""
+        guard !rows.isEmpty, let url = URL(string: base)?.appendingPathComponent("rest/v1/rpc/upsert_health_daily") else {
+            return ["error": "no rows or no URL"]
+        }
+        var request = URLRequest(url: url)
+        request.httpMethod = "POST"
+        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        request.setValue(key, forHTTPHeaderField: "apikey")
+        request.setValue("Bearer \(session.accessToken)", forHTTPHeaderField: "Authorization")
+        struct Body: Encodable { let rows: [HealthDailyPayload] }
+        do {
+            request.httpBody = try JSONEncoder().encode(Body(rows: rows))
+            let (data, response) = try await URLSession.shared.data(for: request)
+            return [
+                "status": (response as? HTTPURLResponse)?.statusCode ?? -1,
+                "body": String(decoding: data.prefix(400), as: UTF8.self)
+            ]
+        } catch {
+            return ["error": "\(error)"]
         }
     }
 
@@ -1352,6 +1408,12 @@ enum BridgeStub {
         r = await wReq('SET_WORD_REMINDERS', { reminders: [{ contractId: 'c-word-rtf', day, at: at.toISOString(), subtitle: 'Chapter · 500 words' }] });
         check('a reminder 45 s ahead is scheduled', r.payload.scheduled === 1);
         log('HOME reminder fires at ' + at.toISOString());
+        log('SCENARIO DONE');
+      },
+      // One health collection and upload with the stored session (#20).
+      async 'health-sync'() {
+        const r = await req('STUB_HEALTH_SYNC', {}, ['STUB_HEALTH_SYNC'], 60000);
+        log('HEALTH SYNC ' + JSON.stringify(r.payload));
         log('SCENARIO DONE');
       },
       // The word reminders iOS holds, for instance the ones the web app set.

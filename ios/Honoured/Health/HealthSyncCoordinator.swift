@@ -1,5 +1,8 @@
 import Foundation
 import HealthKit
+import os
+
+private let healthSyncLogger = Logger(subsystem: "com.honoured.app", category: "HealthSync")
 
 enum HealthCollectionDeferral: Sendable {
     case noSession
@@ -28,6 +31,7 @@ actor HealthSyncCoordinator {
     private var needsAnotherCollectionPass = false
     private var collectionWaiters: [CheckedContinuation<HealthCollectionOutcome, Never>] = []
     private var isDraining = false
+    private var dailyLedger = HealthDailyLedger(refreshInterval: HealthSyncCoordinator.dailyRefreshInterval)
 
     private let iso8601 = ISO8601DateFormatter()
     private let dayFormatter: DateFormatter = {
@@ -78,11 +82,11 @@ actor HealthSyncCoordinator {
             } else {
                 currentTotals = await LiveActivityCoordinator.shared.refreshHealthProgress()
             }
-            // New samples are the only thing that can push a total past its goal.
-            // The same reads are reused, so the card and GOAL_REACHED agree.
-            if case .queued = outcome {
-                await GoalMonitor.shared.evaluate(prefetched: currentTotals)
-            }
+            // Every completed pass checks the goals, including one that found
+            // nothing new to upload: a goal the last check could not read is
+            // still announced. The same reads are reused, so the card and
+            // GOAL_REACHED agree.
+            await GoalMonitor.shared.evaluate(prefetched: currentTotals)
         }
 
         let waiters = collectionWaiters
@@ -134,6 +138,7 @@ actor HealthSyncCoordinator {
                 // Recompute today plus any historical day receiving a late sample.
                 // This populates the initial history and finalizes past days without
                 // deriving totals from overlapping iPhone/Watch samples on the server.
+                // Only the totals that changed are queued; see HealthDailyLedger.
                 var affectedDays: Set<Date> = [dayStart]
                 for sample in result.added {
                     let attributionDate = metric == .sleep
@@ -160,6 +165,11 @@ actor HealthSyncCoordinator {
                 }
             }
 
+            let readTotals = daily.count
+            let queuedTotals = await OfflineHealthQueue.shared.queuedDaily(userId: session.userId)
+            daily = dailyLedger.totalsToUpload(daily, userId: session.userId, queued: queuedTotals, now: now)
+            healthSyncLogger.debug("Queueing \(daily.count, privacy: .public) of \(readTotals, privacy: .public) daily totals")
+
             let batch = PendingHealthBatch(
                 id: UUID(), userId: session.userId, createdAt: now, samples: samples,
                 deletions: deletions, daily: daily, attempts: 0
@@ -184,12 +194,18 @@ actor HealthSyncCoordinator {
         }
     }
 
-    /// Attempts at most one queued batch and never sleeps. This is safe to start
-    /// after acknowledging a HealthKit background delivery.
+    /// Uploads at most a few queued batches and never sleeps, stopping at the
+    /// first one that has to wait. Each upload is about half a megabyte, so this
+    /// is safe to start after acknowledging a HealthKit background delivery.
     func drainOnce() async {
         guard !isDraining else { return }
         isDraining = true
-        _ = await attemptFirstQueuedBatch()
+        uploads: for _ in 0..<Self.backgroundUploadLimit {
+            switch await attemptFirstQueuedBatch() {
+            case .uploaded, .reshaped: continue uploads
+            case .empty, .terminal, .retryable: break uploads
+            }
+        }
         isDraining = false
         // Icon days are scored from the readings this upload may have added.
         await IconVerifier.shared.run()
@@ -214,7 +230,7 @@ actor HealthSyncCoordinator {
     private func drainUntilSettled() async -> Bool {
         while true {
             switch await attemptFirstQueuedBatch() {
-            case .uploaded:
+            case .uploaded, .reshaped:
                 continue
             case .retryable(let attempts):
                 let delay = min(pow(2.0, Double(attempts)), 300)
@@ -229,9 +245,13 @@ actor HealthSyncCoordinator {
         }
     }
 
+    private static let backgroundUploadLimit = 5
+
     private enum DrainAttempt {
         case empty
         case uploaded
+        /// A refused batch was halved, or its one refused row dropped.
+        case reshaped
         case retryable(attempts: Int)
         case terminal
     }
@@ -270,10 +290,13 @@ actor HealthSyncCoordinator {
                     postInvalidSession(reason: "refreshed_session_rejected")
                     return .terminal
                 } catch {
-                    return await retryableAttempt(for: batch)
+                    return await failedAttempt(for: batch, error: error)
                 }
             }
 
+            // Recorded before the batch leaves the queue, so a collection pass
+            // in between still finds these totals in one place or the other.
+            dailyLedger.recordUpload(batch.daily, userId: batch.userId, at: Date())
             do {
                 try await OfflineHealthQueue.shared.removeFirst(id: batch.id)
             } catch {
@@ -297,8 +320,31 @@ actor HealthSyncCoordinator {
             postInvalidSession(reason: "refresh_rejected")
             return .terminal
         } catch {
-            return await retryableAttempt(for: batch)
+            return await failedAttempt(for: batch, error: error)
         }
+    }
+
+    /// A batch the server refuses is halved until the refused rows stand alone
+    /// and are dropped, so one bad row never holds back the queue. Anything
+    /// else is tried again later. Only counts and status codes are logged.
+    private func failedAttempt(for batch: PendingHealthBatch, error: Error) async -> DrainAttempt {
+        if case SupabaseHealthClient.SyncError.http(let status) = error,
+           HealthUploadFailure.classify(statusCode: status) == .refused {
+            let parts = batch.halves().map { [$0.0, $0.1] } ?? []
+            do {
+                try await OfflineHealthQueue.shared.replaceFirst(id: batch.id, with: parts)
+            } catch {
+                return await retryableAttempt(for: batch)
+            }
+            if parts.isEmpty {
+                healthSyncLogger.error("Dropped one health row the server refused (HTTP \(status, privacy: .public))")
+            } else {
+                healthSyncLogger.notice("Server refused \(batch.itemCount, privacy: .public) health rows (HTTP \(status, privacy: .public)); retrying them in halves")
+            }
+            return .reshaped
+        }
+        healthSyncLogger.error("Health upload of \(batch.itemCount, privacy: .public) rows failed: \(error.localizedDescription, privacy: .public)")
+        return await retryableAttempt(for: batch)
     }
 
     private func retryableAttempt(for batch: PendingHealthBatch) async -> DrainAttempt {
@@ -319,7 +365,18 @@ actor HealthSyncCoordinator {
 
     func clear() async throws {
         try await OfflineHealthQueue.shared.clear()
+        dailyLedger.reset()
         HealthBackgroundPendingState.clear()
+    }
+
+    /// Debug builds take `-HonouredHealthRefreshSeconds <n>`, so the refresh of
+    /// unchanged totals can be checked without waiting an hour.
+    private static var dailyRefreshInterval: TimeInterval {
+        #if DEBUG
+        let override = UserDefaults.standard.double(forKey: "HonouredHealthRefreshSeconds")
+        if override > 0 { return override }
+        #endif
+        return HealthDailyLedger.defaultRefreshInterval
     }
 
     private func startOfHealthDay(containing date: Date) async -> Date {

@@ -100,8 +100,10 @@ targets:
       - HonouredShared
       - Honoured/LiveActivities/Core
       - Honoured/Auth/Core
+      - Honoured/Health/HealthDailyLedger.swift
       - Honoured/Health/HealthMetric.swift
       - Honoured/Health/HealthSourcePreference.swift
+      - Honoured/Health/HealthSyncPayloads.swift
       - Honoured/Health/IconMeasurement.swift
       - Honoured/WordTracker/Core
       - Honoured/WordTracker/WordDocumentReader.swift

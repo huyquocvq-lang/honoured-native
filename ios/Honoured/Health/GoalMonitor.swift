@@ -3,10 +3,10 @@ import UIKit
 
 /// Compares today's on-device totals with the goals the web app sent through
 /// `SET_GOALS` and announces each goal at most once per activity per health
-/// day. Runs after every collection pass that queued new samples, so a goal
-/// crossed while the app is in the background is noticed on the same wake that
-/// read the data. It never derives totals from raw samples; it uses the same
-/// source-deduplicated statistics queries as `health_daily`.
+/// day. Runs after every collection pass, so a goal crossed while the app is
+/// in the background is noticed on the same wake that read the data. It never
+/// derives totals from raw samples; it uses the same source-deduplicated
+/// statistics queries as `health_daily`.
 actor GoalMonitor {
     static let shared = GoalMonitor()
 

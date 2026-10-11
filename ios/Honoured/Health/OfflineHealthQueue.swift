@@ -14,23 +14,33 @@ actor OfflineHealthQueue {
         fileURL = root.appendingPathComponent("health-sync-queue.json")
         if let data = try? Data(contentsOf: fileURL),
            let decoded = try? JSONDecoder().decode([PendingHealthBatch].self, from: data) {
-            batches = decoded
+            // A batch queued before uploads were split may be too large to
+            // ever reach the server; split it now so the queue moves again.
+            batches = decoded.flatMap { $0.splitForUpload() }
+            if batches.count != decoded.count { try? persist() }
         } else {
             batches = []
         }
     }
 
+    /// Queues the batch in upload-sized parts.
     func append(_ batch: PendingHealthBatch) throws {
-        batches.append(batch)
+        let parts = batch.splitForUpload()
+        batches.append(contentsOf: parts)
         do {
             try persist()
         } catch {
-            batches.removeLast()
+            batches.removeLast(parts.count)
             throw error
         }
     }
 
     func first() -> PendingHealthBatch? { batches.first }
+
+    /// The daily totals still waiting to upload for `userId`, oldest first.
+    func queuedDaily(userId: String) -> [HealthDailyPayload] {
+        batches.filter { $0.userId == userId }.flatMap(\.daily)
+    }
 
     func removeFirst(id: UUID) throws {
         guard batches.first?.id == id else { return }
@@ -38,6 +48,20 @@ actor OfflineHealthQueue {
         do {
             try persist()
         } catch {
+            batches.insert(removed, at: 0)
+            throw error
+        }
+    }
+
+    /// Replaces the first batch with `parts`, in order; an empty list drops it.
+    func replaceFirst(id: UUID, with parts: [PendingHealthBatch]) throws {
+        guard batches.first?.id == id else { return }
+        let removed = batches.removeFirst()
+        batches.insert(contentsOf: parts, at: 0)
+        do {
+            try persist()
+        } catch {
+            batches.removeFirst(parts.count)
             batches.insert(removed, at: 0)
             throw error
         }
