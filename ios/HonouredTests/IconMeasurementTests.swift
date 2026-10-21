@@ -68,16 +68,31 @@ final class IconMeasurementTests: XCTestCase {
         XCTAssertEqual(IconTimestamp.parse(sent), date("2026-10-06T09:30:00Z"))
     }
 
-    func testSummaryReportsWhetherAnyDayWasStamped() throws {
-        let pendingOnly = try JSONDecoder().decode(
-            IconMeasurementSummary.self,
-            from: Data(#"{"honoured":0,"broken":0,"pending":2,"skipped":1}"#.utf8)
-        )
-        XCTAssertFalse(pendingOnly.stampedAny)
-        let stamped = try JSONDecoder().decode(
-            IconMeasurementSummary.self,
-            from: Data(#"{"honoured":0,"broken":1,"pending":0,"skipped":0}"#.utf8)
-        )
-        XCTAssertTrue(stamped.stampedAny)
+    private func summary(_ json: String) throws -> IconMeasurementSummary {
+        try JSONDecoder().decode(IconMeasurementSummary.self, from: Data(json.utf8))
+    }
+
+    func testV1SummaryReportsWhetherAnyDayWasStamped() throws {
+        let pendingOnly = try summary(#"{"honoured":0,"broken":0,"pending":2,"skipped":1}"#)
+        XCTAssertEqual(pendingOnly.updated, 0)
+        XCTAssertFalse(pendingOnly.changedAny)
+        XCTAssertTrue(try summary(#"{"honoured":0,"broken":1,"pending":0,"skipped":0}"#).changedAny)
+    }
+
+    func testRaisedTotalOfAStampedDayCountsAsAChange() throws {
+        let raised = try summary(#"{"honoured":0,"broken":0,"pending":0,"updated":2,"unchanged":3,"skipped":0}"#)
+        XCTAssertEqual(raised.updated, 2)
+        XCTAssertTrue(raised.changedAny)
+    }
+
+    func testReadingsThatRaiseNothingAreNoChange() throws {
+        let same = try summary(#"{"honoured":0,"broken":0,"pending":0,"updated":0,"unchanged":4,"skipped":1}"#)
+        XCTAssertFalse(same.changedAny)
+    }
+
+    func testBrokenDayTurnedHonouredCountsAsHonoured() throws {
+        let flipped = try summary(#"{"honoured":1,"broken":0,"pending":0,"updated":0,"unchanged":0,"skipped":0}"#)
+        XCTAssertEqual(flipped.honoured, 1)
+        XCTAssertTrue(flipped.changedAny)
     }
 }

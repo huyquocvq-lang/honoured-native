@@ -657,11 +657,13 @@ The iOS shell is portrait-only. The contract screen's full-screen signature pad 
 
 ## v2 — Icon day verification (iOS)
 
-An Icon (V1.2 M2) is scored per scheduled day on the server (`docs/db/icon_scoring_v1.sql`). For an Icon whose activity Health can measure, the iOS shell asks Supabase which days are pending, reads each one in HealthKit from the start of the Icon day to its cut-off (or to now while the day is open, with the person's Health source preference), and reports the totals with `record_icon_measurements`. It does this after every health upload and whenever the app becomes active. The server stamps HONOURED as soon as a total meets the target; BROKEN once a reading covers the cut-off and an hour has passed for late Watch data; anything still pending 24 hours after the cut-off becomes BROKEN (`no_data` when nothing was ever read). A day the device cannot read, including a declined Health permission, is not reported, so it is never stamped from a zero. There is no web → native message for this.
+An Icon (V1.2 M2) is scored per scheduled day on the server (`docs/db/icon_scoring_v1.sql`, `docs/db/icon_scoring_v2.sql`). For an Icon whose activity Health can measure, the iOS shell asks Supabase which days to measure, reads each one in HealthKit from the start of the Icon day to its cut-off (or to now while the day is open, with the person's Health source preference), and reports the totals with `record_icon_measurements`. It does this after every health upload and whenever the app becomes active. The server stamps HONOURED as soon as a total meets the target; BROKEN once a reading covers the cut-off and an hour has passed for late Watch data; anything still pending 24 hours after the cut-off becomes BROKEN (`no_data` when nothing was ever read). A day the device cannot read, including a declined Health permission, is not reported, so it is never stamped from a zero. There is no web → native message for this.
+
+With `icon_scoring_v2.sql` applied, a stamped day keeps being measured until 30 days after its cut-off, so `icon_days.measured_value` shows the whole day's total rather than the reading that first met the target. That includes data HealthKit receives later, for example from a watch app that syncs after the day ended. A reading only ever raises a stamped day's total. HONOURED stays HONOURED, and BROKEN becomes HONOURED (`target_met`) once a late total meets the target.
 
 | Native → Web (broadcast) | When |
 |---|---|
-| `ICON_DAYS_UPDATED { honoured, broken }` | A report stamped at least one Icon day. The web app re-reads `icon_days`. Counts are of this report only. |
+| `ICON_DAYS_UPDATED { honoured, broken, updated }` | A report stamped at least one Icon day (a BROKEN day turned HONOURED counts in `honoured`) or raised the total of a stamped day (`updated`). The web app re-reads `icon_days`. Counts are of this report only. |
 
 Icons whose activity Health cannot measure are self-reported by the web app with the `self_report_icon_day` RPC; native is not involved.
 

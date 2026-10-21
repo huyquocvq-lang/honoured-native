@@ -1,8 +1,10 @@
 import Foundation
 
-/// One pending Icon day the server wants measured, as returned by
-/// `icon_days_to_measure()` (docs/db/icon_scoring_v1.sql). Foundation only:
-/// it is also compiled into the host-less test target.
+/// One Icon day the server wants measured, as returned by
+/// `icon_days_to_measure()`: pending, or stamped from Health readings and
+/// still inside the 30-day window in which its total keeps growing
+/// (docs/db/icon_scoring_v2.sql). Foundation only: it is also compiled into
+/// the host-less test target.
 struct IconDayToMeasure: Decodable, Equatable, Sendable {
     let contractId: String
     /// The Icon day as the server stores it, "YYYY-MM-DD". Sent back unchanged.
@@ -65,11 +67,30 @@ struct IconMeasurementPayload: Encodable, Equatable, Sendable {
 
 /// Counts from `record_icon_measurements`.
 struct IconMeasurementSummary: Decodable, Equatable, Sendable {
+    /// Days this report stamped HONOURED, including a BROKEN day a late
+    /// reading took to the target.
     let honoured: Int
     let broken: Int
     let pending: Int
     let skipped: Int
+    /// Stamped days whose total went up. A server still on
+    /// icon_scoring_v1.sql has no such count, so it reads as zero.
+    let updated: Int
 
-    /// True when a day was stamped, which the web app should show.
-    var stampedAny: Bool { honoured + broken > 0 }
+    private enum CodingKeys: String, CodingKey {
+        case honoured, broken, pending, skipped, updated
+    }
+
+    init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        honoured = try container.decode(Int.self, forKey: .honoured)
+        broken = try container.decode(Int.self, forKey: .broken)
+        pending = try container.decode(Int.self, forKey: .pending)
+        skipped = try container.decode(Int.self, forKey: .skipped)
+        updated = try container.decodeIfPresent(Int.self, forKey: .updated) ?? 0
+    }
+
+    /// True when a day was stamped or a stamped day's total rose, either of
+    /// which the web app should show.
+    var changedAny: Bool { honoured + broken + updated > 0 }
 }

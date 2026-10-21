@@ -25,7 +25,8 @@ actor SupabaseHealthClient {
         }
     }
 
-    /// The caller's pending Icon days of measured Icons (`icon_days_to_measure`).
+    /// The caller's Icon days of measured Icons that still take readings
+    /// (`icon_days_to_measure`).
     func iconDaysToMeasure(session: NativeAuthSession) async throws -> [IconDayToMeasure] {
         guard let baseURL = AppConfig.supabaseURL, !AppConfig.supabaseAnonKey.isEmpty else {
             throw SyncError.notConfigured
