@@ -118,6 +118,24 @@ enum BridgeStub {
             }
         case "STUB_LIST_LIVE_ACTIVITIES":
             reply("STUB_LIVE_ACTIVITIES", ["activities": liveActivities()])
+        case "STUB_GOAL_DIAGNOSTICS":
+            Task {
+                // Lines are written by detached tasks; give the last ones a moment.
+                try? await Task.sleep(nanoseconds: 500_000_000)
+                let events = await GoalDiagnostics.shared.storedEvents().map { event -> [String: Any] in
+                    [
+                        "event": event.event,
+                        "certainty": event.certainty.rawValue,
+                        "reason": event.reason ?? NSNull(),
+                        "method": event.method ?? NSNull(),
+                        "source": event.source ?? NSNull(),
+                        "activityId": event.activityId ?? NSNull(),
+                        "hasTime": event.occurredAt != nil,
+                        "hasWindow": event.windowStart != nil && event.windowEnd != nil
+                    ]
+                }
+                reply("STUB_GOAL_DIAGNOSTICS", ["enabled": GoalDiagnostics.isEnabled, "events": events])
+            }
         case "STUB_DISMISS_LIVE_ACTIVITY":
             // Ends a card behind the engine's back, as a swipe on the Lock
             // Screen or the system time limit would.
@@ -847,6 +865,9 @@ enum BridgeStub {
       // pedometer, so there it checks the fallback; on an iPhone it also
       // checks the readable path.
       async 'core-motion'() {
+        // Signed in, so the goal diagnostics of this run are kept.
+        await req('CLEAR_AUTH_SESSION', {}, ['AUTH_SESSION_CLEARED']);
+        await laAuth('stub-diagnostics-user');
         let r = await req('GET_HEALTH_STATUS', {}, ['HEALTH_PERMISSION_STATUS']);
         const motion = r.payload.motion || {};
         check('HEALTH_PERMISSION_STATUS carries motion', typeof motion.available === 'boolean' && typeof motion.authorization === 'string');
@@ -887,10 +908,27 @@ enum BridgeStub {
         check(readable ? 'calorie estimate offered' : 'no calorie estimate while falling back',
           readable ? (r.payload.estimates || {}).walking_running_energy !== undefined : r.payload.estimates === undefined);
 
+        // What the goal diagnostics kept of it (Phase 3 M2-B).
+        r = await req('STUB_GOAL_DIAGNOSTICS', {}, ['STUB_GOAL_DIAGNOSTICS']);
+        const mine = (r.payload.events || []).filter((e) => e.activityId === walk.activityId);
+        const one = (name) => mine.find((e) => e.event === name) || {};
+        check('diagnostics run in this build', r.payload.enabled === true);
+        check('readings kept as recorded', mine.some((e) => e.event === 'reading' && e.certainty === 'recorded' && e.hasTime));
+        check('goal_detected recorded with its source', one('goal_detected').certainty === 'recorded' && one('goal_detected').source === (readable ? 'core_motion' : 'healthkit'));
+        // On screen it is `app_active`; with the notification prompt of a
+        // fresh install over the app, iOS reports it inactive and unasked.
+        check('notification outcome recorded (' + one('notification_requested').reason + ')',
+          one('notification_requested').certainty === 'recorded' && ['app_active', 'not_authorized'].includes(one('notification_requested').reason));
+        check('data_available is an estimated window', one('data_available').certainty === 'estimated' && one('data_available').hasWindow && !one('data_available').hasTime);
+        check('goal_crossed is an estimated window with a method', one('goal_crossed').certainty === 'estimated' && one('goal_crossed').hasWindow && typeof one('goal_crossed').method === 'string');
+
         r = await req('SET_HEALTH_SOURCE_PREFERENCE', { mode: 'automatic' }, ['HEALTH_SOURCE_PREFERENCE_ACCEPTED']);
         check('back to automatic', r.type === 'HEALTH_SOURCE_PREFERENCE_ACCEPTED' && r.payload.preference.mode === 'automatic' && r.payload.fallback === false);
         await req('SET_GOALS', { goals: [] }, ['GOALS_ACCEPTED']);
         await req('STUB_SET_FAKE_HEALTH_TOTALS', { spec: null }, ['STUB_FAKE_HEALTH_TOTALS_SET'], 15000);
+        await req('CLEAR_AUTH_SESSION', {}, ['AUTH_SESSION_CLEARED']);
+        r = await req('STUB_GOAL_DIAGNOSTICS', {}, ['STUB_GOAL_DIAGNOSTICS']);
+        check('signing out leaves no diagnostics behind', (r.payload.events || []).length === 0);
         log('SCENARIO DONE');
       },
       // Launch with -HonouredFakeHealthTotals steps=9000,active_energy=250

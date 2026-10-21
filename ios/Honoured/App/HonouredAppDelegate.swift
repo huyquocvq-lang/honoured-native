@@ -31,6 +31,7 @@ final class HonouredAppDelegate: NSObject, UIApplicationDelegate {
         application.registerForRemoteNotifications()
         observeLifecycle()
         MotionProbeAccess.applicationDidFinishLaunching(state: application.applicationState)
+        GoalDiagnostics.ran("launch", details: ["state_at_launch": Self.stateName(application.applicationState)])
         #if DEBUG
         LiveActivityPulseProbe.runIfRequested()
         MotionProbeSmoke.runIfRequested()
@@ -69,6 +70,8 @@ final class HonouredAppDelegate: NSObject, UIApplicationDelegate {
             ) { _ in
                 LiveActivityCoordinator.shared.applicationDidBecomeActive()
                 Task { await MotionProbe.shared.recordRun(reason: .appActive) }
+                GoalDiagnostics.lifecycle("did_become_active")
+                GoalDiagnostics.ran("app_active")
                 // With Core Motion chosen, opening the app reads it at once and
                 // follows it live while on screen.
                 Task { await MotionLiveUpdates.shared.refresh() }
@@ -79,6 +82,7 @@ final class HonouredAppDelegate: NSObject, UIApplicationDelegate {
                     await IconVerifier.shared.run()
                     await IconSignatureSync.shared.run()
                     await IconCardCoordinator.shared.refresh()
+                    await GoalDiagnostics.shared.upload()
                 }
             },
             center.addObserver(
@@ -87,17 +91,21 @@ final class HonouredAppDelegate: NSObject, UIApplicationDelegate {
                 LiveActivityCoordinator.shared.protectedDataDidBecomeAvailable()
                 Task { await HealthBackgroundDeliveryCoordinator.shared.retryPendingCollection() }
                 Task { await MotionProbe.shared.recordRun(reason: .protectedDataAvailable) }
-                Task { await MotionLiveUpdates.shared.checkIfReadingCoreMotion() }
+                GoalDiagnostics.lifecycle("protected_data_did_become_available")
+                GoalDiagnostics.ran("protected_data_available")
+                Task { await MotionLiveUpdates.shared.checkIfReadingCoreMotion(trigger: "unlock") }
             },
             center.addObserver(
                 forName: UIApplication.protectedDataWillBecomeUnavailableNotification, object: nil, queue: .main
             ) { _ in
                 MotionProbe.note("lifecycle", reason: "protected_data_will_become_unavailable")
+                GoalDiagnostics.lifecycle("protected_data_will_become_unavailable")
             },
             center.addObserver(
                 forName: UIApplication.willEnterForegroundNotification, object: nil, queue: .main
             ) { _ in
                 MotionProbe.note("lifecycle", reason: "will_enter_foreground")
+                GoalDiagnostics.lifecycle("will_enter_foreground")
             },
             // Midnight, a time-zone or DST change, or a manual clock change can
             // move the health day under a card.
@@ -117,6 +125,7 @@ final class HonouredAppDelegate: NSObject, UIApplicationDelegate {
                 forName: UIApplication.didEnterBackgroundNotification, object: nil, queue: .main
             ) { _ in
                 MotionProbe.note("lifecycle", reason: "did_enter_background")
+                GoalDiagnostics.lifecycle("did_enter_background")
                 Task { @MainActor in MotionLiveUpdates.shared.stop() }
                 NotificationSound.yieldToOtherApps()
                 // Refresh the pending request on every background transition so the
@@ -124,5 +133,14 @@ final class HonouredAppDelegate: NSObject, UIApplicationDelegate {
                 HealthBackgroundRefresh.shared.scheduleIfSessionExists()
             }
         ]
+    }
+
+    private static func stateName(_ state: UIApplication.State) -> String {
+        switch state {
+        case .active: return "active"
+        case .inactive: return "inactive"
+        case .background: return "background"
+        @unknown default: return "unknown"
+        }
     }
 }

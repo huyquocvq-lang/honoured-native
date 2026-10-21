@@ -86,8 +86,12 @@ final class IconCardCoordinator {
                 let key = IconCardPlan.key(contractId: facts.contractId, iconDay: facts.iconDay)
                 started[IconCardPlan.startedKey(key, slot: slot)] = facts.deadline
             case let .update(id, state, staleDate):
-                await activities.first { $0.id == id }?.update(ActivityContent(state: state, staleDate: staleDate))
+                guard let activity = activities.first(where: { $0.id == id }) else { continue }
+                await activity.update(ActivityContent(state: state, staleDate: staleDate))
                 MotionProbe.noteLiveActivityUpdate(kind: "icon")
+                GoalDiagnostics.iconCardUpdated(
+                    contractId: activity.attributes.facts.contractId, iconDay: activity.attributes.facts.iconDay, state: state
+                )
             case let .end(id):
                 await activities.first { $0.id == id }?.end(nil, dismissalPolicy: .immediate)
             }

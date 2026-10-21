@@ -223,6 +223,17 @@ Honoured is on screen it follows the pedometer live; in the background it reads
 it whenever iOS already runs the app. The simulator has no pedometer, so the
 choice falls back to Apple Health there; the Core Motion path needs an iPhone.
 
+### Goal diagnostics (Phase 3 M2)
+
+Development, Ad Hoc and TestFlight builds record when a step or distance goal
+was crossed, noticed, announced and seen (`ios/Honoured/Diagnostics/`), and
+upload the lines to `goal_diagnostics` with `record_goal_diagnostics`
+(`docs/db/goal_diagnostics_v1.sql`, applied to Lovable Cloud on 21 Oct 2026). Each
+moment is `recorded`, `estimated` (a window and its method, never one time)
+or `unknown`; `goal_diagnostics_timeline()` assembles a goal's day with its
+delays. App Store builds record nothing. The lines hold no tokens or email
+and are deleted from the device on sign-out or an account switch.
+
 ### Motion probe (Phase 3 M1)
 
 Debug builds, Release builds installed from Xcode or as Ad Hoc, and TestFlight

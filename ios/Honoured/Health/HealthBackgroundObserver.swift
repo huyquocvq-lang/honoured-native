@@ -74,6 +74,7 @@ final class HealthBackgroundObserver: @unchecked Sendable {
                 // is suspended, launch/foreground recovery will perform the read.
                 HealthBackgroundPendingState.markPending()
                 MotionProbe.noteHealthKitCallback(metric: metric.rawValue)
+                GoalDiagnostics.ran("healthkit_delivery", details: ["metric": metric.rawValue])
                 let completion = HealthObserverCompletion(completionHandler)
                 Task {
                     await HealthBackgroundDeliveryCoordinator.shared.receive(completion)

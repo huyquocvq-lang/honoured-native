@@ -372,6 +372,9 @@ final class NativeBridge: NSObject, WKScriptMessageHandler {
                     let previousUserId = await AuthSessionStore.shared.load()?.userId
                     let accountChanged = previousUserId != nil && previousUserId != userId
                     if accountChanged {
+                        // First, so a failure further on cannot leave the
+                        // previous account's diagnostics for the next one.
+                        await GoalDiagnostics.shared.clear()
                         try await HealthSyncCoordinator.shared.clear()
                         await HealthKitService.shared.resetSyncState()
                         await HealthSyncSettings.shared.reset()
@@ -391,6 +394,7 @@ final class NativeBridge: NSObject, WKScriptMessageHandler {
                         refreshToken: refreshToken,
                         expiresAt: expiresAt
                     ))
+                    await GoalDiagnostics.shared.sessionStored()
                     reply("AUTH_SESSION_ACCEPTED", ["userId": userId, "liveActivityBridgeSessionId": liveActivitySessionId])
                     // After the save: the previous account's push tokens go
                     // first, then this account's are registered.
@@ -419,6 +423,7 @@ final class NativeBridge: NSObject, WKScriptMessageHandler {
             Self.authMutations.enqueue {
                 do {
                     try await AuthSessionStore.shared.clear()
+                    await GoalDiagnostics.shared.clear()
                     // After the clear, so no registration can find the session
                     // again. Needs no session itself: the install stops getting
                     // pushes even when the web app has already revoked it.
@@ -551,7 +556,7 @@ final class NativeBridge: NSObject, WKScriptMessageHandler {
                         // reply has already gone out so the sheet cannot time it out.
                         if !goals.isEmpty {
                             await NotificationCoordinator.shared.requestPermissionIfNeeded()
-                            await GoalMonitor.shared.evaluate()
+                            await GoalMonitor.shared.evaluate(trigger: "goals_set")
                         }
                         await MotionLiveUpdates.shared.refresh()
                     } catch {
@@ -572,7 +577,7 @@ final class NativeBridge: NSObject, WKScriptMessageHandler {
                 reply("DAY_RESET_HOUR_ACCEPTED", ["hour": hour])
                 if changed {
                     await GoalMonitor.shared.clear()
-                    await GoalMonitor.shared.evaluate()
+                    await GoalMonitor.shared.evaluate(trigger: "reset_hour")
                     // The current health day may be a different one now; cards
                     // of the old day stop showing its Health numbers.
                     LiveActivityCoordinator.shared.dayMayHaveChanged()

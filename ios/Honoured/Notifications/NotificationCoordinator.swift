@@ -201,7 +201,9 @@ final class NotificationCoordinator: NSObject, UNUserNotificationCenterDelegate 
         case .timer:
             Task { await TestamentTimer.shared.notificationPresentedInForeground(activityId: activityId) }
         case .goal:
-            break
+            GoalDiagnostics.notificationPresented(
+                identifier: notification.request.identifier, activityId: activityId, deliveredAt: notification.date
+            )
         }
     }
 
@@ -217,6 +219,12 @@ final class NotificationCoordinator: NSObject, UNUserNotificationCenterDelegate 
         MotionProbe.notificationOpened(response)
         guard response.actionIdentifier == UNNotificationDefaultActionIdentifier,
               let (kind, activityId) = Self.target(of: response.notification.request.content.userInfo) else { return }
+        if kind == .goal {
+            GoalDiagnostics.notificationOpened(
+                identifier: response.notification.request.identifier, activityId: activityId,
+                deliveredAt: response.notification.date
+            )
+        }
 
         Task {
             // Settle the owning feature first so its completion event is stored

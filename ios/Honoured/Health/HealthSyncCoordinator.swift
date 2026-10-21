@@ -239,6 +239,7 @@ actor HealthSyncCoordinator {
         await IconVerifier.shared.run()
         await IconSignatureSync.shared.run()
         await IconCardCoordinator.shared.refresh()
+        await GoalDiagnostics.shared.upload()
     }
 
     /// Foreground retry loop. HealthKit observer callbacks must not await this.
@@ -251,6 +252,7 @@ actor HealthSyncCoordinator {
             await IconVerifier.shared.run()
             await IconSignatureSync.shared.run()
             await IconCardCoordinator.shared.refresh()
+            await GoalDiagnostics.shared.upload()
         }
     }
 

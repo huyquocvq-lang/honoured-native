@@ -52,6 +52,15 @@ actor SupabaseHealthClient {
         return try JSONDecoder().decode(IconMeasurementSummary.self, from: data)
     }
 
+    /// Stores goal diagnostics lines (`record_goal_diagnostics`,
+    /// docs/db/goal_diagnostics_v1.sql). A line sent twice is kept once.
+    func recordGoalDiagnostics(_ rows: [GoalDiagnosticsRow], session: NativeAuthSession) async throws {
+        guard let baseURL = AppConfig.supabaseURL, !AppConfig.supabaseAnonKey.isEmpty else {
+            throw SyncError.notConfigured
+        }
+        try await rpc("record_goal_diagnostics", body: GoalDiagnosticsRequest(rows: rows), baseURL: baseURL, session: session)
+    }
+
     @discardableResult
     private func rpc<T: Encodable>(
         _ name: String,
@@ -84,6 +93,7 @@ actor SupabaseHealthClient {
     private struct DailyRequest: Codable { let rows: [HealthDailyPayload] }
     private struct EmptyBody: Encodable {}
     private struct IconMeasurementsRequest: Encodable { let rows: [IconMeasurementPayload] }
+    private struct GoalDiagnosticsRequest: Encodable { let rows: [GoalDiagnosticsRow] }
 
     enum SyncError: LocalizedError {
         case notConfigured, invalidResponse, invalidSession, http(Int)

@@ -107,6 +107,7 @@ targets:
       - Honoured/Health/IconMeasurement.swift
       - Honoured/Health/MotionModels.swift
       - Honoured/MotionProbe/Core
+      - Honoured/Diagnostics/Core
       - Honoured/WordTracker/Core
       - Honoured/WordTracker/WordDocumentReader.swift
       - Honoured/LiveActivities/IconSignatureImage.swift

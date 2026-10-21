@@ -20,6 +20,7 @@ actor GoalMonitor {
     /// goal unmarked and announce it twice.
     private var isEvaluating = false
     private var needsAnotherPass = false
+    private var nextTrigger: String?
     private var waiters: [CheckedContinuation<Void, Never>] = []
 
     private init() {}
@@ -30,21 +31,28 @@ actor GoalMonitor {
     /// that arrives during a check runs one more pass afterwards, with fresh
     /// reads, so no request is lost and none overlaps another.
     ///
-    /// - Parameter prefetched: totals the Live Activity refresh just read for
-    ///   today's window. They are reused only for the same health-day start, so
-    ///   a read that straddled the reset never counts toward the new day.
-    func evaluate(prefetched: HealthPrefetch? = nil) async {
+    /// - Parameters:
+    ///   - prefetched: totals the Live Activity refresh just read for today's
+    ///     window. They are reused only for the same health-day start, so a read
+    ///     that straddled the reset never counts toward the new day.
+    ///   - trigger: what asked for this check (`sync_pass`, `motion_live`,
+    ///     `live_start`, ...), for the diagnostics.
+    func evaluate(prefetched: HealthPrefetch? = nil, trigger: String = "sync_pass") async {
         if isEvaluating {
             needsAnotherPass = true
+            nextTrigger = trigger
             await withCheckedContinuation { waiters.append($0) }
             return
         }
         isEvaluating = true
         var prefetched = prefetched
+        var trigger = trigger
         repeat {
             needsAnotherPass = false
-            await evaluatePass(prefetched: prefetched)
+            await evaluatePass(prefetched: prefetched, trigger: trigger)
             prefetched = nil
+            trigger = nextTrigger ?? trigger
+            nextTrigger = nil
         } while needsAnotherPass
         isEvaluating = false
         let resumed = waiters
@@ -52,7 +60,7 @@ actor GoalMonitor {
         for waiter in resumed { waiter.resume() }
     }
 
-    private func evaluatePass(prefetched: HealthPrefetch?) async {
+    private func evaluatePass(prefetched: HealthPrefetch?, trigger: String) async {
         let goals = await HealthSyncSettings.shared.currentGoals()
         guard !goals.isEmpty, HealthKitService.shared.isAvailable else { return }
 
@@ -61,6 +69,7 @@ actor GoalMonitor {
         let day = HealthSyncSettings.dayString(dayStart)
         let markedAtStart = prunedMarkers(keeping: day)
         let reusable = prefetched?.dayStart == dayStart ? prefetched?.totals ?? [:] : [:]
+        let account = GoalDiagnostics.account()
 
         for goal in goals where !markedAtStart.contains(Self.marker(goal.activityId, day)) {
             let read: HealthTotalRead
@@ -71,6 +80,10 @@ actor GoalMonitor {
             } else {
                 (read, source) = await HealthKitService.shared.readTotalAndSource(for: goal.metric, from: dayStart, to: now)
             }
+            await GoalDiagnostics.shared.reading(
+                activityId: goal.activityId, metric: goal.metric, day: day, target: goal.target,
+                read: read, source: source, trigger: trigger, at: now, account: account
+            )
             guard let value = read.numericValue, value >= goal.target else { continue }
 
             // Read the markers again and mark with no suspension in between:
@@ -81,11 +94,13 @@ actor GoalMonitor {
             guard markers.insert(Self.marker(goal.activityId, day)).inserted else { continue }
             save(markers)
 
+            let identifier = "goal-\(goal.activityId)-\(day)"
             let isActive = await MainActor.run { UIApplication.shared.applicationState == .active }
             var notified = false
+            var notification = isActive ? "app_active" : "not_authorized"
             if !isActive, await NotificationCoordinator.shared.isAuthorized() {
                 notified = (try? await NotificationCoordinator.shared.schedule(
-                    identifier: "goal-\(goal.activityId)-\(day)",
+                    identifier: identifier,
                     kind: .goal,
                     activityId: goal.activityId,
                     title: "Goal reached",
@@ -93,6 +108,7 @@ actor GoalMonitor {
                     at: now,
                     sound: NotificationSound.current
                 )) != nil
+                notification = notified ? "scheduled" : "failed"
             }
 
             NativeBridgeEvents.postDurable(type: "GOAL_REACHED", payload: [
@@ -108,6 +124,16 @@ actor GoalMonitor {
                 metric: goal.metric.rawValue, value: value, target: goal.target,
                 notified: notified, source: source.rawValue
             )
+            // Not awaited: estimating the crossing reads history and must not
+            // hold the next goal's announcement.
+            let metric = goal.metric, activityId = goal.activityId, target = goal.target
+            Task {
+                await GoalDiagnostics.shared.goalDetected(
+                    activityId: activityId, metric: metric, day: day, dayStart: dayStart, target: target,
+                    value: value, source: source, trigger: trigger, notification: notification,
+                    identifier: identifier, at: now, account: account
+                )
+            }
         }
     }
 

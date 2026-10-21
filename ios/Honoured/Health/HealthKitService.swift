@@ -134,6 +134,31 @@ actor HealthKitService {
         return .coreMotion
     }
 
+    /// HealthKit's per-minute totals of `metric`, read as `readTotal` reads
+    /// it (the chosen source, overlaps removed), to estimate when a goal was
+    /// crossed. Nil when they cannot be read or the metric is not a sum.
+    func minuteTotals(for metric: HealthMetric, from: Date, to: Date) async -> [(start: Date, end: Date, value: Double)]? {
+        guard to > from, metric.aggregation == .sum,
+              let unit = metric.quantityUnit, let type = metric.objectType as? HKQuantityType else { return nil }
+        var predicate = HKQuery.predicateForSamples(withStart: from, end: to, options: [])
+        if let selected = await sourceResolution(for: metric).selected,
+           let source = await healthKitSource(for: selected, metric: metric) {
+            predicate = NSCompoundPredicate(andPredicateWithSubpredicates: [predicate, HKQuery.predicateForObjects(from: source)])
+        }
+        let descriptor = HKStatisticsCollectionQueryDescriptor(
+            predicate: .quantitySample(type: type, predicate: predicate),
+            options: .cumulativeSum,
+            anchorDate: from,
+            intervalComponents: DateComponents(minute: 1)
+        )
+        guard let collection = try? await descriptor.result(for: store) else { return nil }
+        var minutes: [(start: Date, end: Date, value: Double)] = []
+        collection.enumerateStatistics(from: from, to: to) { statistics, _ in
+            minutes.append((statistics.startDate, statistics.endDate, statistics.sumQuantity()?.doubleValue(for: unit) ?? 0))
+        }
+        return minutes
+    }
+
     /// Core Motion's walking and running energy estimate over the range, only
     /// while Core Motion is the source being read. Calorie goals keep using
     /// Active Energy.

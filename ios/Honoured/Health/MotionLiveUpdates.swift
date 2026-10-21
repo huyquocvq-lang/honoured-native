@@ -51,7 +51,7 @@ final class MotionLiveUpdates {
         if pedometer != nil, countingFrom == dayStart { return }
         halt()
         start(from: dayStart)
-        scheduleCheck()
+        scheduleCheck(trigger: "live_start")
         // Opening the app brings Home up to date too, not only the card.
         syncSoon(force: true)
     }
@@ -71,9 +71,9 @@ final class MotionLiveUpdates {
 
     /// One check outside the live count, for a moment iOS runs the app anyway
     /// while it may be off screen, such as an unlock.
-    func checkIfReadingCoreMotion() async {
+    func checkIfReadingCoreMotion(trigger: String) async {
         guard await HealthKitService.shared.readsCoreMotion(), await Self.hasMotionGoal() else { return }
-        await checkGoals()
+        await checkGoals(trigger: trigger)
     }
 
     private func start(from dayStart: Date) {
@@ -88,7 +88,7 @@ final class MotionLiveUpdates {
 
     private func updateArrived(countingFrom dayStart: Date) {
         guard pedometer != nil, countingFrom == dayStart else { return }
-        scheduleCheck()
+        scheduleCheck(trigger: "motion_live")
         syncSoon(force: false)
     }
 
@@ -103,7 +103,7 @@ final class MotionLiveUpdates {
 
     /// At most one check per `minimumInterval`; updates in between fold into
     /// the next one.
-    private func scheduleCheck() {
+    private func scheduleCheck(trigger: String) {
         guard pendingCheck == nil else { return }
         let wait = max(0, Self.minimumInterval - Date().timeIntervalSince(lastCheck))
         pendingCheck = Task { @MainActor [weak self] in
@@ -117,14 +117,14 @@ final class MotionLiveUpdates {
                 await self.refresh()
                 return
             }
-            await self.checkGoals()
+            await self.checkGoals(trigger: trigger)
         }
     }
 
     /// The card and `GOAL_REACHED` from the same reads, as after a sync pass.
-    private func checkGoals() async {
+    private func checkGoals(trigger: String) async {
         let prefetched = await LiveActivityCoordinator.shared.refreshHealthProgress()
-        await GoalMonitor.shared.evaluate(prefetched: prefetched)
+        await GoalMonitor.shared.evaluate(prefetched: prefetched, trigger: trigger)
     }
 
     private static func hasMotionGoal() async -> Bool {

@@ -73,6 +73,7 @@ final class HealthBackgroundRefresh: @unchecked Sendable {
         let completion = BackgroundTaskCompletion(task)
         let work = Task { [weak self] in
             await MotionProbe.shared.recordRun(reason: .backgroundRefresh)
+            GoalDiagnostics.ran("bg_app_refresh")
             let outcome = await HealthSyncCoordinator.shared.collectAndEnqueue()
             if outcome.completedLocalProcessing, !Task.isCancelled {
                 await HealthSyncCoordinator.shared.drainOnce()
@@ -86,6 +87,7 @@ final class HealthBackgroundRefresh: @unchecked Sendable {
         }
         task.expirationHandler = {
             MotionProbe.note("lifecycle", reason: "bg_app_refresh_expired")
+            GoalDiagnostics.lifecycle("bg_app_refresh_expired")
             work.cancel()
             completion.finish(success: false)
         }
