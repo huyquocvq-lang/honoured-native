@@ -4,10 +4,14 @@ import Foundation
 /// server stamps HONOURED or BROKEN from them (V1.2 M2-05,
 /// docs/db/icon_scoring_v1.sql). A stamped day stays on the list for 30 days
 /// after its cut-off so it shows the whole day's total, and a late total can
-/// still turn BROKEN into HONOURED (docs/db/icon_scoring_v2.sql). Runs after
-/// each health upload and when the app becomes active. A day the device cannot
-/// read is simply not reported: the server's 24-hour rule settles it, so
-/// nothing here ever stamps a day itself.
+/// still turn BROKEN into HONOURED (docs/db/icon_scoring_v2.sql). Steps and
+/// walking distance come from the source the person chose, Core Motion
+/// included, and each reading names its source (docs/db/icon_scoring_v3.sql);
+/// Core Motion cannot read a day older than its seven-day history, so such a
+/// day keeps its earlier reading. Runs after each health upload and when the
+/// app becomes active. A day the device cannot read is simply not reported:
+/// the server's 24-hour rule settles it, so nothing here ever stamps a day
+/// itself.
 actor IconVerifier {
     static let shared = IconVerifier()
 
@@ -31,10 +35,11 @@ actor IconVerifier {
                 // "Nothing recorded" and "could not read" both wait. A declined
                 // Health permission looks like no data, so it is never read as
                 // zero and stamped BROKEN early.
-                guard case .value(let total) = await HealthKitService.shared.readTotal(
+                let (read, source) = await HealthKitService.shared.readTotalAndSource(
                     for: metric, from: window.start, to: window.end
-                ) else { continue }
-                readings.append(IconMeasurementPayload(day: day, value: total, measuredThrough: window.end))
+                )
+                guard case .value(let total) = read else { continue }
+                readings.append(IconMeasurementPayload(day: day, value: total, measuredThrough: window.end, source: source))
             }
             guard !readings.isEmpty else { return }
 

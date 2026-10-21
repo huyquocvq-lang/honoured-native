@@ -103,12 +103,14 @@ actor MotionProbe {
     }
 
     /// The production goal path (`GoalMonitor`), to compare with the probe's.
-    nonisolated static func noteAppGoal(metric: String, value: Double, target: Double, notified: Bool) {
+    /// `source` is the one the goal was read from (`core_motion` or
+    /// `healthkit`).
+    nonisolated static func noteAppGoal(metric: String, value: Double, target: Double, notified: Bool, source: String) {
         guard isEnabled else { return }
         let at = Date()
         Task {
             await shared.append(MotionProbeEvent(
-                at: at, event: "app_goal_reached", source: healthKit,
+                at: at, event: "app_goal_reached", source: source,
                 numbers: ["value": value, "target": target],
                 notes: ["metric": metric, "notification_scheduled": String(notified)]
             ))

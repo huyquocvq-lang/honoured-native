@@ -59,13 +59,25 @@ final class IconMeasurementTests: XCTestCase {
 
     func testPayloadSendsTheDayBackUnchangedAndAnISOInstant() throws {
         let day = try IconDayToMeasure.decodeList(from: response)[0]
-        let payload = IconMeasurementPayload(day: day, value: 6240, measuredThrough: date("2026-10-06T09:30:00Z"))
+        let payload = IconMeasurementPayload(
+            day: day, value: 6240, measuredThrough: date("2026-10-06T09:30:00Z"), source: .healthKit
+        )
         let json = try JSONSerialization.jsonObject(with: JSONEncoder().encode(payload)) as? [String: Any]
         XCTAssertEqual(json?["contractId"] as? String, day.contractId)
         XCTAssertEqual(json?["day"] as? String, "2026-10-06")
         XCTAssertEqual(json?["value"] as? Double, 6240)
         let sent = try XCTUnwrap(json?["measuredThrough"] as? String)
         XCTAssertEqual(IconTimestamp.parse(sent), date("2026-10-06T09:30:00Z"))
+        XCTAssertEqual(json?["source"] as? String, "healthkit")
+    }
+
+    func testPayloadNamesCoreMotionReadings() throws {
+        let day = try IconDayToMeasure.decodeList(from: response)[0]
+        let payload = IconMeasurementPayload(
+            day: day, value: 10_250, measuredThrough: date("2026-10-06T09:30:00Z"), source: .coreMotion
+        )
+        let json = try JSONSerialization.jsonObject(with: JSONEncoder().encode(payload)) as? [String: Any]
+        XCTAssertEqual(json?["source"] as? String, "core_motion")
     }
 
     private func summary(_ json: String) throws -> IconMeasurementSummary {

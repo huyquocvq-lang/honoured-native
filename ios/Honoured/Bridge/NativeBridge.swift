@@ -79,7 +79,7 @@ final class NativeBridge: NSObject, WKScriptMessageHandler {
     private static let v2MessageTypes: Set<String> = [
         "SET_AUTH_SESSION", "CLEAR_AUTH_SESSION",
         "REQUEST_HEALTH_PERMISSION", "GET_HEALTH_STATUS", "QUERY_HEALTH_METRICS",
-        "GET_HEALTH_SOURCES", "SET_HEALTH_SOURCE_PREFERENCE",
+        "GET_HEALTH_SOURCES", "SET_HEALTH_SOURCE_PREFERENCE", "REQUEST_MOTION_PERMISSION",
         "SET_GOALS", "SET_DAY_RESET_HOUR",
         "START_TIMER", "CANCEL_TIMER", "GET_TIMER_STATE",
         "ACTIVITY_COMPLETED", "SET_SOUND_ENABLED",
@@ -378,6 +378,8 @@ final class NativeBridge: NSObject, WKScriptMessageHandler {
                         try await NativeEventStore.shared.clear()
                         await TestamentTimer.shared.clear()
                         await GoalMonitor.shared.clear()
+                        // The previous account's goals are gone.
+                        await MotionLiveUpdates.shared.refresh()
                         AppleSignInCoordinator.shared.clear()
                         NotificationCoordinator.shared.cancelAll()
                         await IconSignatureSync.shared.reset()
@@ -429,6 +431,7 @@ final class NativeBridge: NSObject, WKScriptMessageHandler {
                     try await NativeEventStore.shared.clear()
                     await TestamentTimer.shared.clear()
                     await GoalMonitor.shared.clear()
+                    await MotionLiveUpdates.shared.refresh()
                     AppleSignInCoordinator.shared.clear()
                     NotificationCoordinator.shared.cancelAll()
                     HealthBackgroundObserver.shared.disableBackgroundDelivery()
@@ -477,6 +480,22 @@ final class NativeBridge: NSObject, WKScriptMessageHandler {
             Task {
                 await HealthKitService.shared.setSourcePreference(preference)
                 reply("HEALTH_SOURCE_PREFERENCE_ACCEPTED", await HealthKitService.shared.sourceSettingsPayload())
+                // A web build that does not ask first: choosing Core Motion is
+                // then the moment to ask. The reply above already went out, so
+                // the prompt cannot time it out; until it is answered the
+                // choice reads the combined total and says so.
+                if preference == .coreMotion, MotionService.authorization() == .notDetermined {
+                    _ = await MotionService.requestAuthorization()
+                }
+                await MotionLiveUpdates.shared.refresh()
+                await HealthSyncCoordinator.shared.syncNow()
+            }
+        case "REQUEST_MOTION_PERMISSION":
+            Task { @MainActor in
+                _ = await MotionService.requestAuthorization()
+                reply("MOTION_PERMISSION_STATUS", MotionService.availability().payload)
+                guard await HealthKitService.shared.readsCoreMotion() else { return }
+                await MotionLiveUpdates.shared.refresh()
                 await HealthSyncCoordinator.shared.syncNow()
             }
         case "QUERY_HEALTH_METRICS":
@@ -504,11 +523,18 @@ final class NativeBridge: NSObject, WKScriptMessageHandler {
                         metrics[metric.rawValue] = NSNull()
                     }
                 }
-                reply("HEALTH_METRICS", [
+                var result: [String: Any] = [
                     "from": Self.iso8601.string(from: from),
                     "to": Self.iso8601.string(from: to),
                     "metrics": metrics
-                ])
+                ]
+                // Core Motion has no calories of its own; next to Active
+                // Energy the web may show this, labelled as an estimate.
+                if parsed.metrics.contains(.activeEnergy),
+                   let estimate = await HealthKitService.shared.motionEnergyEstimate(from: from, to: to) {
+                    result["estimates"] = ["walking_running_energy": estimate.payload]
+                }
+                reply("HEALTH_METRICS", result)
             }
         case "SET_GOALS":
             guard let rawGoals = payload["goals"] as? [[String: Any]] else {
@@ -527,6 +553,7 @@ final class NativeBridge: NSObject, WKScriptMessageHandler {
                             await NotificationCoordinator.shared.requestPermissionIfNeeded()
                             await GoalMonitor.shared.evaluate()
                         }
+                        await MotionLiveUpdates.shared.refresh()
                     } catch {
                         reply("ERROR", ["message": error.localizedDescription, "code": "goals_save_failed"])
                     }
@@ -549,6 +576,7 @@ final class NativeBridge: NSObject, WKScriptMessageHandler {
                     // The current health day may be a different one now; cards
                     // of the old day stop showing its Health numbers.
                     LiveActivityCoordinator.shared.dayMayHaveChanged()
+                    await MotionLiveUpdates.shared.refresh()
                 }
             }
         case "SIGN_IN_WITH_APPLE":

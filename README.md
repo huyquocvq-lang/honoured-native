@@ -194,7 +194,9 @@ from documents placed in On My iPhone; the scenarios say which), and
 `word-reminders`, which lists the word reminders iOS holds (for instance the
 ones the web app set), and `health-sync`, which runs one health collection with
 the stored session and posts its daily totals to the real backend, reporting
-the HTTP status (it never refreshes the session or prints tokens);
+the HTTP status (it never refreshes the session or prints tokens), and
+`core-motion`, which checks Core Motion as a step source (on the simulator,
+which has no pedometer, only the fallback to Apple Health);
 add `-HonouredStubExitWhenDone` to quit when it finishes. Build with ad-hoc
 signing (`CODE_SIGN_IDENTITY=- CODE_SIGNING_REQUIRED=NO`) to run it:
 
@@ -210,6 +212,16 @@ Supabase, and is compiled out of Release builds.
 Outside the stub, a Debug build also takes `-HonouredHealthRefreshSeconds <n>`,
 which shortens the hour after which unchanged daily Health totals are uploaded
 again, so that refresh can be checked without waiting.
+
+### Core Motion as a step source (Phase 3 M2)
+
+Settings › Health can pick the iPhone's own pedometer (Core Motion) instead of
+Apple Health for steps and walking distance; see "Core Motion as a source" in
+`docs/phase1/bridge.md`. It needs the Motion & Fitness permission
+(`NSMotionUsageDescription`) and only counts steps taken with the iPhone. While
+Honoured is on screen it follows the pedometer live; in the background it reads
+it whenever iOS already runs the app. The simulator has no pedometer, so the
+choice falls back to Apple Health there; the Core Motion path needs an iPhone.
 
 ### Motion probe (Phase 3 M1)
 

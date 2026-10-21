@@ -54,10 +54,13 @@ actor HealthKitService {
 
     /// Read permission is deliberately unknowable on iOS: once the user has
     /// decided, a declined type looks identical to one with no data. The only
-    /// signal available is whether the sheet still needs to be shown.
+    /// signal available is whether the sheet still needs to be shown. The
+    /// Motion & Fitness permission, which can be read back, rides along as
+    /// `motion`.
     func permissionStatusPayload(for metrics: [HealthMetric]) async -> [String: Any] {
+        let motion = MotionService.availability().payload
         guard isAvailable else {
-            return ["available": false, "perMetric": [String: String]()]
+            return ["available": false, "perMetric": [String: String](), "motion": motion]
         }
 
         var perMetric: [String: String] = [:]
@@ -69,36 +72,74 @@ actor HealthKitService {
             default: perMetric[metric.rawValue] = "unknown"
             }
         }
-        return ["available": true, "perMetric": perMetric]
+        return ["available": true, "perMetric": perMetric, "motion": motion]
     }
 
     // MARK: - Data source preference
 
     func setSourcePreference(_ preference: HealthSourcePreference) {
-        defaults.set(preference.payload["mode"], forKey: sourcePreferenceModeKey)
-        switch preference {
-        case .automatic:
-            defaults.removeObject(forKey: sourcePreferenceIdKey)
-        case .source(let id):
+        let payload = preference.payload
+        defaults.set(payload["mode"], forKey: sourcePreferenceModeKey)
+        if let id = payload["sourceId"] {
             defaults.set(id, forKey: sourcePreferenceIdKey)
+        } else {
+            defaults.removeObject(forKey: sourcePreferenceIdKey)
         }
     }
 
+    /// The HealthKit sources, with Core Motion first on an iPhone that counts
+    /// steps. `effectiveSource*` and `fallback` say what is read now, which
+    /// for Core Motion depends on its permission (`motion`).
     func sourceSettingsPayload() async -> [String: Any] {
+        let preference = sourcePreference()
+        let motion = MotionService.availability()
         guard isAvailable else {
-            return ["available": false, "sources": [], "preference": sourcePreference().payload]
+            return ["available": false, "sources": [], "preference": preference.payload, "motion": motion.payload]
         }
-        let sources = await availableSources(for: Array(Self.sourceSelectableMetrics))
-        let resolution = HealthSourceSelector.resolve(preference: sourcePreference(), available: sources)
+        let healthKitSources = await availableSources(for: Array(Self.sourceSelectableMetrics))
+        let resolution = HealthSourceSelector.resolve(
+            preference: preference,
+            available: healthKitSources,
+            motionReadable: motion.canRead(.steps)
+        )
+        let sources = (motion.stepCounting ? [HealthSourceDescriptor.coreMotion] : []) + healthKitSources
         return [
             "available": true,
             "sources": sources.map(Self.sourcePayload),
-            "preference": sourcePreference().payload,
+            "preference": preference.payload,
             "effectiveSourceId": resolution.selected.map { $0.id as Any } ?? NSNull(),
             "effectiveSourceName": resolution.selected.map { $0.name as Any } ?? NSNull(),
             "fallback": resolution.requestedSourceMissing,
-            "appliesTo": Self.sourceSelectableMetrics.map(\.rawValue).sorted()
+            "appliesTo": Self.sourceSelectableMetrics.map(\.rawValue).sorted(),
+            "motion": motion.payload
         ]
+    }
+
+    /// The person chose Core Motion, whether or not it can be read.
+    func prefersCoreMotion() -> Bool {
+        sourcePreference() == .coreMotion
+    }
+
+    /// Core Motion is chosen and readable, so steps come from the iPhone's
+    /// pedometer rather than HealthKit.
+    func readsCoreMotion() -> Bool {
+        prefersCoreMotion() && MotionService.availability().canRead(.steps)
+    }
+
+    /// Where `metric`'s totals come from right now: the same answer as the
+    /// source resolution `readTotal` uses, without querying HealthKit.
+    func readingSource(for metric: HealthMetric) -> HealthReadingSource {
+        guard Self.sourceSelectableMetrics.contains(metric), prefersCoreMotion(),
+              MotionService.availability().canRead(metric) else { return .healthKit }
+        return .coreMotion
+    }
+
+    /// Core Motion's walking and running energy estimate over the range, only
+    /// while Core Motion is the source being read. Calorie goals keep using
+    /// Active Energy.
+    func motionEnergyEstimate(from: Date, to: Date) async -> MotionEnergyEstimate? {
+        guard readsCoreMotion() else { return nil }
+        return await MotionService.estimatedEnergy(from: from, to: to)
     }
 
     func sourceMetadata(for metric: HealthMetric) async -> [String: Any] {
@@ -142,16 +183,36 @@ actor HealthKitService {
     /// read" (a locked device before the data is decrypted, a failed query), so
     /// a Live Activity can keep its last reading instead of showing zero. A
     /// declined read permission looks exactly like no data, as iOS intends.
+    ///
+    /// Every reader of steps and walking distance comes through here — goals,
+    /// Live Activities, Icon readings, `QUERY_HEALTH_METRICS` and
+    /// `health_daily` — so with Core Motion chosen they all read the
+    /// pedometer, never the pedometer plus HealthKit.
     func readTotal(for metric: HealthMetric, from: Date, to: Date) async -> HealthTotalRead {
+        await readTotalAndSource(for: metric, from: from, to: to).read
+    }
+
+    /// `readTotal` and the source it read, from one source resolution, so a
+    /// reading is never labelled with a source chosen a moment later.
+    func readTotalAndSource(for metric: HealthMetric, from: Date, to: Date) async -> (read: HealthTotalRead, source: HealthReadingSource) {
         #if DEBUG
-        if let fake = BridgeStub.fakeHealthRead(for: metric) { return fake }
+        if let fake = BridgeStub.fakeHealthRead(for: metric) { return (fake, readingSource(for: metric)) }
         #endif
         guard let unit = metric.quantityUnit, let type = metric.objectType as? HKQuantityType else {
-            return await sleepMinutes(from: from, to: to)
+            return (await sleepMinutes(from: from, to: to), .healthKit)
         }
 
-        let range = HKQuery.predicateForSamples(withStart: from, end: to, options: .strictStartDate)
         let resolution = await sourceResolution(for: metric)
+        if resolution.readingSource == .coreMotion {
+            return (await MotionService.readTotal(for: metric, from: from, to: to), .coreMotion)
+        }
+        return (await healthKitTotal(metric: metric, unit: unit, type: type, resolution: resolution, from: from, to: to), .healthKit)
+    }
+
+    private func healthKitTotal(
+        metric: HealthMetric, unit: HKUnit, type: HKQuantityType, resolution: HealthSourceResolution, from: Date, to: Date
+    ) async -> HealthTotalRead {
+        let range = HKQuery.predicateForSamples(withStart: from, end: to, options: .strictStartDate)
         let predicate: NSPredicate
         if let selected = resolution.selected,
            let source = await healthKitSource(for: selected, metric: metric) {
@@ -230,11 +291,10 @@ actor HealthKitService {
     }
 
     private func sourcePreference() -> HealthSourcePreference {
-        if defaults.string(forKey: sourcePreferenceModeKey) == "source",
-           let id = defaults.string(forKey: sourcePreferenceIdKey), !id.isEmpty {
-            return .source(id)
-        }
-        return .automatic
+        HealthSourcePreference.parse(
+            mode: defaults.string(forKey: sourcePreferenceModeKey),
+            sourceId: defaults.string(forKey: sourcePreferenceIdKey)
+        ) ?? .automatic
     }
 
     private func sourceResolution(for metric: HealthMetric) async -> HealthSourceResolution {
@@ -242,6 +302,13 @@ actor HealthKitService {
         // Automatic never narrows a read, so it needs no source query.
         guard Self.sourceSelectableMetrics.contains(metric), preference != .automatic else {
             return HealthSourceResolution(selected: nil, requestedSourceMissing: false)
+        }
+        if preference == .coreMotion {
+            return HealthSourceSelector.resolve(
+                preference: preference,
+                available: [],
+                motionReadable: MotionService.availability().canRead(metric)
+            )
         }
         return HealthSourceSelector.resolve(
             preference: preference,
@@ -374,12 +441,10 @@ actor HealthKitService {
     /// How totals of `sourceSelectableMetrics` are read now. `health_daily`
     /// rows written under another basis are stale: another source choice, or
     /// a build whose `automatic` read one device instead of the combined
-    /// total (such a build never stored a basis).
+    /// total (such a build never stored a basis). Core Motion counts as its
+    /// own basis only while it can be read.
     func dailyBasis() -> String {
-        switch sourcePreference() {
-        case .automatic: return "combined"
-        case .source(let id): return "source:\(id)"
-        }
+        sourcePreference().dailyBasis(motionReadable: MotionService.availability().canRead(.steps))
     }
 
     /// The basis of the totals already queued for upload; nil before the first.

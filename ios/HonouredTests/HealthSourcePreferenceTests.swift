@@ -52,4 +52,52 @@ final class HealthSourcePreferenceTests: XCTestCase {
         XCTAssertNil(HealthSourcePreference.parse(mode: "source", sourceId: nil))
         XCTAssertNil(HealthSourcePreference.parse(mode: "other", sourceId: nil))
     }
+
+    // MARK: - Core Motion (Phase 3 M2-C)
+
+    func testCoreMotionTravelsAsAnOrdinarySourceSoOlderWebBuildsKeepWorking() {
+        let payload = HealthSourcePreference.coreMotion.payload
+        XCTAssertEqual(payload, ["mode": "source", "sourceId": "core_motion"])
+        XCTAssertEqual(HealthSourcePreference.parse(mode: payload["mode"], sourceId: payload["sourceId"]), .coreMotion)
+    }
+
+    func testCoreMotionIdCannotNameAHealthKitSource() {
+        for source in [watch, phone, garmin] {
+            XCTAssertNotEqual(source.id, HealthSourceDescriptor.coreMotionId)
+            XCTAssertTrue(source.id.contains("|"))
+        }
+        XCTAssertFalse(HealthSourceDescriptor.coreMotionId.contains("|"))
+        XCTAssertEqual(HealthSourceDescriptor.coreMotion.kind, .coreMotion)
+    }
+
+    func testReadableCoreMotionReplacesHealthKitWhateverSourcesExist() {
+        for available in [[phone, watch], [garmin], []] {
+            let result = HealthSourceSelector.resolve(preference: .coreMotion, available: available, motionReadable: true)
+            XCTAssertEqual(result.selected, .coreMotion)
+            XCTAssertFalse(result.requestedSourceMissing)
+            XCTAssertEqual(result.readingSource, .coreMotion)
+        }
+    }
+
+    func testUnreadableCoreMotionFallsBackToTheCombinedTotalAndSaysSo() {
+        let result = HealthSourceSelector.resolve(preference: .coreMotion, available: [phone, watch], motionReadable: false)
+        XCTAssertNil(result.selected)
+        XCTAssertTrue(result.requestedSourceMissing)
+        XCTAssertEqual(result.readingSource, .healthKit)
+    }
+
+    func testAHealthKitSourceIsStillReadFromHealthKit() {
+        XCTAssertEqual(HealthSourceSelector.resolve(preference: .automatic, available: [phone]).readingSource, .healthKit)
+        XCTAssertEqual(
+            HealthSourceSelector.resolve(preference: .source(garmin.id), available: [garmin], motionReadable: true).readingSource,
+            .healthKit
+        )
+    }
+
+    func testDailyBasisChangesWhenCoreMotionBecomesReadable() {
+        XCTAssertEqual(HealthSourcePreference.automatic.dailyBasis(motionReadable: true), "combined")
+        XCTAssertEqual(HealthSourcePreference.source(garmin.id).dailyBasis(motionReadable: true), "source:\(garmin.id)")
+        XCTAssertEqual(HealthSourcePreference.coreMotion.dailyBasis(motionReadable: false), "combined")
+        XCTAssertEqual(HealthSourcePreference.coreMotion.dailyBasis(motionReadable: true), "core_motion")
+    }
 }

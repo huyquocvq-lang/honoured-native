@@ -359,6 +359,9 @@ enum BridgeStub {
     <button onclick="req('SIGN_IN_WITH_APPLE',{},['APPLE_SIGN_IN_SUCCESS','APPLE_SIGN_IN_FAILED'],120000)">SIGN_IN_WITH_APPLE</button>
     <button onclick="req('GET_HEALTH_STATUS',{},['HEALTH_PERMISSION_STATUS'])">GET_HEALTH_STATUS</button>
     <button onclick="req('REQUEST_HEALTH_PERMISSION',{},['HEALTH_PERMISSION_STATUS'],60000)">REQUEST_HEALTH_PERMISSION</button>
+    <button onclick="req('REQUEST_MOTION_PERMISSION',{},['MOTION_PERMISSION_STATUS'],120000)">REQUEST_MOTION_PERMISSION</button>
+    <button onclick="req('SET_HEALTH_SOURCE_PREFERENCE',{mode:'source',sourceId:'core_motion'},['HEALTH_SOURCE_PREFERENCE_ACCEPTED'])">Source · Core Motion</button>
+    <button onclick="req('SET_HEALTH_SOURCE_PREFERENCE',{mode:'automatic'},['HEALTH_SOURCE_PREFERENCE_ACCEPTED'])">Source · automatic</button>
     <button onclick="laManualSetup()">LA · sign in stub-user-a + goals</button>
     <button onclick="track(demo.walk)">LA · open Walking (steps)</button>
     <button onclick="track(demo.exercise)">LA · open Exercise (minutes)</button>
@@ -838,6 +841,56 @@ enum BridgeStub {
         r = await req('GET_TIMER_STATE', {}, ['TIMER_STATE']);
         check('timer still running with the same endsAt after toggling sound', r.payload.active === true && r.payload.endsAt === endsAt);
         r = await req('CANCEL_TIMER', { activityId: 'act-snd' }, ['TIMER_CANCELLED']);
+        log('SCENARIO DONE');
+      },
+      // Phase 3 M2: Core Motion as a step source. The simulator has no
+      // pedometer, so there it checks the fallback; on an iPhone it also
+      // checks the readable path.
+      async 'core-motion'() {
+        let r = await req('GET_HEALTH_STATUS', {}, ['HEALTH_PERMISSION_STATUS']);
+        const motion = r.payload.motion || {};
+        check('HEALTH_PERMISSION_STATUS carries motion', typeof motion.available === 'boolean' && typeof motion.authorization === 'string');
+        r = await req('REQUEST_MOTION_PERMISSION', {}, ['MOTION_PERMISSION_STATUS'], 120000);
+        check('REQUEST_MOTION_PERMISSION → MOTION_PERMISSION_STATUS', r.type === 'MOTION_PERMISSION_STATUS' && typeof r.payload.available === 'boolean'
+          && ['notDetermined', 'authorized', 'denied', 'restricted'].includes(r.payload.authorization));
+        const readable = r.payload.available && r.payload.authorization === 'authorized';
+        r = await req('GET_HEALTH_SOURCES', {}, ['HEALTH_SOURCES']);
+        const listed = (r.payload.sources || []).filter((s) => s.kind === 'core_motion');
+        check(motion.available ? 'Core Motion listed first' : 'no Core Motion entry without a pedometer',
+          motion.available ? (r.payload.sources[0] || {}).id === 'core_motion' && listed.length === 1 : listed.length === 0);
+        check('HEALTH_SOURCES carries motion', typeof (r.payload.motion || {}).available === 'boolean');
+
+        r = await req('SET_HEALTH_SOURCE_PREFERENCE', { mode: 'source', sourceId: 'core_motion' }, ['HEALTH_SOURCE_PREFERENCE_ACCEPTED']);
+        check('Core Motion saved as an ordinary source', r.type === 'HEALTH_SOURCE_PREFERENCE_ACCEPTED'
+          && r.payload.preference.mode === 'source' && r.payload.preference.sourceId === 'core_motion');
+        check(readable ? 'readable Core Motion is in use' : 'unreadable Core Motion falls back to the combined total',
+          readable ? r.payload.effectiveSourceId === 'core_motion' && r.payload.fallback === false
+                   : r.payload.effectiveSourceId === null && r.payload.fallback === true);
+
+        // The first goals of a fresh install ask for notification permission
+        // before their own check, so the check here comes from new totals,
+        // as after a sync pass.
+        await req('STUB_SET_FAKE_HEALTH_TOTALS', { spec: null }, ['STUB_FAKE_HEALTH_TOTALS_SET'], 15000);
+        const walk = { activityId: 'act-cm-' + Date.now(), activityName: 'Walk', metric: 'steps', target: 8000, unit: 'count' };
+        r = await req('SET_GOALS', { goals: [walk] }, ['GOALS_ACCEPTED']);
+        const reached = waitFor(['GOAL_REACHED'], 6000);
+        await fake('steps=9000,active_energy=250');
+        r = await reached;
+        check('GOAL_REACHED names its source', r.type === 'GOAL_REACHED' && r.payload.activityId === walk.activityId
+          && r.payload.source === (readable ? 'core_motion' : 'healthkit'));
+
+        const from = new Date(); from.setHours(0, 0, 0, 0);
+        r = await req('QUERY_HEALTH_METRICS', { metrics: ['steps', 'active_energy'], from: from.toISOString(), to: new Date().toISOString() }, ['HEALTH_METRICS']);
+        check(readable ? 'Core Motion steps labelled core_motion' : 'fallback steps labelled as the aggregate',
+          readable ? ((r.payload.metrics.steps || {}).source || {}).kind === 'core_motion'
+                   : ((r.payload.metrics.steps || {}).source || {}).fallback === true);
+        check(readable ? 'calorie estimate offered' : 'no calorie estimate while falling back',
+          readable ? (r.payload.estimates || {}).walking_running_energy !== undefined : r.payload.estimates === undefined);
+
+        r = await req('SET_HEALTH_SOURCE_PREFERENCE', { mode: 'automatic' }, ['HEALTH_SOURCE_PREFERENCE_ACCEPTED']);
+        check('back to automatic', r.type === 'HEALTH_SOURCE_PREFERENCE_ACCEPTED' && r.payload.preference.mode === 'automatic' && r.payload.fallback === false);
+        await req('SET_GOALS', { goals: [] }, ['GOALS_ACCEPTED']);
+        await req('STUB_SET_FAKE_HEALTH_TOTALS', { spec: null }, ['STUB_FAKE_HEALTH_TOTALS_SET'], 15000);
         log('SCENARIO DONE');
       },
       // Launch with -HonouredFakeHealthTotals steps=9000,active_energy=250

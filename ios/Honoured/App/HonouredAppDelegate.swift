@@ -69,6 +69,9 @@ final class HonouredAppDelegate: NSObject, UIApplicationDelegate {
             ) { _ in
                 LiveActivityCoordinator.shared.applicationDidBecomeActive()
                 Task { await MotionProbe.shared.recordRun(reason: .appActive) }
+                // With Core Motion chosen, opening the app reads it at once and
+                // follows it live while on screen.
+                Task { await MotionLiveUpdates.shared.refresh() }
                 Task {
                     await PushTokenRegistry.shared.scheduleSync()
                     await TestamentTimer.shared.reconcile()
@@ -84,6 +87,7 @@ final class HonouredAppDelegate: NSObject, UIApplicationDelegate {
                 LiveActivityCoordinator.shared.protectedDataDidBecomeAvailable()
                 Task { await HealthBackgroundDeliveryCoordinator.shared.retryPendingCollection() }
                 Task { await MotionProbe.shared.recordRun(reason: .protectedDataAvailable) }
+                Task { await MotionLiveUpdates.shared.checkIfReadingCoreMotion() }
             },
             center.addObserver(
                 forName: UIApplication.protectedDataWillBecomeUnavailableNotification, object: nil, queue: .main
@@ -101,16 +105,19 @@ final class HonouredAppDelegate: NSObject, UIApplicationDelegate {
                 forName: UIApplication.significantTimeChangeNotification, object: nil, queue: .main
             ) { _ in
                 LiveActivityCoordinator.shared.dayMayHaveChanged()
+                Task { await MotionLiveUpdates.shared.refresh() }
             },
             center.addObserver(
                 forName: .NSSystemTimeZoneDidChange, object: nil, queue: .main
             ) { _ in
                 LiveActivityCoordinator.shared.dayMayHaveChanged()
+                Task { await MotionLiveUpdates.shared.refresh() }
             },
             center.addObserver(
                 forName: UIApplication.didEnterBackgroundNotification, object: nil, queue: .main
             ) { _ in
                 MotionProbe.note("lifecycle", reason: "did_enter_background")
+                Task { @MainActor in MotionLiveUpdates.shared.stop() }
                 NotificationSound.yieldToOtherApps()
                 // Refresh the pending request on every background transition so the
                 // earliest-begin date is measured from the last time the user left.

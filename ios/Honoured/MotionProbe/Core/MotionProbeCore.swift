@@ -219,24 +219,14 @@ enum MotionProbeMath {
         case walking, running
     }
 
-    /// Below 0.42 s per metre (about 7 min per km) counts as running.
-    static let runningPaceSecondsPerMeter = 0.42
-
-    /// A rough active-energy estimate: about 0.5 kcal per kg per km walking and
-    /// 1.0 running. Core Motion has no calorie API, so this is only ever shown
-    /// as an estimate next to Apple Health's Active Energy.
+    /// Honoured's own estimate (`MotionEnergyEstimate`), so the probe's report
+    /// and the number the app shows never disagree.
     static func estimatedActiveKilocalories(
         distanceMeters: Double,
         activeSeconds: Double?,
-        weightKg: Double = 70
+        weightKg: Double = MotionEnergyEstimate.assumedWeightKg
     ) -> (kilocalories: Double, gait: Gait) {
-        let km = max(distanceMeters, 0) / 1_000
-        var gait = Gait.walking
-        if let activeSeconds, activeSeconds > 0, distanceMeters > 0,
-           activeSeconds / distanceMeters < runningPaceSecondsPerMeter {
-            gait = .running
-        }
-        let perKgKm = gait == .running ? 1.0 : 0.5
-        return (km * weightKg * perKgKm, gait)
+        let estimate = MotionEnergyEstimate(distanceMeters: distanceMeters, activeSeconds: activeSeconds, weightKg: weightKg)
+        return (estimate.kilocalories, estimate.gait == .running ? .running : .walking)
     }
 }

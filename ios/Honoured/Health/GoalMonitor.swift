@@ -6,42 +6,79 @@ import UIKit
 /// day. Runs after every collection pass, so a goal crossed while the app is
 /// in the background is noticed on the same wake that read the data. It never
 /// derives totals from raw samples; it uses the same source-deduplicated
-/// statistics queries as `health_daily`.
+/// statistics queries as `health_daily`, or Core Motion when the person chose
+/// it. The marker ignores the source, so switching sources never announces a
+/// goal twice.
 actor GoalMonitor {
     static let shared = GoalMonitor()
 
     private let defaults = UserDefaults.standard
     private let markersKey = "goals.reached-markers"
 
+    /// One check at a time. Reads suspend the actor, so two checks at once —
+    /// a sync pass and the live Core Motion count, say — could both find a
+    /// goal unmarked and announce it twice.
+    private var isEvaluating = false
+    private var needsAnotherPass = false
+    private var waiters: [CheckedContinuation<Void, Never>] = []
+
     private init() {}
 
     // MARK: - Evaluation
 
+    /// Returns once a check that started after this call has finished. A call
+    /// that arrives during a check runs one more pass afterwards, with fresh
+    /// reads, so no request is lost and none overlaps another.
+    ///
     /// - Parameter prefetched: totals the Live Activity refresh just read for
     ///   today's window. They are reused only for the same health-day start, so
     ///   a read that straddled the reset never counts toward the new day.
     func evaluate(prefetched: HealthPrefetch? = nil) async {
+        if isEvaluating {
+            needsAnotherPass = true
+            await withCheckedContinuation { waiters.append($0) }
+            return
+        }
+        isEvaluating = true
+        var prefetched = prefetched
+        repeat {
+            needsAnotherPass = false
+            await evaluatePass(prefetched: prefetched)
+            prefetched = nil
+        } while needsAnotherPass
+        isEvaluating = false
+        let resumed = waiters
+        waiters.removeAll()
+        for waiter in resumed { waiter.resume() }
+    }
+
+    private func evaluatePass(prefetched: HealthPrefetch?) async {
         let goals = await HealthSyncSettings.shared.currentGoals()
         guard !goals.isEmpty, HealthKitService.shared.isAvailable else { return }
 
         let now = Date()
         let dayStart = await HealthSyncSettings.shared.healthDayStart(containing: now)
         let day = HealthSyncSettings.dayString(dayStart)
-        var markers = prunedMarkers(keeping: day)
+        let markedAtStart = prunedMarkers(keeping: day)
         let reusable = prefetched?.dayStart == dayStart ? prefetched?.totals ?? [:] : [:]
 
-        for goal in goals where !markers.contains(Self.marker(goal.activityId, day)) {
-            let total: Double?
-            if let read = reusable[goal.metric] {
-                total = read.numericValue
+        for goal in goals where !markedAtStart.contains(Self.marker(goal.activityId, day)) {
+            let read: HealthTotalRead
+            let source: HealthReadingSource
+            if let prefetchedRead = reusable[goal.metric] {
+                read = prefetchedRead
+                source = await HealthKitService.shared.readingSource(for: goal.metric)
             } else {
-                total = await HealthKitService.shared.total(for: goal.metric, from: dayStart, to: now)
+                (read, source) = await HealthKitService.shared.readTotalAndSource(for: goal.metric, from: dayStart, to: now)
             }
-            guard let value = total, value >= goal.target else { continue }
+            guard let value = read.numericValue, value >= goal.target else { continue }
 
-            // Persist the marker before announcing so a crash in between can only
-            // lose an event, never repeat a notification.
-            markers.insert(Self.marker(goal.activityId, day))
+            // Read the markers again and mark with no suspension in between:
+            // ACTIVITY_COMPLETED may have marked the goal during the reads.
+            // The marker is saved before announcing so a crash in between can
+            // only lose an event, never repeat a notification.
+            var markers = prunedMarkers(keeping: day)
+            guard markers.insert(Self.marker(goal.activityId, day)).inserted else { continue }
             save(markers)
 
             let isActive = await MainActor.run { UIApplication.shared.applicationState == .active }
@@ -64,9 +101,13 @@ actor GoalMonitor {
                 "value": value,
                 "target": goal.target,
                 "reachedAt": TestamentTimer.iso8601.string(from: now),
-                "notified": notified
+                "notified": notified,
+                "source": source.rawValue
             ])
-            MotionProbe.noteAppGoal(metric: goal.metric.rawValue, value: value, target: goal.target, notified: notified)
+            MotionProbe.noteAppGoal(
+                metric: goal.metric.rawValue, value: value, target: goal.target,
+                notified: notified, source: source.rawValue
+            )
         }
     }
 
@@ -83,12 +124,15 @@ actor GoalMonitor {
     ///   its own day and cannot silence today's goal. Nil means today.
     func markCelebrated(activityId: String, day: String? = nil) async {
         let dayStart = await HealthSyncSettings.shared.healthDayStart(containing: Date())
+        let goals = await HealthSyncSettings.shared.currentGoals()
         let today = HealthSyncSettings.dayString(dayStart)
         let markerDay = day ?? today
+        // Read and saved with no suspension in between, so a mark a running
+        // check makes meanwhile is never overwritten.
         var markers = prunedMarkers(keeping: today)
         markers.insert(Self.marker(activityId, markerDay))
         let slotPrefix = activityId + ":"
-        for goal in await HealthSyncSettings.shared.currentGoals() where goal.activityId.hasPrefix(slotPrefix) {
+        for goal in goals where goal.activityId.hasPrefix(slotPrefix) {
             markers.insert(Self.marker(goal.activityId, markerDay))
         }
         save(markers)

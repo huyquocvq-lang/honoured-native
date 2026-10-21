@@ -51,17 +51,22 @@ struct IconDayToMeasure: Decodable, Equatable, Sendable {
 
 /// A reading of one Icon day: the total from the start of the day to
 /// `measuredThrough`. The server decides HONOURED / BROKEN / still pending.
+/// `source` (`healthkit` or `core_motion`) lets icon_scoring_v3.sql tell a
+/// source change from a lower reading of the same source; servers before it
+/// ignore the key.
 struct IconMeasurementPayload: Encodable, Equatable, Sendable {
     let contractId: String
     let day: String
     let value: Double
     let measuredThrough: String
+    let source: String
 
-    init(day: IconDayToMeasure, value: Double, measuredThrough: Date) {
+    init(day: IconDayToMeasure, value: Double, measuredThrough: Date, source: HealthReadingSource) {
         contractId = day.contractId
         self.day = day.day
         self.value = value
         self.measuredThrough = IconTimestamp.format(measuredThrough)
+        self.source = source.rawValue
     }
 }
 

@@ -116,6 +116,13 @@ actor HealthSyncCoordinator {
         if await HealthKitService.shared.committedDailyBasis() != basis {
             rebuildDays = await historyDayStarts(through: now)
         }
+        // HealthKit's anchors name the days that received samples; Core
+        // Motion has nothing like them, so with it every day it still holds is
+        // read again. Days the app was not run on get their final totals, and
+        // HealthDailyLedger keeps unchanged ones from being sent.
+        if basis == HealthSourcePreference.coreMotionBasis {
+            rebuildDays.formUnion(await dayStarts(since: now.addingTimeInterval(-MotionHistory.retention), through: now))
+        }
 
         do {
             for metric in HealthMetric.allCases {
@@ -409,16 +416,20 @@ actor HealthSyncCoordinator {
     private static let rebuildHistoryDays = 90
 
     /// The start of every health day from the history floor, at most
-    /// `rebuildHistoryDays` back, through the day containing `now`.
+    /// `rebuildHistoryDays` back, through the day containing `now`. Core
+    /// Motion reads only its last seven of them; the rest keep their totals.
     private func historyDayStarts(through now: Date) async -> Set<Date> {
-        let calendar = Calendar.current
         let floor = await HealthKitService.shared.historyStart()
-        let earliest = calendar.date(byAdding: .day, value: -Self.rebuildHistoryDays, to: now) ?? now
-        return Set(HealthDayMath.dayStarts(
-            from: max(floor, earliest),
+        let earliest = Calendar.current.date(byAdding: .day, value: -Self.rebuildHistoryDays, to: now) ?? now
+        return await dayStarts(since: max(floor, earliest), through: now)
+    }
+
+    private func dayStarts(since start: Date, through now: Date) async -> Set<Date> {
+        Set(HealthDayMath.dayStarts(
+            from: start,
             through: now,
             resetHour: await HealthSyncSettings.shared.dayResetHour(),
-            calendar: calendar
+            calendar: .current
         ))
     }
 }
