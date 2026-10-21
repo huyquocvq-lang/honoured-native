@@ -113,6 +113,55 @@ final class HealthDayMathTests: XCTestCase {
         XCTAssertEqual(HealthDayMath.info(containing: noon, resetHour: 0, calendar: newYork), spring)
     }
 
+    private func local(_ calendar: Calendar, _ month: Int, _ day: Int, _ hour: Int) -> Date {
+        calendar.date(from: DateComponents(year: 2026, month: month, day: day, hour: hour))!
+    }
+
+    private func days(_ first: Int, through last: Int, month: Int) -> [String] {
+        (first...last).map { String(format: "2026-%02d-%02d", month, $0) }
+    }
+
+    func testDayStartsListEveryDayOnceAcrossTheSpringForward() {
+        // Sydney moves its clocks forward at 02:00 on 4 Oct 2026.
+        let sydney = calendar("Australia/Sydney")
+        let from = local(sydney, 9, 30, 10)
+        let through = local(sydney, 10, 8, 20)
+        let expected: [Int: [String]] = [
+            0: ["2026-09-30"] + days(1, through: 8, month: 10),
+            3: ["2026-09-30"] + days(1, through: 8, month: 10),
+            // 10:00 is still the previous health day under an 18:00 reset.
+            18: ["2026-09-29", "2026-09-30"] + days(1, through: 8, month: 10)
+        ]
+        for (resetHour, names) in expected {
+            let starts = HealthDayMath.dayStarts(from: from, through: through, resetHour: resetHour, calendar: sydney)
+            XCTAssertEqual(starts.map { HealthDayMath.dayString($0, calendar: sydney) }, names, "reset \(resetHour)")
+            for (start, name) in zip(starts, names) {
+                XCTAssertEqual(start, HealthDayMath.window(forDay: name, resetHour: resetHour, calendar: sydney)?.start)
+                // A sample just after the start belongs to the same day.
+                let inside = HealthDayMath.dayStart(containing: start.addingTimeInterval(60), resetHour: resetHour, calendar: sydney)
+                XCTAssertEqual(HealthDayMath.dayString(inside, calendar: sydney), name, "reset \(resetHour)")
+            }
+        }
+    }
+
+    func testDayStartsListEveryDayOnceAcrossTheFallBack() {
+        let newYork = calendar("America/New_York")
+        let starts = HealthDayMath.dayStarts(
+            from: local(newYork, 10, 30, 12), through: local(newYork, 11, 3, 8), resetHour: 0, calendar: newYork
+        )
+        XCTAssertEqual(
+            starts.map { HealthDayMath.dayString($0, calendar: newYork) },
+            ["2026-10-30", "2026-10-31", "2026-11-01", "2026-11-02", "2026-11-03"]
+        )
+    }
+
+    func testDayStartsOfOneOrNoDay() {
+        let sydney = calendar("Australia/Sydney")
+        let noon = local(sydney, 10, 16, 12)
+        XCTAssertEqual(HealthDayMath.dayStarts(from: noon, through: noon, resetHour: 0, calendar: sydney).count, 1)
+        XCTAssertEqual(HealthDayMath.dayStarts(from: noon, through: local(sydney, 10, 15, 12), resetHour: 0, calendar: sydney), [])
+    }
+
     func testTheSameInstantIsADifferentDayInAnotherTimeZone() {
         let instant = ISO8601DateFormatter().date(from: "2026-09-23T20:00:00Z")!
         XCTAssertEqual(HealthDayMath.info(containing: instant, resetHour: 0, calendar: calendar("Asia/Ho_Chi_Minh")).day, "2026-09-24")

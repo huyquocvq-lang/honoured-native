@@ -153,6 +153,32 @@ enum HealthDayMath {
         return HealthDayInfo(day: dayString(start, calendar: calendar), start: start, end: end)
     }
 
+    /// The start of every health day from the one containing `from` through
+    /// the one containing `through`, oldest first, one per day name: each is
+    /// the start of `window(forDay:)`. Asking `dayStart(containing:)` instead
+    /// can give one day two starts an hour apart where daylight saving moves
+    /// a reset hour other than midnight.
+    static func dayStarts(from: Date, through: Date, resetHour: Int, calendar: Calendar) -> [Date] {
+        let first = info(containing: from, resetHour: resetHour, calendar: calendar).day
+        let last = info(containing: through, resetHour: resetHour, calendar: calendar).day
+        // Noon of each calendar day never falls in a DST gap.
+        guard let midnight = dayFormatter(calendar).date(from: first),
+              var cursor = calendar.date(bySettingHour: 12, minute: 0, second: 0, of: midnight) else {
+            return []
+        }
+        var starts: [Date] = []
+        while true {
+            let day = dayString(cursor, calendar: calendar)
+            guard day <= last else { break }
+            if let window = window(forDay: day, resetHour: resetHour, calendar: calendar) {
+                starts.append(window.start)
+            }
+            guard let next = calendar.date(byAdding: .day, value: 1, to: cursor) else { break }
+            cursor = next
+        }
+        return starts
+    }
+
     /// The window a named health day covers under `resetHour`.
     static func window(forDay day: String, resetHour: Int, calendar: Calendar) -> HealthDayInfo? {
         guard let date = dayFormatter(calendar).date(from: day) else { return nil }

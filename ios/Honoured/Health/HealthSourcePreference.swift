@@ -62,31 +62,22 @@ struct HealthSourceResolution: Equatable, Sendable {
 }
 
 enum HealthSourceSelector {
+    /// `automatic` selects nothing, so reads use the combined Apple Health
+    /// total: the number the Health app shows, every device and app merged
+    /// with overlaps removed. Picking one device dropped the steps another
+    /// recorded, such as a Garmin walk while the iPhone stayed at home. Only a
+    /// source the person chose narrows the read; when that source is gone the
+    /// combined total is used and `requestedSourceMissing` says so.
     static func resolve(
         preference: HealthSourcePreference,
         available: [HealthSourceDescriptor]
     ) -> HealthSourceResolution {
-        let sorted = available.sorted {
-            if rank($0.kind) != rank($1.kind) { return rank($0.kind) < rank($1.kind) }
-            return $0.name.localizedCaseInsensitiveCompare($1.name) == .orderedAscending
-        }
         switch preference {
         case .automatic:
-            return HealthSourceResolution(selected: sorted.first, requestedSourceMissing: false)
+            return HealthSourceResolution(selected: nil, requestedSourceMissing: false)
         case .source(let id):
-            if let source = available.first(where: { $0.id == id }) {
-                return HealthSourceResolution(selected: source, requestedSourceMissing: false)
-            }
-            return HealthSourceResolution(selected: sorted.first, requestedSourceMissing: true)
-        }
-    }
-
-    private static func rank(_ kind: HealthSourceDescriptor.Kind) -> Int {
-        switch kind {
-        case .appleWatch: return 0
-        case .iPhone: return 1
-        case .otherWatch: return 2
-        case .other: return 3
+            let source = available.first { $0.id == id }
+            return HealthSourceResolution(selected: source, requestedSourceMissing: source == nil)
         }
     }
 }

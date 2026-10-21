@@ -10,42 +10,40 @@ final class HealthSourcePreferenceTests: XCTestCase {
         bundleIdentifier: "com.apple.health.iphone"
     )
     private let garmin = HealthSourceDescriptor.make(
-        name: "Garmin Connect",
-        bundleIdentifier: "com.garmin.connect"
+        name: "Connect",
+        bundleIdentifier: "com.garmin.connect.mobile"
     )
 
-    func testAutomaticPrefersAppleWatchOverPhone() {
-        let result = HealthSourceSelector.resolve(preference: .automatic, available: [phone, watch])
-        XCTAssertEqual(result.selected, watch)
-        XCTAssertFalse(result.requestedSourceMissing)
+    func testAutomaticReadsTheCombinedTotalWhateverDevicesExist() {
+        for available in [[phone, watch], [phone, garmin], [phone], [garmin], []] {
+            let result = HealthSourceSelector.resolve(preference: .automatic, available: available)
+            XCTAssertNil(result.selected, "\(available.map(\.name))")
+            XCTAssertFalse(result.requestedSourceMissing)
+        }
     }
 
-    func testAutomaticUsesPhoneWhenNoWatchExists() {
-        let result = HealthSourceSelector.resolve(preference: .automatic, available: [phone])
-        XCTAssertEqual(result.selected, phone)
-    }
-
-    func testManualSelectionWinsOverAutomaticRanking() {
+    func testManualSelectionNarrowsTheReadToThatSource() {
         let result = HealthSourceSelector.resolve(preference: .source(phone.id), available: [watch, phone])
         XCTAssertEqual(result.selected, phone)
         XCTAssertFalse(result.requestedSourceMissing)
     }
 
-    func testMissingManualSourceFallsBackToBestAvailable() {
+    func testManualSelectionCanPickAThirdPartyWatch() {
+        let result = HealthSourceSelector.resolve(preference: .source(garmin.id), available: [phone, garmin])
+        XCTAssertEqual(result.selected, garmin)
+        XCTAssertFalse(result.requestedSourceMissing)
+    }
+
+    func testMissingManualSourceFallsBackToTheCombinedTotal() {
         let result = HealthSourceSelector.resolve(preference: .source("missing"), available: [phone, watch])
-        XCTAssertEqual(result.selected, watch)
+        XCTAssertNil(result.selected)
         XCTAssertTrue(result.requestedSourceMissing)
     }
 
-    func testPhoneRanksAheadOfThirdPartySources() {
-        let result = HealthSourceSelector.resolve(preference: .automatic, available: [phone, garmin])
-        XCTAssertEqual(result.selected, phone)
-    }
-
-    func testEmptySourcesUseAggregateFallback() {
-        let result = HealthSourceSelector.resolve(preference: .automatic, available: [])
-        XCTAssertNil(result.selected)
-        XCTAssertFalse(result.requestedSourceMissing)
+    func testDescriptorKindStillLabelsTheSource() {
+        XCTAssertEqual(watch.kind, .appleWatch)
+        XCTAssertEqual(phone.kind, .iPhone)
+        XCTAssertEqual(garmin.kind, .otherWatch)
     }
 
     func testPreferencePayloadParsingRejectsIncompleteSource() {

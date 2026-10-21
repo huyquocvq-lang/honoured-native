@@ -32,8 +32,11 @@ actor HealthKitService {
     private let syncFloorKey = "healthkit.sync.floor"
     private let sourcePreferenceModeKey = "healthkit.source.preference.mode"
     private let sourcePreferenceIdKey = "healthkit.source.preference.id"
+    private let dailyBasisKey = "healthkit.daily.basis"
 
-    private static let sourceSelectableMetrics: Set<HealthMetric> = [
+    /// The metrics the source preference applies to; every other metric reads
+    /// the combined total.
+    static let sourceSelectableMetrics: Set<HealthMetric> = [
         .steps, .distanceWalkingRunning
     ]
 
@@ -235,11 +238,13 @@ actor HealthKitService {
     }
 
     private func sourceResolution(for metric: HealthMetric) async -> HealthSourceResolution {
-        guard Self.sourceSelectableMetrics.contains(metric) else {
+        let preference = sourcePreference()
+        // Automatic never narrows a read, so it needs no source query.
+        guard Self.sourceSelectableMetrics.contains(metric), preference != .automatic else {
             return HealthSourceResolution(selected: nil, requestedSourceMissing: false)
         }
         return HealthSourceSelector.resolve(
-            preference: sourcePreference(),
+            preference: preference,
             available: await availableSources(for: [metric])
         )
     }
@@ -353,13 +358,42 @@ actor HealthKitService {
         defaults.set(data, forKey: anchorKey(for: metric))
     }
 
-    /// Forgets every anchor and the history floor. Used when the signed-in user
-    /// changes, so the next user's sync starts from a clean read.
+    /// Forgets every anchor, the history floor and the daily basis. Used when
+    /// the signed-in user changes, so the next user's sync starts from a clean
+    /// read.
     func resetSyncState() {
         for metric in HealthMetric.allCases {
             defaults.removeObject(forKey: anchorKey(for: metric))
         }
         defaults.removeObject(forKey: syncFloorKey)
+        defaults.removeObject(forKey: dailyBasisKey)
+    }
+
+    // MARK: - Daily totals basis
+
+    /// How totals of `sourceSelectableMetrics` are read now. `health_daily`
+    /// rows written under another basis are stale: another source choice, or
+    /// a build whose `automatic` read one device instead of the combined
+    /// total (such a build never stored a basis).
+    func dailyBasis() -> String {
+        switch sourcePreference() {
+        case .automatic: return "combined"
+        case .source(let id): return "source:\(id)"
+        }
+    }
+
+    /// The basis of the totals already queued for upload; nil before the first.
+    func committedDailyBasis() -> String? {
+        defaults.string(forKey: dailyBasisKey)
+    }
+
+    func commitDailyBasis(_ basis: String) {
+        defaults.set(basis, forKey: dailyBasisKey)
+    }
+
+    /// The oldest moment the uploaded history covers.
+    func historyStart() -> Date {
+        syncFloor()
     }
 
     private func storedAnchor(for metric: HealthMetric) -> HKQueryAnchor? {

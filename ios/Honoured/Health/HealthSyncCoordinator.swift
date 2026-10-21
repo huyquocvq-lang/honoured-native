@@ -111,6 +111,11 @@ actor HealthSyncCoordinator {
         var reads: [HealthReadResult] = []
         let now = Date()
         let dayStart = await startOfHealthDay(containing: now)
+        let basis = await HealthKitService.shared.dailyBasis()
+        var rebuildDays: Set<Date> = []
+        if await HealthKitService.shared.committedDailyBasis() != basis {
+            rebuildDays = await historyDayStarts(through: now)
+        }
 
         do {
             for metric in HealthMetric.allCases {
@@ -138,15 +143,27 @@ actor HealthSyncCoordinator {
                 // Recompute today plus any historical day receiving a late sample.
                 // This populates the initial history and finalizes past days without
                 // deriving totals from overlapping iPhone/Watch samples on the server.
-                // Only the totals that changed are queued; see HealthDailyLedger.
+                // After the source basis changes, every recent day of a metric the
+                // basis covers is recomputed once, so health_daily never mixes
+                // totals read two ways. Only the totals that changed are queued;
+                // see HealthDailyLedger.
                 var affectedDays: Set<Date> = [dayStart]
+                if HealthKitService.sourceSelectableMetrics.contains(metric) {
+                    affectedDays.formUnion(rebuildDays)
+                }
                 for sample in result.added {
                     let attributionDate = metric == .sleep
                         ? sample.endDate.addingTimeInterval(-0.001)
                         : sample.startDate
                     affectedDays.insert(await startOfHealthDay(containing: attributionDate))
                 }
+                // Where daylight saving moves a reset hour other than midnight,
+                // two instants can name the same day; the server's upsert
+                // refuses a batch that repeats a day, so each is read once.
+                var namedDays: Set<String> = []
                 for affectedDay in affectedDays.sorted() {
+                    let day = dayFormatter.string(from: affectedDay)
+                    guard namedDays.insert(day).inserted else { continue }
                     let calendar = Calendar.current
                     let dayEnd = calendar.date(byAdding: .day, value: 1, to: affectedDay) ?? now
                     let rangeEnd = min(dayEnd, now)
@@ -156,7 +173,7 @@ actor HealthSyncCoordinator {
                         to: rangeEnd
                     ) {
                         daily.append(HealthDailyPayload(
-                            day: dayFormatter.string(from: affectedDay),
+                            day: day,
                             metric: metric.rawValue,
                             total: total,
                             unit: metric.unitName
@@ -175,6 +192,7 @@ actor HealthSyncCoordinator {
                 deletions: deletions, daily: daily, attempts: 0
             )
             guard !samples.isEmpty || !deletions.isEmpty || !daily.isEmpty else {
+                await HealthKitService.shared.commitDailyBasis(basis)
                 return .noChanges
             }
 
@@ -182,6 +200,9 @@ actor HealthSyncCoordinator {
             for result in reads {
                 await HealthKitService.shared.commitAnchor(result.newAnchor, for: result.metric)
             }
+            // The basis read at the start of the pass: a preference changed
+            // mid-pass leaves a mismatch, and the next pass rebuilds again.
+            await HealthKitService.shared.commitDailyBasis(basis)
             return .queued
         } catch {
             let nsError = error as NSError
@@ -381,5 +402,23 @@ actor HealthSyncCoordinator {
 
     private func startOfHealthDay(containing date: Date) async -> Date {
         await HealthSyncSettings.shared.healthDayStart(containing: date)
+    }
+
+    /// How far back a basis change recomputes daily totals. Bounded because
+    /// the history floor stays where the first sync put it.
+    private static let rebuildHistoryDays = 90
+
+    /// The start of every health day from the history floor, at most
+    /// `rebuildHistoryDays` back, through the day containing `now`.
+    private func historyDayStarts(through now: Date) async -> Set<Date> {
+        let calendar = Calendar.current
+        let floor = await HealthKitService.shared.historyStart()
+        let earliest = calendar.date(byAdding: .day, value: -Self.rebuildHistoryDays, to: now) ?? now
+        return Set(HealthDayMath.dayStarts(
+            from: max(floor, earliest),
+            through: now,
+            resetHour: await HealthSyncSettings.shared.dayResetHour(),
+            calendar: calendar
+        ))
     }
 }
