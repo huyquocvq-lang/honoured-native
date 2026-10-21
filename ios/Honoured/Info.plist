@@ -63,6 +63,8 @@
 	<string>Honoured only reads your Health data and never writes to it.</string>
 	<key>NSMicrophoneUsageDescription</key>
 	<string>Record a private Voice of Change reflection.</string>
+	<key>NSMotionUsageDescription</key>
+	<string>Honoured reads your iPhone’s step count and walking distance to recognise your goals sooner.</string>
 	<key>NSSupportsLiveActivities</key>
 	<true/>
 	<key>RevenueCatAPIKey</key>

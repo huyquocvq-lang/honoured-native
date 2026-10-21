@@ -73,6 +73,7 @@ final class HealthBackgroundObserver: @unchecked Sendable {
                 // Persist the signal before crossing into async work. If the process
                 // is suspended, launch/foreground recovery will perform the read.
                 HealthBackgroundPendingState.markPending()
+                MotionProbe.noteHealthKitCallback(metric: metric.rawValue)
                 let completion = HealthObserverCompletion(completionHandler)
                 Task {
                     await HealthBackgroundDeliveryCoordinator.shared.receive(completion)
@@ -170,6 +171,9 @@ actor HealthBackgroundDeliveryCoordinator {
             let prefetched = await LiveActivityCoordinator.shared.refreshHealthProgress()
             outcome = await HealthSyncCoordinator.shared.collectAndEnqueue(prefetched: prefetched)
         } while needsAnotherPass
+        // Inside the same wake, before HealthKit is acknowledged: whether Core
+        // Motion can be read here is what the M1 probe measures.
+        await MotionProbe.shared.recordRun(reason: .healthKitDelivery)
 
         let pendingCompletions = completions
         completions.removeAll()

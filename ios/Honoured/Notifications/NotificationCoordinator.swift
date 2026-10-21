@@ -182,12 +182,19 @@ final class NotificationCoordinator: NSObject, UNUserNotificationCenterDelegate 
 
     /// A notification firing while the app is in the foreground is never shown:
     /// the timer and goal owners emit their bridge event instead and the web app
-    /// runs the in-app celebration.
+    /// runs the in-app celebration. The motion probe's own test notifications
+    /// are the exception: the tester has to see them, and they must reach
+    /// Notification Center for their delivery time to be read.
     func userNotificationCenter(
         _ center: UNUserNotificationCenter,
         willPresent notification: UNNotification,
         withCompletionHandler completionHandler: @escaping (UNNotificationPresentationOptions) -> Void
     ) {
+        if MotionProbe.isProbeNotification(notification) {
+            MotionProbe.notificationWillPresent(notification)
+            completionHandler([.banner, .list, .sound])
+            return
+        }
         defer { completionHandler([]) }
         guard let (kind, activityId) = Self.target(of: notification.request.content.userInfo) else { return }
         switch kind {
@@ -207,6 +214,7 @@ final class NotificationCoordinator: NSObject, UNUserNotificationCenterDelegate 
         withCompletionHandler completionHandler: @escaping () -> Void
     ) {
         defer { completionHandler() }
+        MotionProbe.notificationOpened(response)
         guard response.actionIdentifier == UNNotificationDefaultActionIdentifier,
               let (kind, activityId) = Self.target(of: response.notification.request.content.userInfo) else { return }
 

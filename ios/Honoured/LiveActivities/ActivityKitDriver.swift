@@ -52,6 +52,7 @@ final class ActivityKitDriver: LiveActivityDriving {
     func update(activityId: String, content: DriverContent) async {
         guard let activity = find(activityId) else { return }
         await activity.update(Self.content(content))
+        MotionProbe.noteLiveActivityUpdate(kind: "contract")
     }
 
     func end(activityId: String, content: DriverContent?, dismissal: DriverDismissal) async {

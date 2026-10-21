@@ -139,6 +139,10 @@ enum AppURLRouter {
         case .googleCallback:
             _ = GoogleSignInCoordinator.shared.handle(url)
         case .app:
+            if MotionProbeAccess.isProbeLink(url) {
+                Task { @MainActor in MotionProbePresenter.shared.open() }
+                return
+            }
             LiveActivityCoordinator.shared.open(url)
         }
     }

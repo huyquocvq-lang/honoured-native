@@ -2,6 +2,7 @@ import SwiftUI
 
 struct RootView: View {
     @StateObject private var state = WebViewLoadState(url: AppConfig.webAppURL)
+    @ObservedObject private var motionProbe = MotionProbePresenter.shared
 
     private static let foreground = Color(red: 0.929, green: 0.906, blue: 0.867)
     private static let muted = Color(white: 0.54)
@@ -30,6 +31,8 @@ struct RootView: View {
                 EmptyView()
             }
         }
+        // Phase 3 M1 test tool; only Debug and TestFlight builds present it.
+        .sheet(isPresented: $motionProbe.isPresented) { MotionProbeView() }
     }
 
     private func errorView(_ detail: String) -> some View {

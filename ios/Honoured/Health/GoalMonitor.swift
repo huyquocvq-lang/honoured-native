@@ -66,6 +66,7 @@ actor GoalMonitor {
                 "reachedAt": TestamentTimer.iso8601.string(from: now),
                 "notified": notified
             ])
+            MotionProbe.noteAppGoal(metric: goal.metric.rawValue, value: value, target: goal.target, notified: notified)
         }
     }
 

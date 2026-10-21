@@ -211,6 +211,17 @@ Outside the stub, a Debug build also takes `-HonouredHealthRefreshSeconds <n>`,
 which shortens the hour after which unchanged daily Health totals are uploaded
 again, so that refresh can be checked without waiting.
 
+### Motion probe (Phase 3 M1)
+
+Debug builds, Release builds installed from Xcode or as Ad Hoc, and TestFlight
+builds open a Core Motion feasibility probe at `honoured://motion-probe`
+(`ios/Honoured/MotionProbe/`); App Store builds ignore the link. While switched on it logs Core Motion and HealthKit readings
+every time iOS runs the app, and exports the log as a zip. Test steps are in
+`docs/phase3/m1-probe-guide.md`. A Debug build started with
+`-HonouredMotionProbeSmoke <steps>` switches the probe on and runs one session,
+report and export without tapping; the simulator has no pedometer, so Core
+Motion reads as unavailable there.
+
 ## Android development
 
 Open the `android` directory in Android Studio and let Gradle sync the project.

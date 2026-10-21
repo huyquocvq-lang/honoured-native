@@ -30,8 +30,10 @@ final class HonouredAppDelegate: NSObject, UIApplicationDelegate {
         PushTokenRegistry.shared.start()
         application.registerForRemoteNotifications()
         observeLifecycle()
+        MotionProbeAccess.applicationDidFinishLaunching(state: application.applicationState)
         #if DEBUG
         LiveActivityPulseProbe.runIfRequested()
+        MotionProbeSmoke.runIfRequested()
         #endif
 
         Task {
@@ -66,6 +68,7 @@ final class HonouredAppDelegate: NSObject, UIApplicationDelegate {
                 forName: UIApplication.didBecomeActiveNotification, object: nil, queue: .main
             ) { _ in
                 LiveActivityCoordinator.shared.applicationDidBecomeActive()
+                Task { await MotionProbe.shared.recordRun(reason: .appActive) }
                 Task {
                     await PushTokenRegistry.shared.scheduleSync()
                     await TestamentTimer.shared.reconcile()
@@ -80,6 +83,17 @@ final class HonouredAppDelegate: NSObject, UIApplicationDelegate {
             ) { _ in
                 LiveActivityCoordinator.shared.protectedDataDidBecomeAvailable()
                 Task { await HealthBackgroundDeliveryCoordinator.shared.retryPendingCollection() }
+                Task { await MotionProbe.shared.recordRun(reason: .protectedDataAvailable) }
+            },
+            center.addObserver(
+                forName: UIApplication.protectedDataWillBecomeUnavailableNotification, object: nil, queue: .main
+            ) { _ in
+                MotionProbe.note("lifecycle", reason: "protected_data_will_become_unavailable")
+            },
+            center.addObserver(
+                forName: UIApplication.willEnterForegroundNotification, object: nil, queue: .main
+            ) { _ in
+                MotionProbe.note("lifecycle", reason: "will_enter_foreground")
             },
             // Midnight, a time-zone or DST change, or a manual clock change can
             // move the health day under a card.
@@ -96,6 +110,7 @@ final class HonouredAppDelegate: NSObject, UIApplicationDelegate {
             center.addObserver(
                 forName: UIApplication.didEnterBackgroundNotification, object: nil, queue: .main
             ) { _ in
+                MotionProbe.note("lifecycle", reason: "did_enter_background")
                 NotificationSound.yieldToOtherApps()
                 // Refresh the pending request on every background transition so the
                 // earliest-begin date is measured from the last time the user left.

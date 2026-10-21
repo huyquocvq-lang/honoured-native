@@ -87,6 +87,7 @@ final class IconCardCoordinator {
                 started[IconCardPlan.startedKey(key, slot: slot)] = facts.deadline
             case let .update(id, state, staleDate):
                 await activities.first { $0.id == id }?.update(ActivityContent(state: state, staleDate: staleDate))
+                MotionProbe.noteLiveActivityUpdate(kind: "icon")
             case let .end(id):
                 await activities.first { $0.id == id }?.end(nil, dismissalPolicy: .immediate)
             }
