@@ -24,6 +24,8 @@ final class MotionLiveUpdates {
     private var lastCheck = Date.distantPast
     private var pendingCheck: Task<Void, Never>?
     private var lastSync = Date.distantPast
+    private var includesDistance = false
+    private var lastPosted: MotionLiveTotals?
     /// Bumped by every refresh and stop. A refresh that finds it moved while
     /// it was reading leaves the decision to the newer call.
     private var latestRequest = 0
@@ -67,6 +69,7 @@ final class MotionLiveUpdates {
         countingFrom = nil
         pendingCheck?.cancel()
         pendingCheck = nil
+        lastPosted = nil
     }
 
     /// One check outside the live count, for a moment iOS runs the app anyway
@@ -80,16 +83,39 @@ final class MotionLiveUpdates {
         let pedometer = CMPedometer()
         self.pedometer = pedometer
         countingFrom = dayStart
-        pedometer.startUpdates(from: dayStart) { [weak self] _, error in
-            guard error == nil else { return }
-            Task { @MainActor in self?.updateArrived(countingFrom: dayStart) }
+        includesDistance = MotionService.availability().canRead(.distanceWalkingRunning)
+        pedometer.startUpdates(from: dayStart) { [weak self] data, error in
+            guard error == nil, let data else { return }
+            let steps = data.numberOfSteps.doubleValue
+            let distance = data.distance?.doubleValue
+            let at = data.endDate
+            Task { @MainActor in
+                self?.updateArrived(countingFrom: dayStart, steps: steps, distance: distance, at: at)
+            }
         }
     }
 
-    private func updateArrived(countingFrom dayStart: Date) {
+    private func updateArrived(countingFrom dayStart: Date, steps: Double, distance: Double?, at: Date) {
         guard pedometer != nil, countingFrom == dayStart else { return }
+        postLiveTotals(dayStart: dayStart, steps: steps, distance: distance, at: at)
         scheduleCheck(trigger: "motion_live")
         syncSoon(force: false)
+    }
+
+    /// Home and the contract card would otherwise wait for the next sync to
+    /// see the count move. Each update the pedometer delivers, every few
+    /// seconds while walking, goes to the web app as it is. Until the
+    /// pedometer has counted a step there is nothing to send: a zero with no
+    /// history reads as no data (`MotionHistory`).
+    private func postLiveTotals(dayStart: Date, steps: Double, distance: Double?, at: Date) {
+        guard steps > 0 else { return }
+        let totals = MotionLiveTotals(
+            day: HealthSyncSettings.dayString(dayStart), from: dayStart, at: at,
+            steps: steps, distanceMeters: includesDistance ? distance : nil
+        )
+        guard totals.steps != lastPosted?.steps || totals.distanceMeters != lastPosted?.distanceMeters else { return }
+        lastPosted = totals
+        NativeBridgeEvents.post(type: "HEALTH_LIVE_TOTALS", payload: totals.payload)
     }
 
     /// A sync pass uploads the day's Core Motion total, and the

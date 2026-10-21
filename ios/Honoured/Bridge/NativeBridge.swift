@@ -484,6 +484,9 @@ final class NativeBridge: NSObject, WKScriptMessageHandler {
             }
             Task {
                 await HealthKitService.shared.setSourcePreference(preference)
+                // Leaving Core Motion: the live count stops before the reply,
+                // so no live total of the old source reaches the page after it.
+                if preference != .coreMotion { MotionLiveUpdates.shared.stop() }
                 reply("HEALTH_SOURCE_PREFERENCE_ACCEPTED", await HealthKitService.shared.sourceSettingsPayload())
                 // A web build that does not ask first: choosing Core Motion is
                 // then the moment to ask. The reply above already went out, so
@@ -919,6 +922,9 @@ final class NativeBridge: NSObject, WKScriptMessageHandler {
     }
 
     private func enqueuePending(type: String, payload: [String: Any], createdAt: Date) {
+        // A live total holds the whole day so far, so only the newest is kept:
+        // a walk while the page is not ready cannot push other broadcasts out.
+        if type == "HEALTH_LIVE_TOTALS" { pendingBroadcasts.removeAll { $0.type == type } }
         if pendingBroadcasts.count >= pendingLimit {
             pendingBroadcasts.removeFirst()
         }

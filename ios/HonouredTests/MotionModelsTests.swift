@@ -54,6 +54,37 @@ final class MotionModelsTests: XCTestCase {
         XCTAssertFalse(MotionHistory.zeroMeansNoHistory(stepsSinceHistoryStart: 1))
     }
 
+    func testLiveTotalsAreShapedLikeHealthMetrics() throws {
+        let start = Date(timeIntervalSince1970: 1_792_000_000)
+        let totals = MotionLiveTotals(
+            day: "2026-10-21", from: start, at: start.addingTimeInterval(3_600), steps: 4_210, distanceMeters: 3_050.5
+        )
+        let payload = totals.payload
+        XCTAssertEqual(payload["day"] as? String, "2026-10-21")
+        XCTAssertNotNil(ISO8601DateFormatter().date(from: try XCTUnwrap(payload["from"] as? String)))
+        XCTAssertNotNil(ISO8601DateFormatter().date(from: try XCTUnwrap(payload["to"] as? String)))
+        let metrics = try XCTUnwrap(payload["metrics"] as? [String: Any])
+        let steps = try XCTUnwrap(metrics["steps"] as? [String: Any])
+        XCTAssertEqual(steps["value"] as? Double, 4_210)
+        XCTAssertEqual(steps["unit"] as? String, "count")
+        let source = try XCTUnwrap(steps["source"] as? [String: Any])
+        XCTAssertEqual(source["mode"] as? String, "source")
+        XCTAssertEqual(source["kind"] as? String, "core_motion")
+        XCTAssertEqual(source["effectiveSourceId"] as? String, "core_motion")
+        XCTAssertEqual(source["fallback"] as? Bool, false)
+        let distance = try XCTUnwrap(metrics["distance_walking_running"] as? [String: Any])
+        XCTAssertEqual(distance["value"] as? Double, 3_050.5)
+        XCTAssertEqual(distance["unit"] as? String, "meters")
+    }
+
+    func testLiveTotalsLeaveDistanceOutWhenThePhoneDoesNotMeasureIt() throws {
+        let start = Date(timeIntervalSince1970: 1_792_000_000)
+        let totals = MotionLiveTotals(day: "2026-10-21", from: start, at: start, steps: 12, distanceMeters: nil)
+        let metrics = try XCTUnwrap(totals.payload["metrics"] as? [String: Any])
+        XCTAssertNotNil(metrics["steps"])
+        XCTAssertNil(metrics["distance_walking_running"])
+    }
+
     func testEnergyEstimateMatchesTheProbeReport() {
         let walk = MotionEnergyEstimate(distanceMeters: 2_000, activeSeconds: 1_500)
         XCTAssertEqual(walk.gait, .walking)

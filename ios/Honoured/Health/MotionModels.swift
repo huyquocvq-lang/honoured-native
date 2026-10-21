@@ -65,6 +65,44 @@ enum MotionHistory {
     }
 }
 
+/// The day's Core Motion totals while Honoured follows the pedometer on
+/// screen, sent as `HEALTH_LIVE_TOTALS` so the web app shows them as they
+/// move instead of waiting for the next sync. Shaped like `HEALTH_METRICS`.
+struct MotionLiveTotals: Equatable, Sendable {
+    /// The health day, "yyyy-MM-dd".
+    let day: String
+    let from: Date
+    let at: Date
+    let steps: Double
+    /// Nil when this iPhone does not measure distance; Apple Health's figure
+    /// stands then.
+    let distanceMeters: Double?
+
+    /// The `source` every value carries, as in `HEALTH_METRICS`.
+    static var source: [String: Any] {
+        [
+            "mode": "source",
+            "effectiveSourceId": HealthSourceDescriptor.coreMotionId,
+            "effectiveSourceName": HealthSourceDescriptor.coreMotion.name,
+            "kind": HealthSourceDescriptor.Kind.coreMotion.rawValue,
+            "fallback": false
+        ]
+    }
+
+    var payload: [String: Any] {
+        var metrics: [String: Any] = [
+            HealthMetric.steps.rawValue: ["value": steps, "unit": HealthMetric.steps.unitName, "source": Self.source]
+        ]
+        if let distanceMeters {
+            metrics[HealthMetric.distanceWalkingRunning.rawValue] = [
+                "value": distanceMeters, "unit": HealthMetric.distanceWalkingRunning.unitName, "source": Self.source
+            ]
+        }
+        let formatter = ISO8601DateFormatter()
+        return ["day": day, "from": formatter.string(from: from), "to": formatter.string(from: at), "metrics": metrics]
+    }
+}
+
 /// A rough walking and running energy estimate from Core Motion's distance
 /// and pace. Core Motion has no calorie API, so this is only ever shown as an
 /// estimate next to Apple Health's Active Energy and never scores a contract.
