@@ -38,12 +38,13 @@ struct HealthSourceDescriptor: Codable, Equatable, Sendable {
 
     /// Core Motion, listed with the HealthKit sources so the existing source
     /// picker offers it (Phase 3 M2-C). Every HealthKit source id contains
-    /// "|", so this reserved id can never name one. The name is shown to the
-    /// person and still awaits the client's wording.
+    /// "|", so this reserved id can never name one. The name, shown to the
+    /// person in the picker and wherever a total names its source, is the
+    /// client's wording.
     static let coreMotionId = "core_motion"
     static let coreMotion = HealthSourceDescriptor(
         id: coreMotionId,
-        name: "iPhone motion sensor",
+        name: "Core Motion",
         bundleIdentifier: "",
         kind: .coreMotion
     )
