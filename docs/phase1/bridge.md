@@ -695,7 +695,7 @@ The Icon card (V1.2 M2-06/M2-07) opens, changes and closes from the server throu
 
 - Native registers its tokens with `register_push_token` under the stored session: the APNs device token, the ActivityKit push-to-start token (iOS 17.2+) and the update token of each Icon card. It sends them again when one changes, when the session changes and once a day.
 - Each install has a random installation id in the Keychain (this device only). Once `CLEAR_AUTH_SESSION` has cleared the session, or a session for another user has been stored, native calls `unregister_push_tokens` with that id, as anon, before registering anything again, and retries until it succeeds.
-- The card appears at the morning reminder and again, as a fresh card, at the evening one (iOS ends a Live Activity 8 hours after it starts). A card the server started counts as shown: if the person swipes it away, the app does not open it again until the next appearance.
+- The card appears at the morning reminder and again, as a fresh card, at the evening one (iOS ends a Live Activity 8 hours after it starts). A card the server started counts as shown: if the person swipes it away, the app does not open it again until the next appearance. An app update ends every card, so after one the app opens the current appearance again the next time it is in the foreground.
 - Below iOS 17.2, or with Live Activities turned off, the server sends a quiet notification instead. In the foreground it is not shown.
 
 ---

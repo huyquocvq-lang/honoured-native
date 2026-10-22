@@ -19,6 +19,8 @@ final class IconCardCoordinator {
     private var isRefreshing = false
     private let defaults = UserDefaults.standard
     private static let startedPrefix = "honoured.iconCards.started."
+    /// The app version and build that recorded the started cards.
+    private static let buildKey = "honoured.iconCards.build"
 
     func refresh() async {
         #if canImport(ActivityKit)
@@ -152,6 +154,7 @@ final class IconCardCoordinator {
 
     /// Card key → that day's cut-off, so old entries can be dropped.
     private func startedCards(for userId: String, now: Date) -> [String: Date] {
+        forgetStartedCardsAfterUpdate()
         let raw = defaults.dictionary(forKey: Self.startedPrefix + userId) as? [String: Double] ?? [:]
         let horizon = now.addingTimeInterval(-2 * 24 * 3600)
         return raw.reduce(into: [:]) { result, entry in
@@ -162,6 +165,19 @@ final class IconCardCoordinator {
 
     private func saveStartedCards(_ cards: [String: Date], for userId: String) {
         defaults.set(cards.mapValues(\.timeIntervalSince1970), forKey: Self.startedPrefix + userId)
+    }
+
+    /// An app update ends every card without the person removing it, so what
+    /// an earlier build showed no longer keeps the day's card away: the next
+    /// time the app is open, the current appearance opens again.
+    private func forgetStartedCardsAfterUpdate() {
+        let info = Bundle.main.infoDictionary
+        let build = "\(info?["CFBundleShortVersionString"] as? String ?? "") (\(info?["CFBundleVersion"] as? String ?? ""))"
+        guard defaults.string(forKey: Self.buildKey) != build else { return }
+        for key in defaults.dictionaryRepresentation().keys where key.hasPrefix(Self.startedPrefix) {
+            defaults.removeObject(forKey: key)
+        }
+        defaults.set(build, forKey: Self.buildKey)
     }
 
     // MARK: - Server
