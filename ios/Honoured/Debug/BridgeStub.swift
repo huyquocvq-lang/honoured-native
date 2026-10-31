@@ -976,6 +976,16 @@ enum BridgeStub {
         check('back to automatic', r.type === 'HEALTH_SOURCE_PREFERENCE_ACCEPTED' && r.payload.preference.mode === 'automatic' && r.payload.fallback === false);
         log('SCENARIO DONE');
       },
+      // Phase 4 M2: the web offers target revisions only to builds that say
+      // so, and asks for the new signature right after one.
+      async 'icon-revisions'() {
+        let r = await req('APP_READY', {}, ['NATIVE_READY']);
+        const cap = (r.payload.capabilities || {}).iconRevisions || {};
+        check('NATIVE_READY advertises iconRevisions v1', cap.supported === true && cap.protocolVersion === 1);
+        r = await req('SYNC_ICON_REVISIONS', {}, ['ICON_REVISIONS_SYNCED'], 30000);
+        check('SYNC_ICON_REVISIONS is answered', r.type === 'ICON_REVISIONS_SYNCED' && typeof r.payload.synced === 'boolean');
+        log('SCENARIO DONE');
+      },
       // Launch with -HonouredFakeHealthTotals steps=9000,active_energy=250
       async 'goals'() {
         const walk = { activityId: 'act-walk', activityName: 'Walk', metric: 'steps', target: 8000, unit: 'count' };

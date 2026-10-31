@@ -11,7 +11,7 @@ struct IconLiveActivityWidget: Widget {
                 facts: context.attributes.facts,
                 state: context.state,
                 isStale: context.isStale,
-                signature: Self.signature(for: context.attributes.facts.contractId)
+                signature: Self.signature(for: context.attributes.facts)
             )
             .activityBackgroundTint(HonouredPalette.background.opacity(0.92))
             .activitySystemActionForegroundColor(HonouredPalette.ink)
@@ -37,8 +37,11 @@ struct IconLiveActivityWidget: Widget {
         }
     }
 
-    private static func signature(for contractId: String) -> UIImage? {
-        IconSignatureCache.load(for: contractId).flatMap(UIImage.init(data:))
+    /// The signature given for the card's own day: after a target revision,
+    /// the days from its effective day show the new one.
+    private static func signature(for facts: IconCardFacts) -> UIImage? {
+        IconSignatureCache.load(for: facts.contractId, iconDay: facts.iconDay, targetRevision: facts.targetRevision)
+            .flatMap(UIImage.init(data:))
     }
 }
 

@@ -348,6 +348,27 @@ final class IconCardPlanTests: XCTestCase {
         XCTAssertNil(first.reading)
     }
 
+    func testTheDaysOwnTargetWinsOverTheSignedOne() throws {
+        // icon_revisions_v1.sql: from a revision's effective day the day
+        // carries the new target; the contract keeps the signed one.
+        let json = Data("""
+        [{"contract_id":"uuid-1","day":"2026-10-07","session_number":6,
+          "deadline_at":"2026-10-07T13:00:00+00:00","morning_at":null,"evening_at":null,
+          "status":"pending","target_text":"12000 steps","target_revision":1,"word_baseline":null,
+          "contracts":{"client_id":"local-1","primary_activity":"Walking","primary_target":"10000 steps","because":"Spring","status":"active"}},
+         {"contract_id":"uuid-1","day":"2026-10-06","session_number":5,
+          "deadline_at":"2026-10-06T13:00:00+00:00","morning_at":null,"evening_at":null,
+          "status":"pending","target_text":null,
+          "contracts":{"client_id":"local-1","primary_activity":"Walking","primary_target":"10000 steps","because":"Spring","status":"active"}}]
+        """.utf8)
+        let days = try IconCardRows.days(from: json, totals: [:])
+        XCTAssertEqual(days.map(\.facts.targetValue), ["12,000", "10,000"])
+        XCTAssertEqual(days.map(\.facts.targetUnit), ["STEPS", "STEPS"])
+        XCTAssertEqual(days.first?.facts.headerLabel, "WED 07.10.26 · 6 OF 6")
+        // The card shows the signature of the day's own revision.
+        XCTAssertEqual(days.map(\.facts.targetRevision), [1, nil])
+    }
+
     func testDecodesTheMetricTheDayStartAndTheLastReading() throws {
         let json = Data("""
         [{"contract_id":"uuid-1","day":"2026-10-06","session_number":5,

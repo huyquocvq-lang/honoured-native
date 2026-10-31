@@ -86,6 +86,7 @@ final class NativeBridge: NSObject, WKScriptMessageHandler {
         "GET_NOTIFICATION_STATUS", "REQUEST_NOTIFICATION_PERMISSION", "OPEN_NOTIFICATION_SETTINGS",
         "SIGN_IN_WITH_APPLE",
         "SET_LANDSCAPE_ALLOWED",
+        "SYNC_ICON_REVISIONS",
     ]
 
     /// Called when the WebView starts a new main-frame load. Anything broadcast
@@ -703,6 +704,14 @@ final class NativeBridge: NSObject, WKScriptMessageHandler {
                 var payload = await NotificationCoordinator.shared.statusPayload()
                 payload["opened"] = opened
                 reply("NOTIFICATION_STATUS", payload)
+            }
+        case "SYNC_ICON_REVISIONS":
+            // Sent by the web right after it revised an Icon's target: the new
+            // signature and the day it starts must reach the card cache before
+            // the next day's card, which the server may start by push.
+            Task { @MainActor in
+                let synced = await IconSignatureSync.shared.run(force: true)
+                reply("ICON_REVISIONS_SYNCED", ["synced": synced])
             }
         default:
             reply("ERROR", [

@@ -29,6 +29,11 @@ struct IconCardFacts: Codable, Hashable {
     var because: String
     /// The day's cut-off; shown in the device's own time zone.
     var deadline: Date
+    /// The revision the day is held to (`icon_days.target_revision`, 0 = the
+    /// signing), whose signature the card shows. Cards the app starts know
+    /// it; push-started cards and earlier builds leave it out, and the widget
+    /// then goes by the revisions' effective days.
+    var targetRevision: Int?
 
     /// ActivityKit caps attributes plus state at 4 KB, the APNs Live Activity
     /// payload too, so free text is cut before it gets here.
@@ -38,7 +43,8 @@ struct IconCardFacts: Codable, Hashable {
 
     init(
         contractId: String, iconDay: String, weekday: String, sessionNumber: Int, totalSessions: Int,
-        targetValue: String, targetUnit: String, activityName: String, because: String, deadline: Date
+        targetValue: String, targetUnit: String, activityName: String, because: String, deadline: Date,
+        targetRevision: Int? = nil
     ) {
         self.contractId = contractId
         self.iconDay = iconDay
@@ -50,6 +56,7 @@ struct IconCardFacts: Codable, Hashable {
         self.activityName = Self.cut(activityName, to: Self.maxActivityName)
         self.because = Self.cut(because, to: Self.maxBecause)
         self.deadline = deadline
+        self.targetRevision = targetRevision.map { max(0, $0) }
     }
 
     /// `TUE · 5 OF 17`
@@ -99,7 +106,7 @@ struct IconCardFacts: Codable, Hashable {
     // date decoding strategy. Decoding goes through `init` to apply the limits.
     private enum CodingKeys: String, CodingKey {
         case contractId, iconDay, weekday, sessionNumber, totalSessions
-        case targetValue, targetUnit, activityName, because, deadline
+        case targetValue, targetUnit, activityName, because, deadline, targetRevision
     }
 
     init(from decoder: Decoder) throws {
@@ -114,7 +121,8 @@ struct IconCardFacts: Codable, Hashable {
             targetUnit: try c.decode(String.self, forKey: .targetUnit),
             activityName: try c.decode(String.self, forKey: .activityName),
             because: try c.decode(String.self, forKey: .because),
-            deadline: Date(timeIntervalSince1970: try c.decode(Double.self, forKey: .deadline))
+            deadline: Date(timeIntervalSince1970: try c.decode(Double.self, forKey: .deadline)),
+            targetRevision: try c.decodeIfPresent(Int.self, forKey: .targetRevision)
         )
     }
 
@@ -130,6 +138,7 @@ struct IconCardFacts: Codable, Hashable {
         try c.encode(activityName, forKey: .activityName)
         try c.encode(because, forKey: .because)
         try c.encode(deadline.timeIntervalSince1970, forKey: .deadline)
+        try c.encodeIfPresent(targetRevision, forKey: .targetRevision)
     }
 
     private static func cut(_ text: String, to limit: Int) -> String {

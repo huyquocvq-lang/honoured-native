@@ -17,6 +17,9 @@ extension NativeBridge {
         capabilities["webCredentials"] = webCredentialsCapability()
         capabilities["sessionRefresh"] = sessionRefreshCapability()
         capabilities["wordTracker"] = wordTrackerCapability()
+        // Phase 4 M2: Icon cards hold each day to its own target and
+        // signature, so the web may offer target revisions (SYNC_ICON_REVISIONS).
+        capabilities["iconRevisions"] = ["protocolVersion": 1, "supported": true]
         return [
             "platform": "ios",
             "bridgeVersion": AppConfig.bridgeVersion,

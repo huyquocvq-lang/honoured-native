@@ -254,6 +254,11 @@ enum IconCardRows {
         let evening_at: String?
         let status: String
         var measured_value: Double? = nil
+        /// The day's own target (`icon_revisions_v1.sql`): the signed one, or
+        /// the revision in force that day. Absent before that migration.
+        var target_text: String? = nil
+        /// The revision behind `target_text`, whose signature the card shows.
+        var target_revision: Int? = nil
         let contracts: Contract
     }
 
@@ -262,7 +267,7 @@ enum IconCardRows {
         try JSONDecoder().decode([Row].self, from: data).compactMap { row in
             guard let deadline = IconTimestamp.parse(row.deadline_at),
                   let status = IconCardDay.Status(rawValue: row.status) else { return nil }
-            let target = IconTargetText.split(row.contracts.primary_target ?? "")
+            let target = IconTargetText.split(row.target_text ?? row.contracts.primary_target ?? "")
             let facts = IconCardFacts(
                 contractId: row.contracts.client_id, iconDay: row.day,
                 weekday: IconTargetText.weekday(of: row.day) ?? "",
@@ -270,7 +275,7 @@ enum IconCardRows {
                 totalSessions: totals[row.contract_id] ?? row.session_number,
                 targetValue: target.value, targetUnit: target.unit,
                 activityName: row.contracts.primary_activity, because: row.contracts.because,
-                deadline: deadline
+                deadline: deadline, targetRevision: row.target_revision
             )
             return IconCardDay(
                 facts: facts,

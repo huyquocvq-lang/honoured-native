@@ -187,8 +187,9 @@ final class IconCardCoordinator {
         let rows = try await get(
             baseURL: baseURL, path: "rest/v1/icon_days", session: session,
             query: [
-                "select": "contract_id,day,session_number,deadline_at,morning_at,evening_at,status,measured_value,"
-                    + "contracts!inner(client_id,primary_activity,primary_target,because,status,icon_metric,icon_timezone)",
+                // Every day column (`*`), so the day's own target comes along
+                // where icon_revisions_v1.sql added it and nothing breaks where not.
+                "select": "*,contracts!inner(client_id,primary_activity,primary_target,because,status,icon_metric,icon_timezone)",
                 "contracts.status": "eq.active",
                 "deadline_at": "gt.\(IconTimestamp.format(now))",
                 "order": "deadline_at.asc",

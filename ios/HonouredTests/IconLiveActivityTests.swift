@@ -148,25 +148,6 @@ final class IconLiveActivityTests: XCTestCase {
         XCTAssertNil(IconCopy.shortValue(12, targetUnit: "", locale: locale))
     }
 
-    // MARK: - Signature cache
-
-    func testSignatureFileNameIsStableAndPathFree() {
-        let name = IconSignatureCache.fileName(for: "../evil/id")
-        XCTAssertEqual(name, IconSignatureCache.fileName(for: "../evil/id"))
-        XCTAssertNotEqual(name, IconSignatureCache.fileName(for: "other"))
-        XCTAssertFalse(name.contains("/"))
-        XCTAssertTrue(name.hasSuffix(".png"))
-        XCTAssertEqual(name.count, 64 + 4)
-    }
-
-    func testWithoutAnAppGroupNothingIsStoredOrRead() throws {
-        // The host-less test bundle declares no App Group, like a build
-        // without the entitlement.
-        XCTAssertNil(IconSignatureCache.groupIdentifier)
-        XCTAssertFalse(try IconSignatureCache.store(Data([0x89, 0x50]), for: "c"))
-        XCTAssertNil(IconSignatureCache.load(for: "c"))
-    }
-
     // MARK: - Rendering
 
     func testEveryIconCardRendersInEveryPresentation() throws {

@@ -198,7 +198,9 @@ the HTTP status (it never refreshes the session or prints tokens), and
 `core-motion`, which checks Core Motion as a step source (on the simulator,
 which has no pedometer, only the fallback to Apple Health), and `this-iphone`,
 which checks "iPhone" (this iPhone's own Health samples) as a step source and
-`hasRecentData` (on the simulator, which records no steps, only the fallback);
+`hasRecentData` (on the simulator, which records no steps, only the fallback),
+and `icon-revisions`, which checks the `iconRevisions` capability and
+`SYNC_ICON_REVISIONS`;
 add `-HonouredStubExitWhenDone` to quit when it finishes. Build with ad-hoc
 signing (`CODE_SIGN_IDENTITY=- CODE_SIGNING_REQUIRED=NO`) to run it:
 
