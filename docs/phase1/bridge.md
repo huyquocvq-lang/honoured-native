@@ -120,7 +120,7 @@ Notes:
 |---|---|
 | `REQUEST_HEALTH_PERMISSION { metrics?: [...] }` | `HEALTH_PERMISSION_STATUS` — shows the system sheet for the given metrics (all nine if omitted) |
 | `GET_HEALTH_STATUS` | `HEALTH_PERMISSION_STATUS` — no UI |
-| `GET_HEALTH_SOURCES` | `HEALTH_SOURCES` — lists sources contributing step/walking-distance samples, plus Core Motion on an iPhone that counts steps, and the effective preference |
+| `GET_HEALTH_SOURCES` | `HEALTH_SOURCES` — lists sources contributing step/walking-distance samples, plus Core Motion on an iPhone that counts steps and the fixed "iPhone" entry, and the effective preference |
 | `SET_HEALTH_SOURCE_PREFERENCE { mode, sourceId? }` | `HEALTH_SOURCE_PREFERENCE_ACCEPTED` — persists `automatic` or one returned source ID and starts a sync |
 | `REQUEST_MOTION_PERMISSION` | `MOTION_PERMISSION_STATUS { available, authorization }` — shows the Motion & Fitness prompt if the person has never been asked (iOS) |
 
@@ -145,6 +145,8 @@ Notes:
 - `unknown` — HealthKit could not report status (rare, transient).
 
 `REQUEST_HEALTH_PERMISSION` with an unknown metric name replies `ERROR { code: "unknown_metric" }` so typos surface during integration rather than as silently missing data.
+
+`HEALTH_PERMISSION_STATUS` also carries `hasRecentData` (iOS, Phase 4 M1): `true` when Honoured could read any steps, walking distance or active energy from the last seven days, from the combined Apple Health total whatever source is chosen; `false` when it read nothing (no data, or read access declined, which iOS does not tell apart; also `false` when `available` is `false`); `null` when the store could not be read, for example on a locked device. It is the closest thing to "connected" iOS allows: show "Connected" only when every metric is `determined` and `hasRecentData` is `true`, "No data yet" when every metric is `determined` and it is `false`, and keep the previous state while it is `null`. Builds before Phase 4 omit the key.
 
 On iOS, `HEALTH_PERMISSION_STATUS` also carries `motion: { available, authorization }`, the Motion & Fitness permission Core Motion needs. `available` is `false` on a device that cannot count steps. Unlike HealthKit read access, this permission can be read back: `authorization` is `notDetermined`, `authorized`, `denied` or `restricted`. Only `denied` and `restricted` mean the person or a device policy refused it, and only iOS Settings › Privacy & Security › Motion & Fitness can change that.
 
@@ -189,6 +191,15 @@ On an iPhone that counts steps, `HEALTH_SOURCES.sources` starts with one entry t
 - Core Motion keeps about seven days of history. A range that started earlier (native stops six hours short of seven days, so a day being trimmed is never read short) is not read from it: `HEALTH_METRICS` returns `null` for such a range, and `health_daily` and Icon days keep the totals the previous source gave them.
 - While the app is on screen and Core Motion is the source being read, native also broadcasts `HEALTH_LIVE_TOTALS { day, from, to, metrics }` each time the pedometer reports, every few seconds while walking: today's totals so far, with `metrics` shaped like `HEALTH_METRICS` (`steps`, and `distance_walking_running` when the iPhone measures distance, each with its `source`). Home and the contract card can show them at once instead of waiting for the next sync. Nothing is sent before the pedometer has counted a step, and nothing at all while the app is in the background. When a saved preference leaves Core Motion, the last one arrives before `HEALTH_SOURCE_PREFERENCE_ACCEPTED`. A page that is not ready yet gets only the newest.
 - Each `HEALTH_METRICS` value read from it has `source { mode: "source", effectiveSourceId: "core_motion", effectiveSourceName, kind: "core_motion", fallback: false }`. A zero is a real zero when the pedometer counted steps earlier in its history; with no step anywhere in that history (a new or restored iPhone) it reads as `null`, never as zero.
+
+### This iPhone as a source (iOS, Phase 4 M1)
+
+Health & Tracking offers three sources: Automatic, iPhone and Core Motion. From Phase 4 `HEALTH_SOURCES.sources` always holds one more entry that is not a HealthKit source, after Core Motion when Core Motion is listed: `{ id: "this_iphone", name: "iPhone", bundleIdentifier: "", kind: "this_iphone" }`. It is chosen like any other source, `SET_HEALTH_SOURCE_PREFERENCE { mode: "source", sourceId: "this_iphone" }`, so a web build that predates it lists, saves and restores it unchanged. Tell it apart by `kind`, never by the ID. A web build that offers only the three options shows an option as unavailable when its entry is missing (a native build before Phase 4 has no `this_iphone` entry; Core Motion is listed only on an iPhone that counts steps).
+
+- With "iPhone" chosen, `steps` and `distance_walking_running` read only the samples Apple's own Health source recorded on this model of iPhone (`HKSourceRevision.productType`, for example `iPhone16,2`): not an Apple Watch, not a third-party app or watch, not entries typed into the Health app. iOS hides the device name from apps, so two iPhones of the same model on one Apple ID count together. Other metrics still read the combined total, and nothing is ever added to or from Core Motion.
+- Every reader follows it, as for any chosen source: goals, `HEALTH_METRICS` (`source.kind: "this_iphone"`, `effectiveSourceName: "iPhone"`), Live Activities, `health_daily` (recomputed, up to 90 days, when the choice changes) and Icon readings, which carry `source: "healthkit_iphone"`. `GOAL_REACHED.source` and goal diagnostics stay `healthkit`.
+- When this iPhone has recorded no steps (Fitness Tracking off in Settings › Privacy & Security › Motion & Fitness, or Health read access declined), native reads the combined total and reports `fallback: true` with `effectiveSourceId` and `effectiveSourceName` `null`, as when a chosen source disappears. The answer is kept for five minutes and refreshed when the preference is saved.
+- A source chosen in an older picker ("Vu's iPhone", "Apple Watch", "Connect") is still honoured by native; the web app maps it onto the three options when it restores the preference.
 
 ### Goals and day boundary
 
@@ -679,7 +690,7 @@ An Icon (V1.2 M2) is scored per scheduled day on the server (`docs/db/icon_scori
 
 With `icon_scoring_v2.sql` applied (on Lovable Cloud since 21 Oct 2026, followed by v3), a stamped day keeps being measured until 30 days after its cut-off, so `icon_days.measured_value` shows the whole day's total rather than the reading that first met the target. That includes data HealthKit receives later, for example from a watch app that syncs after the day ended. A reading only ever raises a stamped day's total. HONOURED stays HONOURED, and BROKEN becomes HONOURED (`target_met`) once a late total meets the target.
 
-Each reading also names its `source`, `healthkit` or `core_motion` (Phase 3 M2); servers before `icon_scoring_v3.sql` ignore it. With v3 applied (on top of v2), `icon_days.measured_source` records it. A reading from the source a stamped day was measured with only raises the total, as in v2; one from another source replaces the total even when it is lower, so a day shows the chosen source's number and never a mix. HONOURED still never moves back, so after a source switch a HONOURED day can show a total below its target; a BROKEN day becomes HONOURED once the new source's total meets the target. With Core Motion chosen, only days that started within its seven-day history are read, and older days keep their earlier reading.
+Each reading also names its `source`, `healthkit` or `core_motion` (Phase 3 M2), or `healthkit_iphone` when "iPhone" is chosen (Phase 4 M1, `icon_scoring_v4.sql`, on Lovable Cloud since 28 Oct 2026); servers before `icon_scoring_v3.sql` ignore it, and v3 skips `healthkit_iphone`. With v3 applied (on top of v2), `icon_days.measured_source` records it. A reading from the source a stamped day was measured with only raises the total, as in v2; one from another source replaces the total even when it is lower, so a day shows the chosen source's number and never a mix. HONOURED still never moves back, so after a source switch a HONOURED day can show a total below its target; a BROKEN day becomes HONOURED once the new source's total meets the target. With Core Motion chosen, only days that started within its seven-day history are read, and older days keep their earlier reading.
 
 | Native → Web (broadcast) | When |
 |---|---|

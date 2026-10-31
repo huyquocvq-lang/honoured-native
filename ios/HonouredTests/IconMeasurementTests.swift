@@ -80,6 +80,15 @@ final class IconMeasurementTests: XCTestCase {
         XCTAssertEqual(json?["source"] as? String, "core_motion")
     }
 
+    func testPayloadNamesThisIPhoneReadings() throws {
+        let day = try IconDayToMeasure.decodeList(from: response)[0]
+        let payload = IconMeasurementPayload(
+            day: day, value: 7_100, measuredThrough: date("2026-10-06T09:30:00Z"), source: .healthKitIPhone
+        )
+        let json = try JSONSerialization.jsonObject(with: JSONEncoder().encode(payload)) as? [String: Any]
+        XCTAssertEqual(json?["source"] as? String, "healthkit_iphone")
+    }
+
     private func summary(_ json: String) throws -> IconMeasurementSummary {
         try JSONDecoder().decode(IconMeasurementSummary.self, from: Data(json.utf8))
     }

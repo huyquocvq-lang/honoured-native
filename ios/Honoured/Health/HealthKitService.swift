@@ -40,6 +40,26 @@ actor HealthKitService {
         .steps, .distanceWalkingRunning
     ]
 
+    /// The hardware model of this iPhone as HealthKit records it in
+    /// `HKSourceRevision.productType` ("iPhone16,2"). The simulator reports
+    /// the model it simulates.
+    static let deviceProductType: String = {
+        if let simulated = ProcessInfo.processInfo.environment["SIMULATOR_MODEL_IDENTIFIER"], !simulated.isEmpty {
+            return simulated
+        }
+        var info = utsname()
+        uname(&info)
+        return withUnsafeBytes(of: &info.machine) { raw in
+            String(decoding: raw.prefix { $0 != 0 }, as: UTF8.self)
+        }
+    }()
+
+    /// How long a "this iPhone" lookup is reused. Every read of steps and
+    /// distance resolves the source, and the answer only changes when the
+    /// iPhone records its first sample or Health access changes.
+    private static let thisIPhoneLookupLifetime: TimeInterval = 5 * 60
+    private var thisIPhoneLookups: [HealthMetric: (predicate: NSPredicate?, at: Date)] = [:]
+
     nonisolated var isAvailable: Bool {
         HKHealthStore.isHealthDataAvailable()
     }
@@ -56,11 +76,15 @@ actor HealthKitService {
     /// decided, a declined type looks identical to one with no data. The only
     /// signal available is whether the sheet still needs to be shown. The
     /// Motion & Fitness permission, which can be read back, rides along as
-    /// `motion`.
+    /// `motion`. `hasRecentData` says whether Honoured could read any steps,
+    /// walking distance or active energy from the last seven days (the
+    /// combined total, whatever source is chosen): the closest thing to
+    /// "connected" iOS allows. It is null when the store could not be read
+    /// (a locked device) rather than empty.
     func permissionStatusPayload(for metrics: [HealthMetric]) async -> [String: Any] {
         let motion = MotionService.availability().payload
         guard isAvailable else {
-            return ["available": false, "perMetric": [String: String](), "motion": motion]
+            return ["available": false, "perMetric": [String: String](), "motion": motion, "hasRecentData": false]
         }
 
         var perMetric: [String: String] = [:]
@@ -72,7 +96,27 @@ actor HealthKitService {
             default: perMetric[metric.rawValue] = "unknown"
             }
         }
-        return ["available": true, "perMetric": perMetric, "motion": motion]
+        let hasRecentData: Any = await hasRecentHealthData().map { $0 as Any } ?? NSNull()
+        return ["available": true, "perMetric": perMetric, "motion": motion, "hasRecentData": hasRecentData]
+    }
+
+    private func hasRecentHealthData() async -> Bool? {
+        #if DEBUG
+        if BridgeStub.fakeHealthRead(for: .steps) != nil { return true }
+        #endif
+        let to = Date()
+        let from = to.addingTimeInterval(-7 * 24 * 60 * 60)
+        let combined = HealthSourceResolution(selected: nil, requestedSourceMissing: false)
+        var unreadable = false
+        for metric in [HealthMetric.steps, .distanceWalkingRunning, .activeEnergy] {
+            guard let unit = metric.quantityUnit, let type = metric.objectType as? HKQuantityType else { continue }
+            switch await healthKitTotal(metric: metric, unit: unit, type: type, resolution: combined, from: from, to: to) {
+            case .value: return true
+            case .noData: continue
+            case .protectedDataUnavailable, .failed: unreadable = true
+            }
+        }
+        return unreadable ? nil : false
     }
 
     // MARK: - Data source preference
@@ -85,11 +129,14 @@ actor HealthKitService {
         } else {
             defaults.removeObject(forKey: sourcePreferenceIdKey)
         }
+        thisIPhoneLookups = [:]
     }
 
     /// The HealthKit sources, with Core Motion first on an iPhone that counts
-    /// steps. `effectiveSource*` and `fallback` say what is read now, which
-    /// for Core Motion depends on its permission (`motion`).
+    /// steps, then "iPhone" (this iPhone's own samples). `effectiveSource*`
+    /// and `fallback` say what is read now, which for Core Motion depends on
+    /// its permission (`motion`) and for "iPhone" on whether this iPhone
+    /// recorded any steps.
     func sourceSettingsPayload() async -> [String: Any] {
         let preference = sourcePreference()
         let motion = MotionService.availability()
@@ -97,12 +144,19 @@ actor HealthKitService {
             return ["available": false, "sources": [], "preference": preference.payload, "motion": motion.payload]
         }
         let healthKitSources = await availableSources(for: Array(Self.sourceSelectableMetrics))
+        var thisIPhoneReadable = false
+        if preference == .thisIPhone {
+            thisIPhoneReadable = await thisIPhonePredicate(for: .steps) != nil
+        }
         let resolution = HealthSourceSelector.resolve(
             preference: preference,
             available: healthKitSources,
-            motionReadable: motion.canRead(.steps)
+            motionReadable: motion.canRead(.steps),
+            thisIPhoneReadable: thisIPhoneReadable
         )
-        let sources = (motion.stepCounting ? [HealthSourceDescriptor.coreMotion] : []) + healthKitSources
+        let sources = (motion.stepCounting ? [HealthSourceDescriptor.coreMotion] : [])
+            + [HealthSourceDescriptor.thisIPhone]
+            + healthKitSources
         return [
             "available": true,
             "sources": sources.map(Self.sourcePayload),
@@ -142,8 +196,8 @@ actor HealthKitService {
               let unit = metric.quantityUnit, let type = metric.objectType as? HKQuantityType else { return nil }
         var predicate = HKQuery.predicateForSamples(withStart: from, end: to, options: [])
         if let selected = await sourceResolution(for: metric).selected,
-           let source = await healthKitSource(for: selected, metric: metric) {
-            predicate = NSCompoundPredicate(andPredicateWithSubpredicates: [predicate, HKQuery.predicateForObjects(from: source)])
+           let narrowing = await sourcePredicate(for: selected, metric: metric) {
+            predicate = NSCompoundPredicate(andPredicateWithSubpredicates: [predicate, narrowing])
         }
         let descriptor = HKStatisticsCollectionQueryDescriptor(
             predicate: .quantitySample(type: type, predicate: predicate),
@@ -220,18 +274,33 @@ actor HealthKitService {
     /// `readTotal` and the source it read, from one source resolution, so a
     /// reading is never labelled with a source chosen a moment later.
     func readTotalAndSource(for metric: HealthMetric, from: Date, to: Date) async -> (read: HealthTotalRead, source: HealthReadingSource) {
+        let (read, resolution) = await resolvedRead(for: metric, from: from, to: to)
+        return (read, resolution.readingSource)
+    }
+
+    /// `readTotal` for an Icon day, labelled as `icon_days.measured_source`
+    /// stores it, so the combined total and this iPhone's samples are told
+    /// apart (icon_scoring_v4.sql).
+    func readIconTotal(for metric: HealthMetric, from: Date, to: Date) async -> (read: HealthTotalRead, source: IconMeasurementSource) {
+        let (read, resolution) = await resolvedRead(for: metric, from: from, to: to)
+        return (read, resolution.iconSource)
+    }
+
+    /// One source resolution and the read it decides, so a reading is never
+    /// labelled with a source chosen a moment later.
+    private func resolvedRead(for metric: HealthMetric, from: Date, to: Date) async -> (HealthTotalRead, HealthSourceResolution) {
         #if DEBUG
-        if let fake = BridgeStub.fakeHealthRead(for: metric) { return (fake, readingSource(for: metric)) }
+        if let fake = BridgeStub.fakeHealthRead(for: metric) { return (fake, await sourceResolution(for: metric)) }
         #endif
         guard let unit = metric.quantityUnit, let type = metric.objectType as? HKQuantityType else {
-            return (await sleepMinutes(from: from, to: to), .healthKit)
+            return (await sleepMinutes(from: from, to: to), HealthSourceResolution(selected: nil, requestedSourceMissing: false))
         }
 
         let resolution = await sourceResolution(for: metric)
         if resolution.readingSource == .coreMotion {
-            return (await MotionService.readTotal(for: metric, from: from, to: to), .coreMotion)
+            return (await MotionService.readTotal(for: metric, from: from, to: to), resolution)
         }
-        return (await healthKitTotal(metric: metric, unit: unit, type: type, resolution: resolution, from: from, to: to), .healthKit)
+        return (await healthKitTotal(metric: metric, unit: unit, type: type, resolution: resolution, from: from, to: to), resolution)
     }
 
     private func healthKitTotal(
@@ -240,10 +309,8 @@ actor HealthKitService {
         let range = HKQuery.predicateForSamples(withStart: from, end: to, options: .strictStartDate)
         let predicate: NSPredicate
         if let selected = resolution.selected,
-           let source = await healthKitSource(for: selected, metric: metric) {
-            predicate = NSCompoundPredicate(andPredicateWithSubpredicates: [
-                range, HKQuery.predicateForObjects(from: source)
-            ])
+           let narrowing = await sourcePredicate(for: selected, metric: metric) {
+            predicate = NSCompoundPredicate(andPredicateWithSubpredicates: [range, narrowing])
         } else {
             predicate = range
         }
@@ -335,10 +402,69 @@ actor HealthKitService {
                 motionReadable: MotionService.availability().canRead(metric)
             )
         }
+        if preference == .thisIPhone {
+            return HealthSourceSelector.resolve(
+                preference: preference,
+                available: [],
+                thisIPhoneReadable: await thisIPhonePredicate(for: metric) != nil
+            )
+        }
         return HealthSourceSelector.resolve(
             preference: preference,
             available: await availableSources(for: [metric])
         )
+    }
+
+    /// What narrows a HealthKit read to the chosen source; nil reads the
+    /// combined total.
+    private func sourcePredicate(for selected: HealthSourceDescriptor, metric: HealthMetric) async -> NSPredicate? {
+        switch selected.kind {
+        case .coreMotion: return nil
+        case .thisIPhone: return await thisIPhonePredicate(for: metric)
+        default: return await healthKitSource(for: selected, metric: metric).map { HKQuery.predicateForObjects(from: $0) }
+        }
+    }
+
+    /// Samples Apple's own Health sources recorded on this model of iPhone:
+    /// the iPhone's motion coprocessor, not the Health app's manual entries
+    /// (`com.apple.Health`), not an Apple Watch (another product type) and
+    /// not a third-party app or watch. The source's name is not used, since
+    /// iOS 16 hides the device name from apps; two iPhones of the same model
+    /// on one Apple ID therefore count together. Nil when this iPhone has
+    /// recorded no sample of the metric, so the caller falls back to the
+    /// combined total.
+    private func thisIPhonePredicate(for metric: HealthMetric) async -> NSPredicate? {
+        if let cached = thisIPhoneLookups[metric],
+           Date().timeIntervalSince(cached.at) < Self.thisIPhoneLookupLifetime {
+            return cached.predicate
+        }
+        let appleSources = await sources(for: metric.objectType).filter {
+            $0.bundleIdentifier.hasPrefix("com.apple.health")
+        }
+        var predicate: NSPredicate?
+        if !appleSources.isEmpty, let sampleType = metric.objectType as? HKSampleType {
+            let revisions = Set(appleSources.map {
+                HKSourceRevision(
+                    source: $0,
+                    version: HKSourceRevisionAnyVersion,
+                    productType: Self.deviceProductType,
+                    operatingSystemVersion: HKSourceRevisionAnyOperatingSystem
+                )
+            })
+            let candidate = HKQuery.predicateForObjects(from: revisions)
+            if await hasSample(of: sampleType, matching: candidate) { predicate = candidate }
+        }
+        thisIPhoneLookups[metric] = (predicate, Date())
+        return predicate
+    }
+
+    private func hasSample(of type: HKSampleType, matching predicate: NSPredicate) async -> Bool {
+        await withCheckedContinuation { continuation in
+            let query = HKSampleQuery(sampleType: type, predicate: predicate, limit: 1, sortDescriptors: nil) { _, samples, _ in
+                continuation.resume(returning: !(samples ?? []).isEmpty)
+            }
+            store.execute(query)
+        }
     }
 
     private func availableSources(for metrics: [HealthMetric]) async -> [HealthSourceDescriptor] {
@@ -467,9 +593,18 @@ actor HealthKitService {
     /// rows written under another basis are stale: another source choice, or
     /// a build whose `automatic` read one device instead of the combined
     /// total (such a build never stored a basis). Core Motion counts as its
-    /// own basis only while it can be read.
-    func dailyBasis() -> String {
-        sourcePreference().dailyBasis(motionReadable: MotionService.availability().canRead(.steps))
+    /// own basis only while it can be read, and "iPhone" only while this
+    /// iPhone has recorded steps.
+    func dailyBasis() async -> String {
+        let preference = sourcePreference()
+        var thisIPhoneModel: String?
+        if preference == .thisIPhone, await thisIPhonePredicate(for: .steps) != nil {
+            thisIPhoneModel = Self.deviceProductType
+        }
+        return preference.dailyBasis(
+            motionReadable: MotionService.availability().canRead(.steps),
+            thisIPhoneModel: thisIPhoneModel
+        )
     }
 
     /// The basis of the totals already queued for upload; nil before the first.

@@ -49,11 +49,21 @@ struct IconDayToMeasure: Decodable, Equatable, Sendable {
     }
 }
 
+/// Where an Icon reading came from, as `icon_days.measured_source` stores it.
+/// Finer than `HealthReadingSource`: the combined Apple Health total and the
+/// samples of this iPhone are both HealthKit, but a switch between them must
+/// replace a day's total rather than keep the higher one (icon_scoring_v4.sql).
+enum IconMeasurementSource: String, Sendable {
+    case healthKit = "healthkit"
+    case healthKitIPhone = "healthkit_iphone"
+    case coreMotion = "core_motion"
+}
+
 /// A reading of one Icon day: the total from the start of the day to
 /// `measuredThrough`. The server decides HONOURED / BROKEN / still pending.
-/// `source` (`healthkit` or `core_motion`) lets icon_scoring_v3.sql tell a
-/// source change from a lower reading of the same source; servers before it
-/// ignore the key.
+/// `source` lets icon_scoring_v3.sql and v4 tell a source change from a lower
+/// reading of the same source; servers before v3 ignore the key, and v3
+/// skips `healthkit_iphone` until v4 is deployed.
 struct IconMeasurementPayload: Encodable, Equatable, Sendable {
     let contractId: String
     let day: String
@@ -61,7 +71,7 @@ struct IconMeasurementPayload: Encodable, Equatable, Sendable {
     let measuredThrough: String
     let source: String
 
-    init(day: IconDayToMeasure, value: Double, measuredThrough: Date, source: HealthReadingSource) {
+    init(day: IconDayToMeasure, value: Double, measuredThrough: Date, source: IconMeasurementSource) {
         contractId = day.contractId
         self.day = day.day
         self.value = value

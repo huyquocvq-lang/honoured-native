@@ -931,6 +931,51 @@ enum BridgeStub {
         check('signing out leaves no diagnostics behind', (r.payload.events || []).length === 0);
         log('SCENARIO DONE');
       },
+      // Phase 4 M1.5 and M1.8: "iPhone" (the steps this iPhone recorded) as a
+      // step source, and hasRecentData. The simulator records no steps, so
+      // there it checks the fallback; an iPhone with steps checks the
+      // narrowed read.
+      async 'this-iphone'() {
+        await req('STUB_SET_FAKE_HEALTH_TOTALS', { spec: null }, ['STUB_FAKE_HEALTH_TOTALS_SET'], 15000);
+        let r = await req('GET_HEALTH_STATUS', {}, ['HEALTH_PERMISSION_STATUS']);
+        check('HEALTH_PERMISSION_STATUS carries hasRecentData',
+          r.payload.available === false ? r.payload.hasRecentData === false
+            : r.payload.hasRecentData === null || typeof r.payload.hasRecentData === 'boolean');
+        r = await req('GET_HEALTH_SOURCES', {}, ['HEALTH_SOURCES']);
+        const sources = r.payload.sources || [];
+        const iphone = sources.filter((s) => s.kind === 'this_iphone');
+        check('one fixed iPhone entry', iphone.length === 1 && iphone[0].id === 'this_iphone' && iphone[0].name === 'iPhone');
+        check('Core Motion stays first when listed', !sources.some((s) => s.kind === 'core_motion') || sources[0].kind === 'core_motion');
+
+        r = await req('SET_HEALTH_SOURCE_PREFERENCE', { mode: 'source', sourceId: 'this_iphone' }, ['HEALTH_SOURCE_PREFERENCE_ACCEPTED']);
+        check('iPhone saved as an ordinary source', r.type === 'HEALTH_SOURCE_PREFERENCE_ACCEPTED'
+          && r.payload.preference.mode === 'source' && r.payload.preference.sourceId === 'this_iphone');
+        const narrowed = r.payload.effectiveSourceId === 'this_iphone';
+        check(narrowed ? 'this iPhone is read' : 'an iPhone with no steps falls back to the combined total',
+          narrowed ? r.payload.fallback === false && r.payload.effectiveSourceName === 'iPhone'
+                   : r.payload.effectiveSourceId === null && r.payload.fallback === true);
+        r = await req('GET_HEALTH_SOURCES', {}, ['HEALTH_SOURCES']);
+        check('the choice is read back', r.payload.preference.sourceId === 'this_iphone');
+
+        // Fake totals stand in for HealthKit reads; each value still carries
+        // the source in use, and other metrics read the combined total.
+        await fake('steps=4000,active_energy=250');
+        const from = new Date(); from.setHours(0, 0, 0, 0);
+        r = await req('QUERY_HEALTH_METRICS', { metrics: ['steps', 'active_energy'], from: from.toISOString(), to: new Date().toISOString() }, ['HEALTH_METRICS']);
+        const stepsSource = ((r.payload.metrics.steps || {}).source || {});
+        check(narrowed ? 'steps labelled this_iphone' : 'fallback steps labelled as the aggregate',
+          narrowed ? stepsSource.kind === 'this_iphone' && stepsSource.fallback === false
+                   : stepsSource.mode === 'aggregate' && stepsSource.fallback === true);
+        const energySource = ((r.payload.metrics.active_energy || {}).source || {});
+        check('other metrics read the combined total', energySource.mode === 'aggregate' && energySource.fallback === false);
+        r = await req('GET_HEALTH_STATUS', {}, ['HEALTH_PERMISSION_STATUS']);
+        check('readable steps count as recent data', r.payload.available === false || r.payload.hasRecentData === true);
+
+        await req('STUB_SET_FAKE_HEALTH_TOTALS', { spec: null }, ['STUB_FAKE_HEALTH_TOTALS_SET'], 15000);
+        r = await req('SET_HEALTH_SOURCE_PREFERENCE', { mode: 'automatic' }, ['HEALTH_SOURCE_PREFERENCE_ACCEPTED']);
+        check('back to automatic', r.type === 'HEALTH_SOURCE_PREFERENCE_ACCEPTED' && r.payload.preference.mode === 'automatic' && r.payload.fallback === false);
+        log('SCENARIO DONE');
+      },
       // Launch with -HonouredFakeHealthTotals steps=9000,active_energy=250
       async 'goals'() {
         const walk = { activityId: 'act-walk', activityName: 'Walk', metric: 'steps', target: 8000, unit: 'count' };

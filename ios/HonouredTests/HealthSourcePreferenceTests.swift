@@ -100,4 +100,73 @@ final class HealthSourcePreferenceTests: XCTestCase {
         XCTAssertEqual(HealthSourcePreference.coreMotion.dailyBasis(motionReadable: false), "combined")
         XCTAssertEqual(HealthSourcePreference.coreMotion.dailyBasis(motionReadable: true), "core_motion")
     }
+
+    // MARK: - This iPhone (Phase 4 M1.5)
+
+    func testThisIPhoneTravelsAsAnOrdinarySourceSoOlderWebBuildsKeepWorking() {
+        let payload = HealthSourcePreference.thisIPhone.payload
+        XCTAssertEqual(payload, ["mode": "source", "sourceId": "this_iphone"])
+        XCTAssertEqual(HealthSourcePreference.parse(mode: payload["mode"], sourceId: payload["sourceId"]), .thisIPhone)
+    }
+
+    func testThisIPhoneIdCannotNameAHealthKitSource() {
+        for source in [watch, phone, garmin] {
+            XCTAssertNotEqual(source.id, HealthSourceDescriptor.thisIPhoneId)
+        }
+        XCTAssertFalse(HealthSourceDescriptor.thisIPhoneId.contains("|"))
+        XCTAssertNotEqual(HealthSourceDescriptor.thisIPhoneId, HealthSourceDescriptor.coreMotionId)
+        XCTAssertEqual(HealthSourceDescriptor.thisIPhone.kind, .thisIPhone)
+        XCTAssertEqual(HealthSourceDescriptor.thisIPhone.kind.rawValue, "this_iphone")
+        XCTAssertEqual(HealthSourceDescriptor.thisIPhone.name, "iPhone")
+    }
+
+    func testAPreviouslyChosenIPhoneSourceStaysAnOrdinarySource() {
+        // A choice saved by the old picker ("Vu's iPhone") is still honoured;
+        // the web app moves people onto the three options.
+        XCTAssertEqual(HealthSourcePreference.parse(mode: "source", sourceId: phone.id), .source(phone.id))
+    }
+
+    func testThisIPhoneNarrowsTheReadToTheDeviceAndIsStillHealthKit() {
+        for available in [[phone, watch], [garmin], []] {
+            let result = HealthSourceSelector.resolve(preference: .thisIPhone, available: available, thisIPhoneReadable: true)
+            XCTAssertEqual(result.selected, .thisIPhone)
+            XCTAssertFalse(result.requestedSourceMissing)
+            XCTAssertEqual(result.readingSource, .healthKit)
+            XCTAssertEqual(result.iconSource, .healthKitIPhone)
+        }
+    }
+
+    func testThisIPhoneWithoutSamplesFallsBackToTheCombinedTotalAndSaysSo() {
+        let result = HealthSourceSelector.resolve(
+            preference: .thisIPhone, available: [phone, watch], motionReadable: true, thisIPhoneReadable: false
+        )
+        XCTAssertNil(result.selected)
+        XCTAssertTrue(result.requestedSourceMissing)
+        XCTAssertEqual(result.readingSource, .healthKit)
+        XCTAssertEqual(result.iconSource, .healthKit)
+    }
+
+    func testThisIPhoneNeverAddsCoreMotion() {
+        let result = HealthSourceSelector.resolve(preference: .thisIPhone, available: [], motionReadable: true, thisIPhoneReadable: true)
+        XCTAssertNotEqual(result.readingSource, .coreMotion)
+    }
+
+    func testIconSourceTellsTheCombinedTotalFromThisIPhone() {
+        XCTAssertEqual(HealthSourceSelector.resolve(preference: .automatic, available: [phone]).iconSource, .healthKit)
+        XCTAssertEqual(HealthSourceSelector.resolve(preference: .source(phone.id), available: [phone]).iconSource, .healthKit)
+        XCTAssertEqual(
+            HealthSourceSelector.resolve(preference: .coreMotion, available: [], motionReadable: true).iconSource,
+            .coreMotion
+        )
+        XCTAssertEqual(IconMeasurementSource.healthKitIPhone.rawValue, "healthkit_iphone")
+    }
+
+    func testDailyBasisForThisIPhoneNamesTheModel() {
+        XCTAssertEqual(HealthSourcePreference.thisIPhone.dailyBasis(motionReadable: true, thisIPhoneModel: "iPhone16,2"), "this_iphone:iPhone16,2")
+        XCTAssertEqual(HealthSourcePreference.thisIPhone.dailyBasis(motionReadable: true, thisIPhoneModel: nil), "combined")
+        XCTAssertNotEqual(
+            HealthSourcePreference.thisIPhone.dailyBasis(motionReadable: true, thisIPhoneModel: "iPhone16,2"),
+            HealthSourcePreference.thisIPhone.dailyBasis(motionReadable: true, thisIPhoneModel: "iPhone17,1")
+        )
+    }
 }

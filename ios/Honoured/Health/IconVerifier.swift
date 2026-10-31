@@ -35,7 +35,7 @@ actor IconVerifier {
                 // "Nothing recorded" and "could not read" both wait. A declined
                 // Health permission looks like no data, so it is never read as
                 // zero and stamped BROKEN early.
-                let (read, source) = await HealthKitService.shared.readTotalAndSource(
+                let (read, source) = await HealthKitService.shared.readIconTotal(
                     for: metric, from: window.start, to: window.end
                 )
                 guard case .value(let total) = read else { continue }

@@ -9,6 +9,9 @@ struct HealthSourceDescriptor: Codable, Equatable, Sendable {
         /// The iPhone's own pedometer, read through Core Motion rather than
         /// HealthKit.
         case coreMotion = "core_motion"
+        /// The Apple Health samples this iPhone recorded itself (Phase 4
+        /// M1.5), whatever the device's name.
+        case thisIPhone = "this_iphone"
     }
 
     let id: String
@@ -48,6 +51,19 @@ struct HealthSourceDescriptor: Codable, Equatable, Sendable {
         bundleIdentifier: "",
         kind: .coreMotion
     )
+
+    /// "iPhone" in Health & Tracking (Phase 4 M1.5): only the samples Apple's
+    /// own Health source recorded on this model of iPhone. Like Core Motion it
+    /// is a reserved id that no HealthKit source id (always containing "|")
+    /// can match, so a web build that predates it lists and saves it as an
+    /// ordinary source.
+    static let thisIPhoneId = "this_iphone"
+    static let thisIPhone = HealthSourceDescriptor(
+        id: thisIPhoneId,
+        name: "iPhone",
+        bundleIdentifier: "",
+        kind: .thisIPhone
+    )
 }
 
 enum HealthSourcePreference: Equatable, Sendable {
@@ -57,12 +73,16 @@ enum HealthSourcePreference: Equatable, Sendable {
     /// `HealthSourceDescriptor.coreMotionId`, so a web build that predates it
     /// lists, saves and restores it like any other source.
     case coreMotion
+    /// The samples this iPhone recorded, sent as the source
+    /// `HealthSourceDescriptor.thisIPhoneId` for the same reason.
+    case thisIPhone
 
     var payload: [String: String] {
         switch self {
         case .automatic: return ["mode": "automatic"]
         case .source(let id): return ["mode": "source", "sourceId": id]
         case .coreMotion: return ["mode": "source", "sourceId": HealthSourceDescriptor.coreMotionId]
+        case .thisIPhone: return ["mode": "source", "sourceId": HealthSourceDescriptor.thisIPhoneId]
         }
     }
 
@@ -71,20 +91,28 @@ enum HealthSourcePreference: Equatable, Sendable {
         case "automatic": return .automatic
         case "source":
             guard let id = sourceId as? String, !id.isEmpty else { return nil }
-            return id == HealthSourceDescriptor.coreMotionId ? .coreMotion : .source(id)
+            switch id {
+            case HealthSourceDescriptor.coreMotionId: return .coreMotion
+            case HealthSourceDescriptor.thisIPhoneId: return .thisIPhone
+            default: return .source(id)
+            }
         default: return nil
         }
     }
 
     /// How totals of the source-selectable metrics are read, so `health_daily`
     /// rows read another way can be told apart and recomputed. Core Motion
-    /// without its permission or pedometer reads the combined total, and is
-    /// labelled so.
-    func dailyBasis(motionReadable: Bool) -> String {
+    /// without its permission or pedometer, and an iPhone that recorded
+    /// nothing, read the combined total and are labelled so. The iPhone basis
+    /// names the model, so a new iPhone recomputes the history it can read.
+    func dailyBasis(motionReadable: Bool, thisIPhoneModel: String? = nil) -> String {
         switch self {
         case .automatic: return Self.combinedBasis
         case .source(let id): return "source:\(id)"
         case .coreMotion: return motionReadable ? Self.coreMotionBasis : Self.combinedBasis
+        case .thisIPhone:
+            guard let thisIPhoneModel else { return Self.combinedBasis }
+            return "\(HealthSourceDescriptor.thisIPhoneId):\(thisIPhoneModel)"
         }
     }
 
@@ -106,6 +134,17 @@ struct HealthSourceResolution: Equatable, Sendable {
     var readingSource: HealthReadingSource {
         selected?.kind == .coreMotion ? .coreMotion : .healthKit
     }
+
+    /// The label an Icon reading carries, so icon_scoring_v4.sql replaces a
+    /// day's total when the person moves between the combined total and
+    /// this iPhone, instead of keeping the higher of the two.
+    var iconSource: IconMeasurementSource {
+        switch selected?.kind {
+        case .coreMotion?: return .coreMotion
+        case .thisIPhone?: return .healthKitIPhone
+        default: return .healthKit
+        }
+    }
 }
 
 enum HealthSourceSelector {
@@ -118,11 +157,14 @@ enum HealthSourceSelector {
     ///
     /// Core Motion is never added to HealthKit: chosen, it replaces the read.
     /// Without its permission or a pedometer it counts as missing, so the
-    /// combined total stands in and the fallback is reported.
+    /// combined total stands in and the fallback is reported. "iPhone" works
+    /// the same way: when this iPhone has recorded nothing (Fitness Tracking
+    /// off, or no read access) the combined total stands in and says so.
     static func resolve(
         preference: HealthSourcePreference,
         available: [HealthSourceDescriptor],
-        motionReadable: Bool = false
+        motionReadable: Bool = false,
+        thisIPhoneReadable: Bool = false
     ) -> HealthSourceResolution {
         switch preference {
         case .automatic:
@@ -133,6 +175,10 @@ enum HealthSourceSelector {
         case .coreMotion:
             return motionReadable
                 ? HealthSourceResolution(selected: .coreMotion, requestedSourceMissing: false)
+                : HealthSourceResolution(selected: nil, requestedSourceMissing: true)
+        case .thisIPhone:
+            return thisIPhoneReadable
+                ? HealthSourceResolution(selected: .thisIPhone, requestedSourceMissing: false)
                 : HealthSourceResolution(selected: nil, requestedSourceMissing: true)
         }
     }
