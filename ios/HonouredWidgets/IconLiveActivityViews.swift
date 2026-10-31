@@ -5,10 +5,10 @@ import UIKit
 // values, not the ActivityKit context, so the unit tests can render them.
 //
 // Lock Screen, four rows:
-//   ∞ Icon                                TUE · 5 OF 17
+//   ∞ Icon                                  5 OF 17
 //   10,000 STEPS · Walking
-//   Spring has begun, all life has sprung.
-//   [signature]  You've got this. · Due 11:59 pm
+//   Spring has begun, all life has sprung.  TUE 06.10.26
+//   [signature]  You've got this.           Due 11:59 pm
 // Morning and evening share the layout; only the line of the moment changes.
 // The result replaces that line with HONOURED or BROKEN before the card closes.
 
@@ -31,18 +31,22 @@ struct IconLockScreenView: View {
                 Text(IconCopy.title)
                     .font(.system(.headline, design: .serif))
                 Spacer(minLength: 8)
-                Text(facts.sessionLabel)
-                    .font(.caption2.weight(.semibold))
-                    .tracking(1.2)
-                    .foregroundStyle(HonouredPalette.gold)
-                    .lineLimit(1)
+                IconHeaderLabel(text: facts.countLabel, accessibilityText: facts.countAccessibilityLabel)
             }
             IconTargetLine(facts: facts)
-            if !facts.because.isEmpty {
-                Text(facts.because)
-                    .font(.system(.footnote, design: .serif).italic())
-                    .foregroundStyle(HonouredPalette.ink.opacity(0.85))
-                    .lineLimit(1)
+            // The day sits right above the cut-off, both flush right (client,
+            // Oct 31); the Because line gives way to it.
+            HStack(alignment: .firstTextBaseline, spacing: 8) {
+                if !facts.because.isEmpty {
+                    Text(facts.because)
+                        .font(.system(.footnote, design: .serif).italic())
+                        .foregroundStyle(HonouredPalette.ink.opacity(0.85))
+                        .lineLimit(1)
+                }
+                Spacer(minLength: 0)
+                IconHeaderLabel(text: facts.dayLabel, accessibilityText: facts.dayAccessibilityLabel)
+                    .fixedSize()
+                    .layoutPriority(2)
             }
             HStack(alignment: .center, spacing: 10) {
                 if let signature {
@@ -71,6 +75,24 @@ struct IconLockScreenView: View {
         // Same ceiling as the contract card: four rows stay inside the Lock
         // Screen's height at the largest allowed text size.
         .dynamicTypeSize(...DynamicTypeSize.xxLarge)
+    }
+}
+
+/// Gold capitals for the Icon day and count: `TUE 06.10.26`, `5 OF 17`.
+private struct IconHeaderLabel: View {
+    let text: String
+    let accessibilityText: String
+
+    var body: some View {
+        Text(text)
+            .font(.caption2.weight(.semibold))
+            .tracking(1.2)
+            .foregroundStyle(HonouredPalette.gold)
+            .lineLimit(1)
+            // Tracking also spaces out the last letter; give that back so the
+            // label is flush right with the cut-off below it.
+            .padding(.trailing, -1.2)
+            .accessibilityLabel(accessibilityText)
     }
 }
 
@@ -219,12 +241,12 @@ struct IconExpandedTrailingView: View {
     let facts: IconCardFacts
 
     var body: some View {
-        Text(facts.sessionLabel)
-            .font(.caption2.weight(.semibold))
-            .tracking(1.2)
-            .foregroundStyle(HonouredPalette.gold)
-            .lineLimit(1)
+        // It shrinks a little before it would cut, so the date always shows;
+        // capped like the bottom view, the island's corner stays one line.
+        IconHeaderLabel(text: facts.headerLabel, accessibilityText: facts.headerAccessibilityLabel)
+            .minimumScaleFactor(0.75)
             .padding(.trailing, 4)
+            .dynamicTypeSize(...DynamicTypeSize.xxLarge)
     }
 }
 

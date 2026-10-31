@@ -53,7 +53,46 @@ struct IconCardFacts: Codable, Hashable {
     }
 
     /// `TUE · 5 OF 17`
-    var sessionLabel: String { "\(weekday) · \(sessionNumber) OF \(totalSessions)" }
+    var sessionLabel: String { "\(weekday) · \(countLabel)" }
+
+    /// `5 OF 17`: the Lock Screen header (client, Oct 31).
+    var countLabel: String { "\(sessionNumber) OF \(totalSessions)" }
+
+    /// The Icon day (Phase 4 M2.8), which the card belongs to even after
+    /// midnight, as the client wrote it: `TUE 06.10.26`. The same `DD.MM.YY`
+    /// for every locale. The Lock Screen shows it above the cut-off.
+    var dayLabel: String {
+        guard let date = Self.shortDate(of: iconDay) else { return weekday }
+        return "\(weekday) \(date)"
+    }
+
+    /// The expanded Dynamic Island's header: `TUE 06.10.26 · 5 OF 17`.
+    var headerLabel: String { "\(dayLabel) · \(countLabel)" }
+
+    /// VoiceOver reads the count as words: `5 of 17`.
+    var countAccessibilityLabel: String { "\(sessionNumber) of \(totalSessions)" }
+
+    /// VoiceOver reads the day as words: `Tuesday 6 October 2026`.
+    var dayAccessibilityLabel: String {
+        let formatter = DateFormatter()
+        formatter.locale = Locale(identifier: "en_US_POSIX")
+        formatter.timeZone = TimeZone(identifier: "UTC")
+        formatter.dateFormat = "yyyy-MM-dd"
+        guard let date = formatter.date(from: iconDay) else { return weekday }
+        formatter.dateFormat = "EEEE d MMMM yyyy"
+        return formatter.string(from: date)
+    }
+
+    /// `Tuesday 6 October 2026, 5 of 17`
+    var headerAccessibilityLabel: String { "\(dayAccessibilityLabel), \(countAccessibilityLabel)" }
+
+    /// `2026-10-06` → `06.10.26`; nil for anything else.
+    static func shortDate(of iconDay: String) -> String? {
+        let parts = iconDay.split(separator: "-")
+        guard parts.count == 3, parts[0].count == 4, parts[1].count == 2, parts[2].count == 2,
+              parts.allSatisfy({ $0.allSatisfy(\.isASCII) && $0.allSatisfy(\.isNumber) }) else { return nil }
+        return "\(parts[2]).\(parts[1]).\(parts[0].suffix(2))"
+    }
 
     // Dates travel as Unix seconds: the push-to-start job writes this JSON and
     // ActivityKit decodes it with its own decoder, so nothing may depend on a

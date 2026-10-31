@@ -28,6 +28,40 @@ final class IconLiveActivityTests: XCTestCase {
         XCTAssertEqual(facts.sessionLabel, "FRI · 1 OF 1")
     }
 
+    func testHeaderShowsTheIconDayAsTheClientWroteIt() throws {
+        // Phase 4 M2.8: "TUE 06.10.26", from the Icon day, not the cut-off.
+        XCTAssertEqual(IconCardPreviewStates.facts.iconDay, "2026-09-29")
+        // Lock Screen (client, Oct 31): the count at the top, the day above the cut-off.
+        XCTAssertEqual(IconCardPreviewStates.facts.countLabel, "5 OF 17")
+        XCTAssertEqual(IconCardPreviewStates.facts.dayLabel, "TUE 29.09.26")
+        XCTAssertEqual(IconCardPreviewStates.facts.countAccessibilityLabel, "5 of 17")
+        XCTAssertEqual(IconCardPreviewStates.facts.dayAccessibilityLabel, "Tuesday 29 September 2026")
+        // Expanded Dynamic Island: both in its header.
+        XCTAssertEqual(IconCardPreviewStates.facts.headerLabel, "TUE 29.09.26 · 5 OF 17")
+        XCTAssertEqual(IconCardPreviewStates.facts.headerAccessibilityLabel, "Tuesday 29 September 2026, 5 of 17")
+        XCTAssertEqual(IconCardFacts.shortDate(of: "2027-01-31"), "31.01.27")
+        // A midnight cut-off falls on the next date; the header keeps the Icon day.
+        let late = IconCardFacts(
+            contractId: "c", iconDay: "2026-10-06", weekday: "TUE", sessionNumber: 1, totalSessions: 3,
+            targetValue: "1", targetUnit: "km", activityName: "Run", because: "",
+            deadline: try XCTUnwrap(IconTimestamp.parse("2026-10-06T13:00:00Z"))
+        )
+        XCTAssertEqual(late.dayLabel, "TUE 06.10.26")
+        XCTAssertEqual(late.headerLabel, "TUE 06.10.26 · 1 OF 3")
+    }
+
+    func testHeaderFallsBackWhenTheDayIsNotADate() {
+        for day in ["", "2026-10", "2026-1-6", "26-10-06", "2026-10-0x", "２０２６-10-06"] {
+            let facts = IconCardFacts(
+                contractId: "c", iconDay: day, weekday: "TUE", sessionNumber: 2, totalSessions: 9,
+                targetValue: "1", targetUnit: "km", activityName: "Run", because: "", deadline: Date()
+            )
+            XCTAssertNil(IconCardFacts.shortDate(of: day), day)
+            XCTAssertEqual(facts.dayLabel, "TUE", day)
+            XCTAssertEqual(facts.headerLabel, "TUE · 2 OF 9", day)
+        }
+    }
+
     func testAffirmationsRotateOnePerIconDay() {
         XCTAssertEqual(IconCopy.affirmation(sessionNumber: 1), "You've got this.")
         XCTAssertEqual(IconCopy.affirmation(sessionNumber: 2), "You're closer than you think.")
@@ -169,6 +203,14 @@ final class IconLiveActivityTests: XCTestCase {
             IconLockScreenView(facts: IconCardPreviewStates.facts, state: IconCardPreviewStates.morning, signature: nil)
                 .background(HonouredPalette.background),
             width: 360, maxHeight: 160, name: "icon-lock-morning-no-signature"
+        )
+        // Without a Because line the day still sits above the cut-off.
+        var noBecause = IconCardPreviewStates.facts
+        noBecause.because = ""
+        try render(
+            IconLockScreenView(facts: noBecause, state: IconCardPreviewStates.morning, signature: signature)
+                .background(HonouredPalette.background),
+            width: 360, maxHeight: 160, name: "icon-lock-morning-no-because"
         )
     }
 
