@@ -241,10 +241,9 @@ struct IconExpandedTrailingView: View {
     let facts: IconCardFacts
 
     var body: some View {
-        // It shrinks a little before it would cut, so the date always shows;
-        // capped like the bottom view, the island's corner stays one line.
-        IconHeaderLabel(text: facts.headerLabel, accessibilityText: facts.headerAccessibilityLabel)
-            .minimumScaleFactor(0.75)
+        // The count alone, as on the Lock Screen; the day moves down to the
+        // cut-off (client, Nov 1). Capped like the bottom view.
+        IconHeaderLabel(text: facts.countLabel, accessibilityText: facts.countAccessibilityLabel)
             .padding(.trailing, 4)
             .dynamicTypeSize(...DynamicTypeSize.xxLarge)
     }
@@ -261,12 +260,18 @@ struct IconExpandedBottomView: View {
                 facts: facts,
                 valueText: state.value.flatMap { IconCopy.shortValue($0, targetUnit: facts.targetUnit) }
             )
-            HStack {
+            // The day sits right above the cut-off, both flush right, as on
+            // the Lock Screen (client, Nov 1); the target line keeps its width.
+            HStack(alignment: .lastTextBaseline) {
                 IconMomentLine(state: state, isStale: isStale)
                 Spacer(minLength: 6)
-                Text(IconCopy.deadlineLabel(facts.deadline))
-                    .font(.caption2)
-                    .foregroundStyle(HonouredPalette.muted)
+                VStack(alignment: .trailing, spacing: 4) {
+                    IconHeaderLabel(text: facts.dayLabel, accessibilityText: facts.dayAccessibilityLabel)
+                    Text(IconCopy.deadlineLabel(facts.deadline))
+                        .font(.caption2)
+                        .foregroundStyle(HonouredPalette.muted)
+                }
+                .fixedSize()
             }
         }
         .foregroundStyle(HonouredPalette.ink)

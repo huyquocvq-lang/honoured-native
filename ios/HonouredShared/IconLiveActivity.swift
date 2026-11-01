@@ -62,19 +62,16 @@ struct IconCardFacts: Codable, Hashable {
     /// `TUE · 5 OF 17`
     var sessionLabel: String { "\(weekday) · \(countLabel)" }
 
-    /// `5 OF 17`: the Lock Screen header (client, Oct 31).
+    /// `5 OF 17`: the card's header (client, Oct 31).
     var countLabel: String { "\(sessionNumber) OF \(totalSessions)" }
 
     /// The Icon day (Phase 4 M2.8), which the card belongs to even after
     /// midnight, as the client wrote it: `TUE 06.10.26`. The same `DD.MM.YY`
-    /// for every locale. The Lock Screen shows it above the cut-off.
+    /// for every locale. The card shows it above the cut-off.
     var dayLabel: String {
         guard let date = Self.shortDate(of: iconDay) else { return weekday }
         return "\(weekday) \(date)"
     }
-
-    /// The expanded Dynamic Island's header: `TUE 06.10.26 · 5 OF 17`.
-    var headerLabel: String { "\(dayLabel) · \(countLabel)" }
 
     /// VoiceOver reads the count as words: `5 of 17`.
     var countAccessibilityLabel: String { "\(sessionNumber) of \(totalSessions)" }
@@ -89,9 +86,6 @@ struct IconCardFacts: Codable, Hashable {
         formatter.dateFormat = "EEEE d MMMM yyyy"
         return formatter.string(from: date)
     }
-
-    /// `Tuesday 6 October 2026, 5 of 17`
-    var headerAccessibilityLabel: String { "\(dayAccessibilityLabel), \(countAccessibilityLabel)" }
 
     /// `2026-10-06` → `06.10.26`; nil for anything else.
     static func shortDate(of iconDay: String) -> String? {

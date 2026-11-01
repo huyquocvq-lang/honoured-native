@@ -364,7 +364,8 @@ final class IconCardPlanTests: XCTestCase {
         let days = try IconCardRows.days(from: json, totals: [:])
         XCTAssertEqual(days.map(\.facts.targetValue), ["12,000", "10,000"])
         XCTAssertEqual(days.map(\.facts.targetUnit), ["STEPS", "STEPS"])
-        XCTAssertEqual(days.first?.facts.headerLabel, "WED 07.10.26 · 6 OF 6")
+        XCTAssertEqual(days.first?.facts.dayLabel, "WED 07.10.26")
+        XCTAssertEqual(days.first?.facts.countLabel, "6 OF 6")
         // The card shows the signature of the day's own revision.
         XCTAssertEqual(days.map(\.facts.targetRevision), [1, nil])
     }
