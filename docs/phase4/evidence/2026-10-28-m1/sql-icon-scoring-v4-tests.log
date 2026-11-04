@@ -1,0 +1,177 @@
+# Pass 1: v4 needs v3, and keeps v2's behaviour for one source
+== /v2/00_schema.sql
+== /db/icon_scoring_v2_rollback.sql
+== /v2/10_seed.sql
+== /db/icon_scoring_v2.sql
+== /db/icon_scoring_v4.sql (must be refused)
+ok  refused: needs icon_scoring_v3.sql applied first
+== /work/05_still_v2.sql
+ok  a refused v4 adds no column
+ok  a refused v4 leaves the v2 function
+== /db/icon_scoring_v3.sql
+== /db/icon_scoring_v4.sql
+== /db/icon_scoring_v4.sql
+== /v2/30_v2_tests.sql
+ok  lists pending in 24 h and stamped-from-readings in 30 days
+ok  A higher reading counts as updated
+ok  A total raised
+ok  A stays honoured
+ok  A keeps target_met
+ok  A keeps scored_at
+ok  A lower reading is unchanged
+ok  A total never drops
+ok  A equal reading is unchanged
+ok  B below target counts as updated
+ok  B still broken
+ok  B keeps target_missed
+ok  B total raised
+ok  B at target turns honoured
+ok  B now honoured
+ok  B now target_met
+ok  B total is the late reading
+ok  B scored_at moved to the flip
+ok  B a lower reading never flips it back
+ok  B stays honoured
+ok  C reading counts as updated
+ok  C still broken
+ok  C no_data becomes target_missed
+ok  C total recorded
+ok  D reading at target turns honoured
+ok  D now honoured target_met
+ok  E outside the window is skipped
+ok  E untouched
+ok  G HONOURED 10 days ago is raised
+ok  G lower reading unchanged
+ok  G total
+ok  H BROKEN 29 days ago is raised
+ok  H still broken
+ok  AM amended skipped
+ok  S self-reported skipped
+ok  S untouched
+ok  W word day skipped
+ok  O foreign day skipped
+ok  O untouched
+ok  P1 partial reading stays pending
+ok  P1 pending total
+ok  P1 reading at target honours
+ok  P2 full reading after the settle hour breaks
+ok  P2 broken target_missed
+ok  P2 late total below target is raised
+ok  P2 late total at target honours
+ok  P3 pending past 24 h skipped
+ok  expiry job stamps P3
+ok  P3 expired with the stale total
+ok  P3 is measured again
+ok  P3 late full total honours
+ok  P3 now honoured
+ok  bad rows skipped
+ok  batch counts
+ok  empty report keys
+ok  anonymous call refused
+# Pass 2: v3's source rules hold under v4
+== /v2/00_schema.sql
+== /db/icon_scoring_v2_rollback.sql
+== /v2/10_seed.sql
+== /db/icon_scoring_v2.sql
+== /db/icon_scoring_v3.sql
+== /db/icon_scoring_v4.sql
+== /v3/30_v3_tests.sql
+ok  seeded days have no source yet
+ok  A higher HealthKit total raises
+ok  A labelled healthkit
+ok  A lower HealthKit total is unchanged
+ok  A a row without source counts as HealthKit
+ok  A Core Motion total replaces it, lower too
+ok  A shows the Core Motion total
+ok  A stays honoured
+ok  A keeps scored_at
+ok  A lower Core Motion total is unchanged
+ok  A higher Core Motion total raises
+ok  A HealthKit total below the target replaces
+ok  A HONOURED survives a total below the target
+ok  A same total from the other source is unchanged
+ok  A only its label moved
+ok  B lower Core Motion total replaces
+ok  B still broken with the Core Motion total
+ok  B Core Motion at the target honours
+ok  B honoured from core_motion
+ok  B lower HealthKit total replaces the number only
+ok  B never goes back to broken
+ok  C Core Motion reading counts
+ok  C target_missed from core_motion
+ok  D HealthKit at the target honours
+ok  D labelled healthkit
+ok  P1 Core Motion partial stays pending
+ok  P1 pending from core_motion
+ok  P1 HealthKit partial replaces it
+ok  P1 pending from healthkit
+ok  P1 Core Motion at the target honours
+ok  P1 honoured from core_motion
+ok  P2 full Core Motion reading breaks after the settle hour
+ok  P2 broken from core_motion
+ok  unknown source skipped
+ok  G untouched by it
+ok  JSON null source counts as HealthKit
+ok  G labelled healthkit
+ok  E outside the window skipped whatever the source
+ok  O foreign day skipped
+ok  S self-reported day skipped
+ok  mixed batch counts
+ok  H replaced by core_motion
+ok  the column refuses an unknown source
+# Pass 3: Automatic <-> iPhone, then the rollback
+== /v2/00_schema.sql
+== /db/icon_scoring_v2_rollback.sql
+== /v2/10_seed.sql
+== /db/icon_scoring_v2.sql
+== /db/icon_scoring_v3.sql
+record_icon_measurements under v3: 227ced59e3ef735932fdc5fc85373599
+== /db/icon_scoring_v4.sql
+== /work/30_v4_tests.sql
+ok  A Automatic raises
+ok  A switch to iPhone replaces with a lower total
+ok  A shows the iPhone total and stays honoured
+ok  A keeps scored_at
+ok  A lower iPhone total is unchanged
+ok  A higher iPhone total raises
+ok  A back to Automatic replaces with a lower total
+ok  A shows the Automatic total
+ok  A same total from iPhone is unchanged
+ok  A only its label moved
+ok  A a row without source counts as Automatic and replaces
+ok  A labelled healthkit again
+ok  B lower iPhone total replaces
+ok  B still broken with the iPhone total
+ok  B iPhone at the target honours
+ok  B honoured from the iPhone
+ok  B lower Automatic total replaces the number only
+ok  B never goes back to broken
+ok  C iPhone reading counts
+ok  C target_missed from the iPhone
+ok  G Core Motion still replaces
+ok  G iPhone replaces Core Motion
+ok  G stays honoured
+ok  P1 iPhone partial stays pending
+ok  P1 pending from the iPhone
+ok  P1 Automatic partial replaces it
+ok  P1 iPhone at the target honours
+ok  P1 honoured from the iPhone
+ok  P2 full iPhone reading breaks after the settle hour
+ok  an unknown source is skipped
+ok  A untouched by the unknown source
+ok  a foreign day is skipped
+ok  an early-exit day is skipped
+ok  a day past 30 days is skipped
+ok  the summary keys are v3's
+ok  the constraint refuses unknown labels
+== /db/icon_scoring_v4_rollback.sql
+== /work/40_rollback_tests.sql
+ok  rollback restores the v3 function
+ok  no healthkit_iphone label is left
+ok  B keeps its total, labelled healthkit
+ok  G keeps its total, labelled healthkit
+ok  an iPhone reading is skipped again
+ok  Core Motion still replaces after the rollback
+ok  the v3 constraint is back
+== /db/icon_scoring_v4.sql
+ALL STEPS PASSED

@@ -1,0 +1,34 @@
+2026-10-01 17:27:33.148 Honoured[28154:2773569] Successfully load keyboard extensions
+[bridge-stub] ◀ NATIVE_READY {"capabilities":{"liveActivities":{"protocolVersion":1,"enabled":true,"minimumOS":"16.2","supported":true},"googleSignIn":{"configured":true,"intents":["sign_in","link"],"protocolVersion":1,"transport":"trusted-auth-v1","supported":true}},"liveActivityBridgeSessionId":"D25591D0-E1A7-4E84-9BEC-D7249B1CB549","platform":"ios","bridgeVersion":2}
+[bridge-stub] ◀ NATIVE_READY {"platform":"ios","liveActivityBridgeSessionId":"D25591D0-E1A7-4E84-9BEC-D7249B1CB549","capabilities":{"liveActivities":{"enabled":true,"protocolVersion":1,"supported":true,"minimumOS":"16.2"},"googleSignIn":{"protocolVersion":1,"supported":true,"configured":true,"transport":"trusted-auth-v1","intents":["sign_in","link"]}},"bridgeVersion":2}
+[bridge-stub] ▶ CLEAR_AUTH_SESSION {}
+[bridge-stub] ◀ AUTH_SESSION_CLEARED {"liveActivityBridgeSessionId":"86EED1D2-EBCE-4E12-9353-1FB41AC85E19","requestId":"stub-1"}
+[bridge-stub] ▶ STUB_SET_FAKE_HEALTH_TOTALS {"spec":null}
+[bridge-stub] ◀ STUB_FAKE_HEALTH_TOTALS_SET {"spec":null,"requestId":"stub-2"}
+[bridge-stub] ▶ SET_AUTH_SESSION {"userId":"stub-user-a","accessToken":"stub-access-token","refreshToken":"stub-refresh-token","expiresAt":1790854054}
+[bridge-stub] ◀ AUTH_SESSION_ACCEPTED {"requestId":"stub-3","liveActivityBridgeSessionId":"86EED1D2-EBCE-4E12-9353-1FB41AC85E19","userId":"stub-user-a"}
+[bridge-stub] ▶ SET_DAY_RESET_HOUR {"hour":0}
+[bridge-stub] ◀ DAY_RESET_HOUR_ACCEPTED {"requestId":"stub-4","hour":0}
+[bridge-stub] ▶ SET_GOALS {"goals":[{"activityId":"c-restore:primary","activityName":"Walking","metric":"steps","target":8000,"unit":"count"},{"activityId":"c-gone:primary","activityName":"Energy","metric":"active_energy","target":300,"unit":"kcal"}]}
+[bridge-stub] ◀ GOALS_ACCEPTED {"requestId":"stub-5","count":2}
+[bridge-stub] ▶ STUB_SET_FAKE_HEALTH_TOTALS {"spec":"steps=4321,active_energy=10"}
+[bridge-stub] ◀ STUB_FAKE_HEALTH_TOTALS_SET {"requestId":"stub-6","spec":"steps=4321,active_energy=10"}
+[bridge-stub] ▶ TRACK_CONTRACT {"bridgeSessionId":"86EED1D2-EBCE-4E12-9353-1FB41AC85E19","clientSequence":1,"reason":"opened","contract":{"contractId":"c-gone","contractName":"Energy","healthDay":"2026-10-01","expiresAt":"2026-10-01T16:27:34.496Z","timerActivityId":"c-gone","completionPolicy":{"kind":"all_health_slots","requiredActivityIds":["c-gone:primary"]},"activities":[{"activityId":"c-gone:primary","slot":"primary","name":"Energy","mode":"health","metric":"active_energy","target":300,"unit":"kcal"}]}}
+[bridge-stub] ◀ LIVE_ACTIVITY_STATE_CHANGED {"enabled":true,"tracked":[{"healthDay":"2026-10-01","focused":true,"presentationStatus":"active","lastUpdatedAt":"2026-10-01T10:27:34Z","contractId":"c-gone"}],"supported":true,"focusedOccurrence":{"contractId":"c-gone","healthDay":"2026-10-01"}}
+[bridge-stub] ◀ CONTRACT_TRACKING_ACCEPTED {"healthDay":"2026-10-01","requestId":"stub-7","contractId":"c-gone","focused":true,"presentationStatus":"active"}
+[bridge-stub] ▶ TRACK_CONTRACT {"bridgeSessionId":"86EED1D2-EBCE-4E12-9353-1FB41AC85E19","clientSequence":2,"reason":"opened","contract":{"contractId":"c-restore","contractName":"Walk","healthDay":"2026-10-01","expiresAt":"2026-10-01T16:27:34.496Z","timerActivityId":"c-restore","completionPolicy":{"kind":"all_health_slots","requiredActivityIds":["c-restore:primary"]},"activities":[{"activityId":"c-restore:primary","slot":"primary","name":"Walking","mode":"health","metric":"steps","target":8000,"unit":"count"}]}}
+[bridge-stub] ◀ LIVE_ACTIVITY_STATE_CHANGED {"enabled":true,"supported":true,"tracked":[{"lastUpdatedAt":"2026-10-01T10:27:35Z","contractId":"c-gone","focused":false,"healthDay":"2026-10-01","presentationStatus":"active"},{"healthDay":"2026-10-01","focused":true,"presentationStatus":"active","lastUpdatedAt":"2026-10-01T10:27:35Z","contractId":"c-restore"}],"focusedOccurrence":{"contractId":"c-restore","healthDay":"2026-10-01"}}
+[bridge-stub] ◀ CONTRACT_TRACKING_ACCEPTED {"requestId":"stub-8","presentationStatus":"active","contractId":"c-restore","healthDay":"2026-10-01","focused":true}
+[bridge-stub] ▶ STUB_LIST_LIVE_ACTIVITIES {}
+[bridge-stub] ◀ STUB_LIVE_ACTIVITIES {"requestId":"stub-9","activities":[{"contractId":"c-restore","activityState":"active","relevanceScore":100,"status":"active","health":[{"target":8000,"dataStatus":"waiting","activityId":"c-restore:primary","reached":false,"value":null}],"contractName":"Walk","staleDate":"2026-10-01T11:27:35Z","healthDay":"2026-10-01","id":"5C9061C8-A069-4D2A-9034-328E365F570C"},{"status":"active","contractName":"Energy","contractId":"c-gone","relevanceScore":100,"id":"0C3FA1CD-6342-4408-849A-8B082EDBCF6A","activityState":"active","healthDay":"2026-10-01","health":[{"dataStatus":"waiting","value":null,"target":300,"reached":false,"activityId":"c-gone:primary"}],"staleDate":"2026-10-01T11:27:34Z"}]}
+[bridge-stub] PASS two cards before relaunch
+[bridge-stub] ▶ STUB_DISMISS_LIVE_ACTIVITY {"contractId":"c-gone","healthDay":"2026-10-01"}
+[bridge-stub] ◀ STUB_LIVE_ACTIVITY_DISMISSED {"dismissed":true,"requestId":"stub-10"}
+[bridge-stub] PASS simulated swipe on c-gone
+[bridge-stub] ◀ LIVE_ACTIVITY_STATE_CHANGED {"enabled":true,"tracked":[{"healthDay":"2026-10-01","focused":false,"reason":"dismissed","presentationStatus":"dismissed","lastUpdatedAt":"2026-10-01T10:27:35Z","contractId":"c-gone"},{"presentationStatus":"active","focused":true,"contractId":"c-restore","lastUpdatedAt":"2026-10-01T10:27:35Z","healthDay":"2026-10-01"}],"supported":true,"focusedOccurrence":{"contractId":"c-restore","healthDay":"2026-10-01"}}
+[bridge-stub] ▶ GET_LIVE_ACTIVITY_STATE {}
+[bridge-stub] ◀ LIVE_ACTIVITY_STATE {"enabled":true,"focusedOccurrence":{"contractId":"c-restore","healthDay":"2026-10-01"},"supported":true,"liveActivityBridgeSessionId":"86EED1D2-EBCE-4E12-9353-1FB41AC85E19","tracked":[{"lastUpdatedAt":"2026-10-01T10:27:35Z","contractId":"c-gone","focused":false,"healthDay":"2026-10-01","presentationStatus":"dismissed","reason":"dismissed"},{"presentationStatus":"active","focused":true,"contractId":"c-restore","lastUpdatedAt":"2026-10-01T10:27:35Z","healthDay":"2026-10-01"}],"requestId":"stub-11"}
+[bridge-stub] PASS a removed card is recorded as dismissed
+[bridge-stub] PASS priority stays with the remaining card
+[bridge-stub] SCENARIO DONE
+com.jimmy.upwork.honoured: 28154

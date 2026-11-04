@@ -1,0 +1,92 @@
+2026-10-01 17:27:03.032 Honoured[27355:2770582] Successfully load keyboard extensions
+[bridge-stub] ◀ NATIVE_READY {"platform":"ios","capabilities":{"liveActivities":{"supported":true,"enabled":true,"minimumOS":"16.2","protocolVersion":1},"googleSignIn":{"configured":true,"supported":true,"transport":"trusted-auth-v1","intents":["sign_in","link"],"protocolVersion":1}},"liveActivityBridgeSessionId":"3E781931-B926-4387-A4DD-A979D2B31ED5","bridgeVersion":2}
+[bridge-stub] ◀ NATIVE_READY {"platform":"ios","capabilities":{"googleSignIn":{"supported":true,"transport":"trusted-auth-v1","configured":true,"intents":["sign_in","link"],"protocolVersion":1},"liveActivities":{"supported":true,"minimumOS":"16.2","protocolVersion":1,"enabled":true}},"liveActivityBridgeSessionId":"3E781931-B926-4387-A4DD-A979D2B31ED5","bridgeVersion":2}
+[bridge-stub] ▶ CLEAR_AUTH_SESSION {}
+[bridge-stub] ◀ AUTH_SESSION_CLEARED {"requestId":"stub-1","liveActivityBridgeSessionId":"8EF3B163-59FB-4554-A34A-7A53F6F2E051"}
+[bridge-stub] ▶ STUB_SET_FAKE_HEALTH_TOTALS {"spec":null}
+[bridge-stub] ◀ STUB_FAKE_HEALTH_TOTALS_SET {"spec":null,"requestId":"stub-2"}
+[bridge-stub] ▶ SET_AUTH_SESSION {"userId":"stub-user-a","accessToken":"stub-access-token","refreshToken":"stub-refresh-token","expiresAt":1790854023}
+[bridge-stub] ◀ AUTH_SESSION_ACCEPTED {"liveActivityBridgeSessionId":"8EF3B163-59FB-4554-A34A-7A53F6F2E051","requestId":"stub-3","userId":"stub-user-a"}
+[bridge-stub] ▶ SET_DAY_RESET_HOUR {"hour":0}
+[bridge-stub] ◀ DAY_RESET_HOUR_ACCEPTED {"requestId":"stub-4","hour":0}
+[bridge-stub] ▶ SET_GOALS {"goals":[]}
+[bridge-stub] ◀ GOALS_ACCEPTED {"requestId":"stub-5","count":0}
+[bridge-stub] ▶ TRACK_CONTRACT {"bridgeSessionId":"8EF3B163-59FB-4554-A34A-7A53F6F2E051","clientSequence":1,"reason":"opened","contract":{"contractId":"c-med","contractName":"Meditation","healthDay":"2026-10-01","expiresAt":"2026-10-01T16:27:03.813Z","completionPolicy":{"kind":"timer_completion","timerActivityId":"c-med"},"activities":[{"activityId":"c-med","slot":"primary","name":"Meditation","mode":"timer"}]}}
+[bridge-stub] ◀ LIVE_ACTIVITY_STATE_CHANGED {"supported":true,"tracked":[{"focused":false,"contractId":"c-med","presentationStatus":"awaiting_timer","healthDay":"2026-10-01"}],"enabled":true}
+[bridge-stub] ◀ CONTRACT_TRACKING_ACCEPTED {"requestId":"stub-6","contractId":"c-med","focused":false,"healthDay":"2026-10-01","presentationStatus":"awaiting_timer"}
+[bridge-stub] PASS opening a timer-only contract records it without an empty card
+[bridge-stub] ▶ STUB_LIST_LIVE_ACTIVITIES {}
+[bridge-stub] ◀ STUB_LIVE_ACTIVITIES {"requestId":"stub-7","activities":[]}
+[bridge-stub] PASS no card yet
+[bridge-stub] ▶ START_TIMER {"activityId":"c-med","activityName":"Meditation","durationSeconds":120,"trackingContext":{"bridgeSessionId":"8EF3B163-59FB-4554-A34A-7A53F6F2E051","clientSequence":2,"timerActivityId":"c-med","contract":{"contractId":"c-med","contractName":"Meditation","healthDay":"2026-10-01","expiresAt":"2026-10-01T16:27:03.813Z","completionPolicy":{"kind":"timer_completion","timerActivityId":"c-med"},"activities":[{"activityId":"c-med","slot":"primary","name":"Meditation","mode":"timer"}]}}}
+[bridge-stub] ◀ LIVE_ACTIVITY_STATE_CHANGED {"enabled":true,"supported":true,"tracked":[{"contractId":"c-med","focused":true,"lastUpdatedAt":"2026-10-01T10:27:03Z","presentationStatus":"active","healthDay":"2026-10-01"}],"focusedOccurrence":{"contractId":"c-med","healthDay":"2026-10-01"}}
+[bridge-stub] ◀ TIMER_STARTED {"endsAt":"2026-10-01T10:29:03Z","activityId":"c-med","requestId":"start-med-1790850423825","liveActivityStatus":"active"}
+[bridge-stub] PASS START_TIMER with tracking: active card
+[bridge-stub] ▶ START_TIMER {"activityId":"c-med","activityName":"Meditation","durationSeconds":120,"trackingContext":{"bridgeSessionId":"8EF3B163-59FB-4554-A34A-7A53F6F2E051","clientSequence":2,"timerActivityId":"c-med","contract":{"contractId":"c-med","contractName":"Meditation","healthDay":"2026-10-01","expiresAt":"2026-10-01T16:27:03.813Z","completionPolicy":{"kind":"timer_completion","timerActivityId":"c-med"},"activities":[{"activityId":"c-med","slot":"primary","name":"Meditation","mode":"timer"}]}}}
+[bridge-stub] ◀ TIMER_STARTED {"endsAt":"2026-10-01T10:29:03Z","liveActivityStatus":"active","requestId":"start-med-1790850423825","activityId":"c-med"}
+[bridge-stub] PASS retrying the same START_TIMER replays it: same endsAt
+[bridge-stub] ▶ GET_TIMER_STATE {}
+[bridge-stub] ◀ TIMER_STATE {"endsAt":"2026-10-01T10:29:03Z","activityId":"c-med","active":true,"requestId":"stub-8"}
+[bridge-stub] PASS the timer was not restarted
+[bridge-stub] ▶ STUB_LIST_LIVE_ACTIVITIES {}
+[bridge-stub] ◀ STUB_LIVE_ACTIVITIES {"activities":[{"contractName":"Meditation","contractId":"c-med","staleDate":"2026-10-01T10:29:03Z","id":"391D2A6A-A1C0-4F22-8156-4B1F6060631E","healthDay":"2026-10-01","health":[],"status":"active","activityState":"active","relevanceScore":100,"timer":{"endsAt":"2026-10-01T10:29:03Z","finished":false,"activityId":"c-med"}}],"requestId":"stub-9"}
+[bridge-stub] PASS one card with the countdown
+[bridge-stub] ▶ CANCEL_TIMER {"activityId":"c-med","reason":"paused","trackingContext":{"bridgeSessionId":"8EF3B163-59FB-4554-A34A-7A53F6F2E051","clientSequence":3}}
+[bridge-stub] ◀ TIMER_CANCELLED {"activityId":"c-med","requestId":"stub-10","reason":"paused"}
+[bridge-stub] PASS pause: TIMER_CANCELLED with reason paused
+[bridge-stub] ◀ LIVE_ACTIVITY_STATE_CHANGED {"enabled":true,"tracked":[{"presentationStatus":"awaiting_timer","healthDay":"2026-10-01","focused":false,"lastUpdatedAt":"2026-10-01T10:27:03Z","contractId":"c-med"}],"supported":true}
+[bridge-stub] ▶ GET_LIVE_ACTIVITY_STATE {}
+[bridge-stub] ◀ LIVE_ACTIVITY_STATE {"tracked":[{"focused":false,"lastUpdatedAt":"2026-10-01T10:27:03Z","contractId":"c-med","presentationStatus":"awaiting_timer","healthDay":"2026-10-01"}],"enabled":true,"supported":true,"requestId":"stub-11","liveActivityBridgeSessionId":"8EF3B163-59FB-4554-A34A-7A53F6F2E051"}
+[bridge-stub] ▶ STUB_LIST_LIVE_ACTIVITIES {}
+[bridge-stub] ◀ STUB_LIVE_ACTIVITIES {"activities":[],"requestId":"stub-12"}
+[bridge-stub] PASS a timer-only card ends while paused
+[bridge-stub] ▶ START_TIMER {"activityId":"c-med","activityName":"Meditation","durationSeconds":4,"trackingContext":{"bridgeSessionId":"8EF3B163-59FB-4554-A34A-7A53F6F2E051","clientSequence":4,"timerActivityId":"c-med","contract":{"contractId":"c-med","contractName":"Meditation","healthDay":"2026-10-01","expiresAt":"2026-10-01T16:27:03.813Z","completionPolicy":{"kind":"timer_completion","timerActivityId":"c-med"},"activities":[{"activityId":"c-med","slot":"primary","name":"Meditation","mode":"timer"}]}}}
+[bridge-stub] ◀ LIVE_ACTIVITY_STATE_CHANGED {"enabled":true,"tracked":[{"focused":true,"lastUpdatedAt":"2026-10-01T10:27:06Z","healthDay":"2026-10-01","contractId":"c-med","presentationStatus":"active"}],"supported":true,"focusedOccurrence":{"healthDay":"2026-10-01","contractId":"c-med"}}
+[bridge-stub] ◀ TIMER_STARTED {"activityId":"c-med","endsAt":"2026-10-01T10:27:09Z","liveActivityStatus":"active","requestId":"stub-13"}
+[bridge-stub] PASS resume (a new start): new card
+[bridge-stub] ▶ GET_LIVE_ACTIVITY_STATE {}
+[bridge-stub] ◀ LIVE_ACTIVITY_STATE {"focusedOccurrence":{"contractId":"c-med","healthDay":"2026-10-01"},"supported":true,"enabled":true,"tracked":[{"focused":true,"lastUpdatedAt":"2026-10-01T10:27:06Z","contractId":"c-med","presentationStatus":"stale","healthDay":"2026-10-01"}],"requestId":"stub-14","liveActivityBridgeSessionId":"8EF3B163-59FB-4554-A34A-7A53F6F2E051"}
+[bridge-stub] PASS at zero: stale until processed, or already completed
+[bridge-stub] ▶ GET_TIMER_STATE {}
+[bridge-stub] ◀ TIMER_STATE {"active":false,"requestId":"stub-15"}
+[bridge-stub] PASS reconcile after the deadline: timer inactive
+[bridge-stub] ◀ LIVE_ACTIVITY_STATE_CHANGED {"supported":true,"enabled":true,"tracked":[{"lastUpdatedAt":"2026-10-01T10:27:11Z","presentationStatus":"ended","healthDay":"2026-10-01","focused":false,"reason":"completed","contractId":"c-med"}]}
+[bridge-stub] ◀ TIMER_COMPLETED {"notified":false,"activityId":"c-med","completedAt":"2026-10-01T10:27:09Z"}
+[bridge-stub] PASS TIMER_COMPLETED reaches the web with completedAt = endsAt
+[bridge-stub] PASS …exactly once
+[bridge-stub] ▶ GET_LIVE_ACTIVITY_STATE {}
+[bridge-stub] ◀ LIVE_ACTIVITY_STATE {"enabled":true,"tracked":[{"lastUpdatedAt":"2026-10-01T10:27:11Z","presentationStatus":"ended","healthDay":"2026-10-01","focused":false,"reason":"completed","contractId":"c-med"}],"liveActivityBridgeSessionId":"8EF3B163-59FB-4554-A34A-7A53F6F2E051","supported":true,"requestId":"stub-16"}
+[bridge-stub] PASS natural finish under timer_completion: completed
+[bridge-stub] ▶ STUB_LIST_LIVE_ACTIVITIES {}
+[bridge-stub] ◀ STUB_LIVE_ACTIVITIES {"requestId":"stub-17","activities":[{"healthDay":"2026-10-01","activityState":"active","relevanceScore":0,"id":"4C19285F-17AD-40B2-BA0E-1F56C7E6C33D","contractId":"c-med","status":"completed","contractName":"Meditation","health":[],"timer":{"finished":true,"activityId":"c-med","endsAt":"2026-10-01T10:27:09Z"}}]}
+[bridge-stub] PASS final content shows the finished timer
+[bridge-stub] ▶ SET_GOALS {"goals":[{"activityId":"c-walk2:primary","activityName":"Walking","metric":"steps","target":8000,"unit":"count"}]}
+[bridge-stub] ◀ GOALS_ACCEPTED {"requestId":"stub-18","count":1}
+[bridge-stub] ▶ STUB_SET_FAKE_HEALTH_TOTALS {"spec":"steps=3000"}
+[bridge-stub] ◀ STUB_FAKE_HEALTH_TOTALS_SET {"spec":"steps=3000","requestId":"stub-19"}
+[bridge-stub] ▶ START_TIMER {"activityId":"c-walk2","activityName":"Walk","durationSeconds":300,"trackingContext":{"bridgeSessionId":"8EF3B163-59FB-4554-A34A-7A53F6F2E051","clientSequence":5,"timerActivityId":"c-walk2","contract":{"contractId":"c-walk2","contractName":"Walk","healthDay":"2026-10-01","expiresAt":"2026-10-01T16:27:13.867Z","timerActivityId":"c-walk2","completionPolicy":{"kind":"all_health_slots","requiredActivityIds":["c-walk2:primary"]},"activities":[{"activityId":"c-walk2:primary","slot":"primary","name":"Walking","mode":"health","metric":"steps","target":8000,"unit":"count"}]}}}
+[bridge-stub] ◀ LIVE_ACTIVITY_STATE_CHANGED {"tracked":[{"lastUpdatedAt":"2026-10-01T10:27:11Z","presentationStatus":"ended","healthDay":"2026-10-01","focused":false,"reason":"completed","contractId":"c-med"},{"healthDay":"2026-10-01","presentationStatus":"active","lastUpdatedAt":"2026-10-01T10:27:14Z","focused":true,"contractId":"c-walk2"}],"supported":true,"focusedOccurrence":{"healthDay":"2026-10-01","contractId":"c-walk2"},"enabled":true}
+[bridge-stub] ◀ TIMER_STARTED {"liveActivityStatus":"active","requestId":"stub-20","activityId":"c-walk2","endsAt":"2026-10-01T10:32:14Z"}
+[bridge-stub] PASS Health contract with a running timer: one card
+[bridge-stub] ▶ START_TIMER {"activityId":"c-med2","activityName":"Breathwork","durationSeconds":300,"trackingContext":{"bridgeSessionId":"8EF3B163-59FB-4554-A34A-7A53F6F2E051","clientSequence":6,"timerActivityId":"c-med2","contract":{"contractId":"c-med2","contractName":"Breathwork","healthDay":"2026-10-01","expiresAt":"2026-10-01T16:27:14.311Z","completionPolicy":{"kind":"timer_completion","timerActivityId":"c-med2"},"activities":[{"activityId":"c-med2","slot":"primary","name":"Breathwork","mode":"timer"}]}}}
+[bridge-stub] ◀ LIVE_ACTIVITY_STATE_CHANGED {"tracked":[{"lastUpdatedAt":"2026-10-01T10:27:11Z","presentationStatus":"ended","healthDay":"2026-10-01","focused":false,"reason":"completed","contractId":"c-med"},{"healthDay":"2026-10-01","presentationStatus":"active","lastUpdatedAt":"2026-10-01T10:27:14Z","focused":false,"contractId":"c-walk2"},{"lastUpdatedAt":"2026-10-01T10:27:14Z","focused":true,"contractId":"c-med2","presentationStatus":"active","healthDay":"2026-10-01"}],"supported":true,"enabled":true,"focusedOccurrence":{"contractId":"c-med2","healthDay":"2026-10-01"}}
+[bridge-stub] ◀ TIMER_CANCELLED {"activityId":"c-walk2"}
+[bridge-stub] ◀ TIMER_STARTED {"activityId":"c-med2","endsAt":"2026-10-01T10:32:14Z","requestId":"stub-21","liveActivityStatus":"active"}
+[bridge-stub] PASS another start broadcasts TIMER_CANCELLED for the first timer
+[bridge-stub] ▶ STUB_LIST_LIVE_ACTIVITIES {}
+[bridge-stub] ◀ STUB_LIVE_ACTIVITIES {"requestId":"stub-22","activities":[{"status":"completed","id":"4C19285F-17AD-40B2-BA0E-1F56C7E6C33D","relevanceScore":0,"contractName":"Meditation","timer":{"endsAt":"2026-10-01T10:27:09Z","finished":true,"activityId":"c-med"},"health":[],"contractId":"c-med","activityState":"active","healthDay":"2026-10-01"},{"health":[{"target":8000,"dataStatus":"fresh","activityId":"c-walk2:primary","reached":false,"value":3000}],"staleDate":"2026-10-01T11:27:14Z","contractName":"Walk","activityState":"active","id":"D907D3E2-44DB-4473-ACAB-34BC806B73A0","status":"active","healthDay":"2026-10-01","relevanceScore":99,"contractId":"c-walk2"},{"activityState":"active","status":"active","contractName":"Breathwork","health":[],"relevanceScore":100,"staleDate":"2026-10-01T10:32:14Z","contractId":"c-med2","healthDay":"2026-10-01","timer":{"endsAt":"2026-10-01T10:32:14Z","activityId":"c-med2","finished":false},"id":"947CFEE2-02EE-421D-A938-D95EE9D50ADF"}]}
+[bridge-stub] PASS the replaced contract keeps its Health card, without the timer
+[bridge-stub] PASS the new timer leads
+[bridge-stub] ▶ START_TIMER {"activityId":"c-x","activityName":"X","durationSeconds":60,"trackingContext":{"bridgeSessionId":"stale","clientSequence":1,"contract":{"contractId":"c-med","contractName":"Meditation","healthDay":"2026-10-01","expiresAt":"2026-10-01T16:27:03.813Z","completionPolicy":{"kind":"timer_completion","timerActivityId":"c-med"},"activities":[{"activityId":"c-med","slot":"primary","name":"Meditation","mode":"timer"}]}}}
+[bridge-stub] ◀ ERROR {"message":"bridgeSessionId does not belong to this page and account; use the latest liveActivityBridgeSessionId","requestId":"stub-23","code":"stale_bridge_session"}
+[bridge-stub] PASS a stale tracking context is refused before the timer is touched
+[bridge-stub] ▶ GET_TIMER_STATE {}
+[bridge-stub] ◀ TIMER_STATE {"requestId":"stub-24","active":true,"activityId":"c-med2","endsAt":"2026-10-01T10:32:14Z"}
+[bridge-stub] PASS …so c-med2 is still the running timer
+[bridge-stub] ▶ CANCEL_TIMER {"activityId":"c-med2"}
+[bridge-stub] ◀ TIMER_CANCELLED {"reason":"cancelled","activityId":"c-med2","requestId":"stub-25"}
+[bridge-stub] ▶ CLEAR_AUTH_SESSION {}
+[bridge-stub] ◀ LIVE_ACTIVITY_STATE_CHANGED {"tracked":[{"lastUpdatedAt":"2026-10-01T10:27:11Z","presentationStatus":"ended","healthDay":"2026-10-01","focused":false,"reason":"completed","contractId":"c-med"},{"healthDay":"2026-10-01","presentationStatus":"active","lastUpdatedAt":"2026-10-01T10:27:14Z","focused":true,"contractId":"c-walk2"},{"lastUpdatedAt":"2026-10-01T10:27:14Z","focused":false,"contractId":"c-med2","presentationStatus":"awaiting_timer","healthDay":"2026-10-01"}],"supported":true,"enabled":true,"focusedOccurrence":{"contractId":"c-walk2","healthDay":"2026-10-01"}}
+[bridge-stub] ◀ AUTH_SESSION_CLEARED {"liveActivityBridgeSessionId":"B4B827D2-8070-4DDF-9683-BA1D7F16AAF8","requestId":"stub-26"}
+[bridge-stub] SCENARIO DONE
+com.jimmy.upwork.honoured: 27355

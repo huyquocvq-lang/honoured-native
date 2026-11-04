@@ -1,0 +1,23 @@
+2026-10-02 09:08:03.459 Honoured[72425:3401577] Successfully load keyboard extensions
+[bridge-stub] ◀ NATIVE_READY {"liveActivityBridgeSessionId":"B8251C6D-C1B2-4846-BC11-5652CE139978","bridgeVersion":2,"capabilities":{"googleSignIn":{"supported":true,"protocolVersion":1,"transport":"trusted-auth-v1","intents":["sign_in","link"],"configured":true},"liveActivities":{"protocolVersion":1,"minimumOS":"16.2","enabled":true,"supported":true}},"platform":"ios"}
+[bridge-stub] ◀ NATIVE_READY {"platform":"ios","bridgeVersion":2,"capabilities":{"liveActivities":{"protocolVersion":1,"minimumOS":"16.2","enabled":true,"supported":true},"googleSignIn":{"supported":true,"protocolVersion":1,"transport":"trusted-auth-v1","intents":["sign_in","link"],"configured":true}},"liveActivityBridgeSessionId":"B8251C6D-C1B2-4846-BC11-5652CE139978"}
+[bridge-stub] ▶ STUB_ICON_CARD {"phase":"start"}
+[bridge-stub] ◀ STUB_ICON_CARD {"phase":"start","requestId":"stub-1","outcome":"started"}
+[bridge-stub] PASS an Icon card starts
+[bridge-stub] ▶ STUB_ICON_CARD {"phase":"count"}
+[bridge-stub] ◀ STUB_ICON_CARD {"phase":"count","requestId":"stub-2","outcome":"1"}
+[bridge-stub] PASS one Icon card is running
+[bridge-stub] ▶ STUB_ICON_CARD {"phase":"evening"}
+[bridge-stub] ◀ STUB_ICON_CARD {"phase":"evening","requestId":"stub-3","outcome":"updated 1"}
+[bridge-stub] PASS evening update reaches it
+[bridge-stub] ▶ STUB_ICON_CARD {"phase":"broken"}
+[bridge-stub] ◀ STUB_ICON_CARD {"phase":"broken","requestId":"stub-4","outcome":"updated 1"}
+[bridge-stub] PASS BROKEN result reaches it
+[bridge-stub] ▶ STUB_ICON_CARD {"phase":"honoured"}
+[bridge-stub] ◀ STUB_ICON_CARD {"requestId":"stub-5","phase":"honoured","outcome":"updated 1"}
+[bridge-stub] PASS HONOURED result reaches it
+[bridge-stub] ▶ STUB_ICON_CARD {"phase":"count"}
+[bridge-stub] ◀ STUB_ICON_CARD {"phase":"count","outcome":"1","requestId":"stub-6"}
+[bridge-stub] PASS still exactly one card after every update
+[bridge-stub] SCENARIO DONE
+com.jimmy.upwork.honoured: 72425

@@ -1,0 +1,13 @@
+2026-10-01 17:24:45.797 Honoured[24092:2758244] Successfully load keyboard extensions
+[bridge-stub] ◀ NATIVE_READY {"platform":"ios","capabilities":{"liveActivities":{"supported":true,"enabled":true,"minimumOS":"16.2","protocolVersion":1},"googleSignIn":{"transport":"trusted-auth-v1","configured":true,"intents":["sign_in","link"],"protocolVersion":1,"supported":true}},"liveActivityBridgeSessionId":"DC3C2B98-2C4C-4557-8FB5-B39F7DEC28E6","bridgeVersion":2}
+[bridge-stub] ◀ NATIVE_READY {"liveActivityBridgeSessionId":"DC3C2B98-2C4C-4557-8FB5-B39F7DEC28E6","capabilities":{"liveActivities":{"supported":true,"protocolVersion":1,"enabled":true,"minimumOS":"16.2"},"googleSignIn":{"transport":"trusted-auth-v1","configured":true,"intents":["sign_in","link"],"protocolVersion":1,"supported":true}},"platform":"ios","bridgeVersion":2}
+[bridge-stub] ◀ AUTH_SESSION_ACCEPTED {"userId":"stub-race-user-b","liveActivityBridgeSessionId":"DC3C2B98-2C4C-4557-8FB5-B39F7DEC28E6","requestId":"race-login"}
+[bridge-stub] PASS the page login during load is accepted (user B)
+[bridge-stub] PASS the older stored session (user A) is never offered
+[bridge-stub] ▶ STUB_AUTH_STATE {}
+[bridge-stub] ◀ STUB_AUTH_STATE {"requestId":"stub-1","userId":"stub-race-user-b","expiresAt":1790857486}
+[bridge-stub] PASS Keychain holds user B, not A
+[bridge-stub] ▶ CLEAR_AUTH_SESSION {}
+[bridge-stub] ◀ AUTH_SESSION_CLEARED {"requestId":"stub-2","liveActivityBridgeSessionId":"2EF325E8-29E0-4B5B-BEBC-66C333AE0FA8"}
+[bridge-stub] SCENARIO DONE
+com.jimmy.upwork.honoured: 24092

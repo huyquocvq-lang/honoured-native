@@ -1,0 +1,10 @@
+2026-10-01 17:24:53.576 Honoured[24234:2759057] Successfully load keyboard extensions
+[bridge-stub] ◀ NATIVE_READY {"liveActivityBridgeSessionId":"AD4A18D2-675E-4656-9F14-853C5541BBD6","bridgeVersion":2,"platform":"ios","capabilities":{"liveActivities":{"supported":true,"protocolVersion":1,"minimumOS":"16.2","enabled":true},"googleSignIn":{"transport":"trusted-auth-v1","intents":["sign_in","link"],"supported":true,"protocolVersion":1,"configured":true}}}
+[bridge-stub] ◀ NATIVE_READY {"liveActivityBridgeSessionId":"AD4A18D2-675E-4656-9F14-853C5541BBD6","bridgeVersion":2,"platform":"ios","capabilities":{"liveActivities":{"supported":true,"protocolVersion":1,"minimumOS":"16.2","enabled":true},"googleSignIn":{"transport":"trusted-auth-v1","intents":["sign_in","link"],"supported":true,"protocolVersion":1,"configured":true}}}
+[bridge-stub] ▶ CLEAR_AUTH_SESSION {}
+[bridge-stub] ◀ AUTH_SESSION_CLEARED {"liveActivityBridgeSessionId":"AF348839-0C32-43A1-B23D-A2B55B5A8D04","requestId":"stub-1"}
+[bridge-stub] ▶ SET_AUTH_SESSION {"userId":"stub-expired-user","accessToken":"stub-access-x","refreshToken":"stub-refresh-not-valid","expiresAt":1790850234}
+[bridge-stub] ◀ AUTH_SESSION_ACCEPTED {"liveActivityBridgeSessionId":"AF348839-0C32-43A1-B23D-A2B55B5A8D04","requestId":"stub-2","userId":"stub-expired-user"}
+[bridge-stub] PASS expired session stored
+[bridge-stub] SCENARIO DONE
+com.jimmy.upwork.honoured: 24234

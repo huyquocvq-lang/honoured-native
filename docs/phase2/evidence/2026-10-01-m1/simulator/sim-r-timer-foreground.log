@@ -1,0 +1,47 @@
+[bridge-stub] ◀ NATIVE_READY {"liveActivityBridgeSessionId":"940CA1ED-BAE4-423C-B1E5-2ADC29FD5AF6","platform":"ios","bridgeVersion":2,"capabilities":{"liveActivities":{"protocolVersion":1,"supported":true,"minimumOS":"16.2","enabled":true},"googleSignIn":{"supported":true,"transport":"trusted-auth-v1","intents":["sign_in","link"],"protocolVersion":1,"configured":true}}}
+[bridge-stub] ◀ NATIVE_READY {"bridgeVersion":2,"liveActivityBridgeSessionId":"940CA1ED-BAE4-423C-B1E5-2ADC29FD5AF6","platform":"ios","capabilities":{"liveActivities":{"protocolVersion":1,"supported":true,"enabled":true,"minimumOS":"16.2"},"googleSignIn":{"supported":true,"configured":true,"transport":"trusted-auth-v1","protocolVersion":1,"intents":["sign_in","link"]}}}
+[bridge-stub] ▶ GET_TIMER_STATE {}
+[bridge-stub] ◀ TIMER_STATE {"requestId":"stub-1","active":false}
+[bridge-stub] PASS initial state inactive
+[bridge-stub] ▶ START_TIMER {"activityId":"act-1","activityName":"Cold plunge","durationSeconds":5}
+[bridge-stub] ◀ TIMER_STARTED {"requestId":"stub-2","endsAt":"2026-10-01T10:29:46Z","activityId":"act-1"}
+[bridge-stub] PASS TIMER_STARTED act-1 with endsAt
+[bridge-stub] PASS endsAt ≈ now + 5 s
+[bridge-stub] ▶ GET_TIMER_STATE {}
+[bridge-stub] ◀ TIMER_STATE {"active":true,"activityId":"act-1","endsAt":"2026-10-01T10:29:46Z","requestId":"stub-3"}
+[bridge-stub] PASS state active act-1
+[bridge-stub] ◀ TIMER_COMPLETED {"completedAt":"2026-10-01T10:29:46Z","activityId":"act-1","notified":false}
+[bridge-stub] PASS TIMER_COMPLETED act-1 notified:false (app active)
+[bridge-stub] PASS completedAt == endsAt
+[bridge-stub] PASS no duplicate TIMER_COMPLETED
+[bridge-stub] ▶ GET_TIMER_STATE {}
+[bridge-stub] ◀ TIMER_STATE {"active":false,"requestId":"stub-4"}
+[bridge-stub] PASS state inactive after completion
+[bridge-stub] ▶ START_TIMER {"activityId":"act-A","activityName":"A","durationSeconds":60}
+[bridge-stub] ◀ TIMER_STARTED {"activityId":"act-A","endsAt":"2026-10-01T10:30:49Z","requestId":"stub-5"}
+[bridge-stub] PASS start act-A
+[bridge-stub] ▶ START_TIMER {"activityId":"act-B","activityName":"B","durationSeconds":60}
+[bridge-stub] ◀ TIMER_CANCELLED {"activityId":"act-A"}
+[bridge-stub] ◀ TIMER_STARTED {"activityId":"act-B","endsAt":"2026-10-01T10:30:49Z","requestId":"stub-6"}
+[bridge-stub] PASS start act-B replaces A
+[bridge-stub] PASS broadcast TIMER_CANCELLED act-A (no requestId)
+[bridge-stub] ▶ CANCEL_TIMER {"activityId":"act-A"}
+[bridge-stub] ◀ ERROR {"code":"timer_not_active","requestId":"stub-7","message":"The running timer is for act-B"}
+[bridge-stub] PASS CANCEL_TIMER for non-running act-A → ERROR timer_not_active
+[bridge-stub] ▶ CANCEL_TIMER {"activityId":"act-B"}
+[bridge-stub] ◀ TIMER_CANCELLED {"reason":"cancelled","activityId":"act-B","requestId":"stub-8"}
+[bridge-stub] PASS CANCEL_TIMER act-B
+[bridge-stub] ▶ CANCEL_TIMER {"activityId":"act-B"}
+[bridge-stub] ◀ TIMER_CANCELLED {"reason":"cancelled","activityId":"act-B","requestId":"stub-9"}
+[bridge-stub] PASS CANCEL_TIMER act-B again is idempotent
+[bridge-stub] ▶ GET_TIMER_STATE {}
+[bridge-stub] ◀ TIMER_STATE {"active":false,"requestId":"stub-10"}
+[bridge-stub] PASS state inactive after cancel
+[bridge-stub] ▶ START_TIMER {"activityId":"","activityName":"x","durationSeconds":5}
+[bridge-stub] ◀ ERROR {"message":"activityId, activityName and a positive durationSeconds are required","code":"invalid_timer","requestId":"stub-11"}
+[bridge-stub] PASS invalid START_TIMER → ERROR invalid_timer
+[bridge-stub] ▶ START_TIMER {"activityId":"act-Z","activityName":"Z","durationSeconds":0}
+[bridge-stub] ◀ ERROR {"message":"activityId, activityName and a positive durationSeconds are required","code":"invalid_timer","requestId":"stub-12"}
+[bridge-stub] PASS zero duration → ERROR invalid_timer
+[bridge-stub] SCENARIO DONE
+com.jimmy.upwork.honoured: 32008

@@ -1,0 +1,13 @@
+2026-10-01 17:24:25.450 Honoured[23540:2755963] Successfully load keyboard extensions
+[bridge-stub] ◀ NATIVE_READY {"platform":"ios","liveActivityBridgeSessionId":"33C9CB01-0B48-4947-8264-16E413388B0D","bridgeVersion":2,"capabilities":{"liveActivities":{"supported":true,"enabled":true,"protocolVersion":1,"minimumOS":"16.2"},"googleSignIn":{"configured":true,"intents":["sign_in","link"],"transport":"trusted-auth-v1","supported":true,"protocolVersion":1}}}
+[bridge-stub] ◀ NATIVE_READY {"capabilities":{"liveActivities":{"enabled":true,"minimumOS":"16.2","supported":true,"protocolVersion":1},"googleSignIn":{"supported":true,"intents":["sign_in","link"],"protocolVersion":1,"configured":true,"transport":"trusted-auth-v1"}},"platform":"ios","liveActivityBridgeSessionId":"33C9CB01-0B48-4947-8264-16E413388B0D","bridgeVersion":2}
+[bridge-stub] ▶ CLEAR_AUTH_SESSION {}
+[bridge-stub] ◀ AUTH_SESSION_CLEARED {"liveActivityBridgeSessionId":"BAE299A1-4366-426F-BF64-EBF752B5D314","requestId":"stub-1"}
+[bridge-stub] ▶ SET_AUTH_SESSION {"userId":"stub-restore-user-a","accessToken":"stub-access-a","refreshToken":"stub-refresh-a","expiresAt":1790857466}
+[bridge-stub] ◀ AUTH_SESSION_ACCEPTED {"liveActivityBridgeSessionId":"BAE299A1-4366-426F-BF64-EBF752B5D314","userId":"stub-restore-user-a","requestId":"stub-2"}
+[bridge-stub] PASS session for user A accepted
+[bridge-stub] ▶ STUB_AUTH_STATE {}
+[bridge-stub] ◀ STUB_AUTH_STATE {"userId":"stub-restore-user-a","expiresAt":1790857466,"requestId":"stub-3"}
+[bridge-stub] PASS Keychain holds user A
+[bridge-stub] SCENARIO DONE
+com.jimmy.upwork.honoured: 23540

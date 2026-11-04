@@ -1,0 +1,16 @@
+2026-10-01 17:25:24.842 Honoured[25064:2762197] Successfully load keyboard extensions
+[bridge-stub] ◀ NATIVE_READY {"liveActivityBridgeSessionId":"22F5AF32-D70C-442C-B029-5D3C35E99105","bridgeVersion":2,"capabilities":{"liveActivities":{"minimumOS":"16.2","protocolVersion":1,"supported":true,"enabled":true},"googleSignIn":{"configured":true,"supported":true,"transport":"trusted-auth-v1","protocolVersion":1,"intents":["sign_in","link"]}},"platform":"ios"}
+[bridge-stub] ◀ NATIVE_READY {"bridgeVersion":2,"liveActivityBridgeSessionId":"22F5AF32-D70C-442C-B029-5D3C35E99105","platform":"ios","capabilities":{"liveActivities":{"minimumOS":"16.2","protocolVersion":1,"supported":true,"enabled":true},"googleSignIn":{"intents":["sign_in","link"],"transport":"trusted-auth-v1","protocolVersion":1,"supported":true,"configured":true}}}
+[bridge-stub] ▶ SYNC_AUTH_CONTEXT {"userId":null}
+[bridge-stub] ◀ AUTH_CONTEXT_SYNCED {"authContextId":"DE0CB49C-ECC2-4363-A610-DFF6C1E778AF","userId":null,"requestId":"stub-1"}
+[bridge-stub] reloading while the Google UI is up
+[bridge-stub] ◀ NATIVE_READY {"capabilities":{"liveActivities":{"minimumOS":"16.2","supported":true,"enabled":true,"protocolVersion":1},"googleSignIn":{"configured":true,"transport":"trusted-auth-v1","supported":true,"intents":["sign_in","link"],"protocolVersion":1}},"bridgeVersion":2,"liveActivityBridgeSessionId":"A72E63D4-A351-4F76-B746-92CF09442D8B","platform":"ios"}
+[bridge-stub] ◀ NATIVE_READY {"platform":"ios","liveActivityBridgeSessionId":"A72E63D4-A351-4F76-B746-92CF09442D8B","capabilities":{"googleSignIn":{"transport":"trusted-auth-v1","protocolVersion":1,"configured":true,"supported":true,"intents":["sign_in","link"]},"liveActivities":{"enabled":true,"supported":true,"protocolVersion":1,"minimumOS":"16.2"}},"bridgeVersion":2}
+[bridge-stub] PASS no Google result reaches the reloaded page
+[bridge-stub] ▶ SYNC_AUTH_CONTEXT {"userId":null}
+[bridge-stub] ◀ AUTH_CONTEXT_SYNCED {"authContextId":"808B88CF-E3BE-4035-AFB9-79AC0528DB7E","userId":null,"requestId":"stub-1"}
+[bridge-stub] ▶ SIGN_IN_WITH_GOOGLE {"intent":"sign_in","authContextId":"808B88CF-E3BE-4035-AFB9-79AC0528DB7E"}
+[bridge-stub] ◀ GOOGLE_SIGN_IN_SUCCESS {"idToken":"<idToken 91 chars>","accessToken":"<accessToken 24 chars>","requestId":"stub-2","rawNonce":"<rawNonce 64 chars>","intent":"sign_in","authContextId":"808B88CF-E3BE-4035-AFB9-79AC0528DB7E"}
+[bridge-stub] PASS the new page can sign in once the old UI has closed
+[bridge-stub] SCENARIO DONE
+com.jimmy.upwork.honoured: 25064

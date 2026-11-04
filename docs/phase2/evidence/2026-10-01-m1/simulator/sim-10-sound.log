@@ -1,0 +1,25 @@
+2026-10-01 17:25:39.285 Honoured[25500:2763709] Successfully load keyboard extensions
+[bridge-stub] ◀ NATIVE_READY {"capabilities":{"liveActivities":{"enabled":true,"protocolVersion":1,"minimumOS":"16.2","supported":true},"googleSignIn":{"transport":"trusted-auth-v1","supported":true,"intents":["sign_in","link"],"protocolVersion":1,"configured":true}},"platform":"ios","bridgeVersion":2,"liveActivityBridgeSessionId":"65517579-7E9F-47C8-B124-37C9A221A244"}
+[bridge-stub] ◀ NATIVE_READY {"bridgeVersion":2,"capabilities":{"googleSignIn":{"configured":true,"protocolVersion":1,"intents":["sign_in","link"],"supported":true,"transport":"trusted-auth-v1"},"liveActivities":{"protocolVersion":1,"supported":true,"minimumOS":"16.2","enabled":true}},"liveActivityBridgeSessionId":"65517579-7E9F-47C8-B124-37C9A221A244","platform":"ios"}
+[bridge-stub] ▶ SET_SOUND_ENABLED {"enabled":true}
+[bridge-stub] ◀ SOUND_STATE {"gongBundled":true,"enabled":true,"requestId":"stub-1"}
+[bridge-stub] PASS SOUND_STATE enabled:true
+[bridge-stub] gongBundled=true
+[bridge-stub] ▶ SET_SOUND_ENABLED {"enabled":1}
+[bridge-stub] ◀ ERROR {"code":"invalid_sound_state","message":"enabled must be a boolean","requestId":"stub-2"}
+[bridge-stub] PASS numeric enabled → ERROR invalid_sound_state
+[bridge-stub] ▶ SET_SOUND_ENABLED {"enabled":"yes"}
+[bridge-stub] ◀ ERROR {"requestId":"stub-3","message":"enabled must be a boolean","code":"invalid_sound_state"}
+[bridge-stub] PASS string enabled → ERROR invalid_sound_state
+[bridge-stub] ▶ START_TIMER {"activityId":"act-snd","activityName":"Sound check","durationSeconds":120}
+[bridge-stub] ◀ TIMER_STARTED {"activityId":"act-snd","requestId":"stub-4","endsAt":"2026-10-01T10:27:40Z"}
+[bridge-stub] ▶ SET_SOUND_ENABLED {"enabled":false}
+[bridge-stub] ◀ SOUND_STATE {"enabled":false,"gongBundled":true,"requestId":"stub-5"}
+[bridge-stub] PASS SOUND_STATE enabled:false
+[bridge-stub] ▶ GET_TIMER_STATE {}
+[bridge-stub] ◀ TIMER_STATE {"activityId":"act-snd","active":true,"requestId":"stub-6","endsAt":"2026-10-01T10:27:40Z"}
+[bridge-stub] PASS timer still running with the same endsAt after toggling sound
+[bridge-stub] ▶ CANCEL_TIMER {"activityId":"act-snd"}
+[bridge-stub] ◀ TIMER_CANCELLED {"requestId":"stub-7","activityId":"act-snd","reason":"cancelled"}
+[bridge-stub] SCENARIO DONE
+com.jimmy.upwork.honoured: 25500

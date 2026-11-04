@@ -1,0 +1,73 @@
+2026-10-01 17:26:44.010 Honoured[26881:2768892] Successfully load keyboard extensions
+[bridge-stub] ◀ NATIVE_READY {"capabilities":{"liveActivities":{"supported":true,"protocolVersion":1,"enabled":true,"minimumOS":"16.2"},"googleSignIn":{"configured":true,"transport":"trusted-auth-v1","protocolVersion":1,"intents":["sign_in","link"],"supported":true}},"platform":"ios","liveActivityBridgeSessionId":"EC613477-9DBC-4342-92CA-855B18B5B14B","bridgeVersion":2}
+[bridge-stub] ◀ NATIVE_READY {"capabilities":{"liveActivities":{"supported":true,"protocolVersion":1,"enabled":true,"minimumOS":"16.2"},"googleSignIn":{"configured":true,"transport":"trusted-auth-v1","protocolVersion":1,"intents":["sign_in","link"],"supported":true}},"platform":"ios","liveActivityBridgeSessionId":"EC613477-9DBC-4342-92CA-855B18B5B14B","bridgeVersion":2}
+[bridge-stub] ▶ CLEAR_AUTH_SESSION {}
+[bridge-stub] ◀ AUTH_SESSION_CLEARED {"liveActivityBridgeSessionId":"97E7D73C-26EF-4D14-972E-04AB647AC8C9","requestId":"stub-1"}
+[bridge-stub] ▶ STUB_SET_FAKE_HEALTH_TOTALS {"spec":null}
+[bridge-stub] ◀ STUB_FAKE_HEALTH_TOTALS_SET {"spec":null,"requestId":"stub-2"}
+[bridge-stub] ▶ SET_AUTH_SESSION {"userId":"stub-user-a","accessToken":"stub-access-token","refreshToken":"stub-refresh-token","expiresAt":1790854004}
+[bridge-stub] ◀ AUTH_SESSION_ACCEPTED {"userId":"stub-user-a","liveActivityBridgeSessionId":"97E7D73C-26EF-4D14-972E-04AB647AC8C9","requestId":"stub-3"}
+[bridge-stub] ▶ SET_DAY_RESET_HOUR {"hour":0}
+[bridge-stub] ◀ DAY_RESET_HOUR_ACCEPTED {"requestId":"stub-4","hour":0}
+[bridge-stub] PASS SET_AUTH_SESSION returns a Live Activity session id
+[bridge-stub] ▶ GET_LIVE_ACTIVITY_STATE {}
+[bridge-stub] ◀ LIVE_ACTIVITY_STATE {"tracked":[],"supported":true,"enabled":true,"liveActivityBridgeSessionId":"97E7D73C-26EF-4D14-972E-04AB647AC8C9","requestId":"stub-5"}
+[bridge-stub] PASS capability: supported and enabled
+[bridge-stub] ▶ SET_GOALS {"goals":[{"activityId":"c-walk:primary","activityName":"Walking","metric":"steps","target":8000,"unit":"count"},{"activityId":"c-exercise:primary","activityName":"Exercise","metric":"exercise_minutes","target":30,"unit":"minutes"}]}
+[bridge-stub] ◀ GOALS_ACCEPTED {"requestId":"stub-6","count":2}
+[bridge-stub] PASS goals accepted
+[bridge-stub] ▶ STUB_SET_FAKE_HEALTH_TOTALS {"spec":"steps=2000,exercise_minutes=5"}
+[bridge-stub] ◀ STUB_FAKE_HEALTH_TOTALS_SET {"requestId":"stub-7","spec":"steps=2000,exercise_minutes=5"}
+[bridge-stub] ▶ TRACK_CONTRACT {"bridgeSessionId":"97E7D73C-26EF-4D14-972E-04AB647AC8C9","clientSequence":1,"reason":"opened","contract":{"contractId":"c-walk","contractName":"Morning Walk","healthDay":"2026-10-01","expiresAt":"2026-10-01T16:26:44.455Z","timerActivityId":"c-walk","completionPolicy":{"kind":"all_health_slots","requiredActivityIds":["c-walk:primary"]},"activities":[{"activityId":"c-walk:primary","slot":"primary","name":"Walking","mode":"health","metric":"steps","target":8000,"unit":"count"}]}}
+[bridge-stub] ◀ LIVE_ACTIVITY_STATE_CHANGED {"focusedOccurrence":{"contractId":"c-walk","healthDay":"2026-10-01"},"enabled":true,"supported":true,"tracked":[{"contractId":"c-walk","lastUpdatedAt":"2026-10-01T10:26:45Z","presentationStatus":"active","healthDay":"2026-10-01","focused":true}]}
+[bridge-stub] ◀ CONTRACT_TRACKING_ACCEPTED {"requestId":"stub-8","focused":true,"presentationStatus":"active","healthDay":"2026-10-01","contractId":"c-walk"}
+[bridge-stub] PASS open Walking: active and focused
+[bridge-stub] ▶ TRACK_CONTRACT {"bridgeSessionId":"97E7D73C-26EF-4D14-972E-04AB647AC8C9","clientSequence":2,"reason":"opened","contract":{"contractId":"c-exercise","contractName":"Move 30","healthDay":"2026-10-01","expiresAt":"2026-10-01T16:26:44.455Z","timerActivityId":"c-exercise","completionPolicy":{"kind":"all_health_slots","requiredActivityIds":["c-exercise:primary"]},"activities":[{"activityId":"c-exercise:primary","slot":"primary","name":"Exercise","mode":"health","metric":"exercise_minutes","target":30,"unit":"minutes"}]}}
+[bridge-stub] ◀ LIVE_ACTIVITY_STATE_CHANGED {"tracked":[{"presentationStatus":"active","contractId":"c-walk","healthDay":"2026-10-01","focused":false,"lastUpdatedAt":"2026-10-01T10:26:45Z"},{"lastUpdatedAt":"2026-10-01T10:26:45Z","focused":true,"contractId":"c-exercise","presentationStatus":"active","healthDay":"2026-10-01"}],"supported":true,"enabled":true,"focusedOccurrence":{"healthDay":"2026-10-01","contractId":"c-exercise"}}
+[bridge-stub] ◀ CONTRACT_TRACKING_ACCEPTED {"focused":true,"presentationStatus":"active","healthDay":"2026-10-01","requestId":"stub-9","contractId":"c-exercise"}
+[bridge-stub] PASS open Exercise: active and focused
+[bridge-stub] ▶ GET_LIVE_ACTIVITY_STATE {}
+[bridge-stub] ◀ LIVE_ACTIVITY_STATE {"requestId":"stub-10","enabled":true,"tracked":[{"contractId":"c-walk","lastUpdatedAt":"2026-10-01T10:26:45Z","presentationStatus":"active","healthDay":"2026-10-01","focused":false},{"presentationStatus":"active","contractId":"c-exercise","healthDay":"2026-10-01","lastUpdatedAt":"2026-10-01T10:26:45Z","focused":true}],"supported":true,"focusedOccurrence":{"healthDay":"2026-10-01","contractId":"c-exercise"},"liveActivityBridgeSessionId":"97E7D73C-26EF-4D14-972E-04AB647AC8C9"}
+[bridge-stub] PASS Walking keeps its card but loses focus
+[bridge-stub] ▶ START_TIMER {"activityId":"c-meditation","activityName":"Meditation","durationSeconds":600,"trackingContext":{"bridgeSessionId":"97E7D73C-26EF-4D14-972E-04AB647AC8C9","clientSequence":3,"timerActivityId":"c-meditation","contract":{"contractId":"c-meditation","contractName":"Meditation","healthDay":"2026-10-01","expiresAt":"2026-10-01T16:26:44.455Z","completionPolicy":{"kind":"timer_completion","timerActivityId":"c-meditation"},"activities":[{"activityId":"c-meditation","slot":"primary","name":"Meditation","mode":"timer"}]}}}
+[bridge-stub] ◀ LIVE_ACTIVITY_STATE_CHANGED {"tracked":[{"presentationStatus":"active","contractId":"c-walk","healthDay":"2026-10-01","lastUpdatedAt":"2026-10-01T10:26:45Z","focused":false},{"presentationStatus":"active","contractId":"c-exercise","healthDay":"2026-10-01","focused":false,"lastUpdatedAt":"2026-10-01T10:26:45Z"},{"presentationStatus":"active","focused":true,"contractId":"c-meditation","healthDay":"2026-10-01","lastUpdatedAt":"2026-10-01T10:26:45Z"}],"supported":true,"enabled":true,"focusedOccurrence":{"contractId":"c-meditation","healthDay":"2026-10-01"}}
+[bridge-stub] ◀ TIMER_STARTED {"endsAt":"2026-10-01T10:36:45Z","liveActivityStatus":"active","activityId":"c-meditation","requestId":"stub-11"}
+[bridge-stub] PASS Start Meditation 10 min: TIMER_STARTED with liveActivityStatus active
+[bridge-stub] ▶ STUB_LIST_LIVE_ACTIVITIES {}
+[bridge-stub] ◀ STUB_LIVE_ACTIVITIES {"requestId":"stub-12","activities":[{"id":"DD0577FB-093D-4995-AB29-A108B5A13696","healthDay":"2026-10-01","relevanceScore":99,"status":"active","activityState":"active","contractName":"Move 30","staleDate":"2026-10-01T11:26:45Z","contractId":"c-exercise","health":[{"activityId":"c-exercise:primary","target":30,"reached":false,"dataStatus":"fresh","value":5}]},{"status":"active","health":[{"value":2000,"target":8000,"activityId":"c-walk:primary","dataStatus":"fresh","reached":false}],"healthDay":"2026-10-01","id":"9A36CC54-5771-4768-8058-F7B7955BA2DB","contractId":"c-walk","contractName":"Morning Walk","staleDate":"2026-10-01T11:26:45Z","relevanceScore":98,"activityState":"active"},{"id":"9302094F-3287-4907-90EC-1727A3A4986E","contractName":"Meditation","healthDay":"2026-10-01","activityState":"active","staleDate":"2026-10-01T10:36:45Z","timer":{"endsAt":"2026-10-01T10:36:45Z","finished":false,"activityId":"c-meditation"},"health":[],"status":"active","contractId":"c-meditation","relevanceScore":100}]}
+[bridge-stub] PASS three separate cards
+[bridge-stub] PASS relevance: Meditation 100, Exercise 99, Walking 98
+[bridge-stub] PASS Meditation card counts down
+[bridge-stub] PASS Walking shows 2000 of 8000 steps, fresh
+[bridge-stub] ▶ TRACK_CONTRACT {"bridgeSessionId":"97E7D73C-26EF-4D14-972E-04AB647AC8C9","clientSequence":4,"reason":"opened","contract":{"contractId":"c-walk","contractName":"Morning Walk","healthDay":"2026-10-01","expiresAt":"2026-10-01T16:26:44.455Z","timerActivityId":"c-walk","completionPolicy":{"kind":"all_health_slots","requiredActivityIds":["c-walk:primary"]},"activities":[{"activityId":"c-walk:primary","slot":"primary","name":"Walking","mode":"health","metric":"steps","target":8000,"unit":"count"}]}}
+[bridge-stub] ◀ LIVE_ACTIVITY_STATE_CHANGED {"tracked":[{"presentationStatus":"active","contractId":"c-walk","healthDay":"2026-10-01","focused":true,"lastUpdatedAt":"2026-10-01T10:26:46Z"},{"presentationStatus":"active","contractId":"c-exercise","healthDay":"2026-10-01","lastUpdatedAt":"2026-10-01T10:26:46Z","focused":false},{"presentationStatus":"active","focused":false,"contractId":"c-meditation","healthDay":"2026-10-01","lastUpdatedAt":"2026-10-01T10:26:46Z"}],"supported":true,"enabled":true,"focusedOccurrence":{"contractId":"c-walk","healthDay":"2026-10-01"}}
+[bridge-stub] ◀ CONTRACT_TRACKING_ACCEPTED {"healthDay":"2026-10-01","presentationStatus":"active","requestId":"stub-13","focused":true,"contractId":"c-walk"}
+[bridge-stub] PASS reopen Walking: focused
+[bridge-stub] ▶ STUB_LIST_LIVE_ACTIVITIES {}
+[bridge-stub] ◀ STUB_LIVE_ACTIVITIES {"requestId":"stub-14","activities":[{"healthDay":"2026-10-01","contractName":"Move 30","staleDate":"2026-10-01T11:26:46Z","id":"DD0577FB-093D-4995-AB29-A108B5A13696","contractId":"c-exercise","status":"active","activityState":"active","relevanceScore":98,"health":[{"target":30,"reached":false,"value":5,"dataStatus":"fresh","activityId":"c-exercise:primary"}]},{"id":"9A36CC54-5771-4768-8058-F7B7955BA2DB","healthDay":"2026-10-01","relevanceScore":100,"status":"active","activityState":"active","contractName":"Morning Walk","staleDate":"2026-10-01T11:26:46Z","contractId":"c-walk","health":[{"activityId":"c-walk:primary","dataStatus":"fresh","reached":false,"target":8000,"value":2000}]},{"activityState":"active","staleDate":"2026-10-01T10:36:45Z","id":"9302094F-3287-4907-90EC-1727A3A4986E","healthDay":"2026-10-01","health":[],"contractId":"c-meditation","timer":{"finished":false,"activityId":"c-meditation","endsAt":"2026-10-01T10:36:45Z"},"relevanceScore":99,"status":"active","contractName":"Meditation"}]}
+[bridge-stub] PASS all three kept; Walking 100, Meditation 99, Exercise 98
+[bridge-stub] ▶ GET_TIMER_STATE {}
+[bridge-stub] ◀ TIMER_STATE {"activityId":"c-meditation","endsAt":"2026-10-01T10:36:45Z","active":true,"requestId":"stub-15"}
+[bridge-stub] PASS Meditation still counting after focus moved
+[bridge-stub] ▶ STUB_SET_FAKE_HEALTH_TOTALS {"spec":"steps=2000,exercise_minutes=31"}
+[bridge-stub] ◀ LIVE_ACTIVITY_STATE_CHANGED {"tracked":[{"presentationStatus":"active","focused":true,"contractId":"c-walk","healthDay":"2026-10-01","lastUpdatedAt":"2026-10-01T10:26:47Z"},{"lastUpdatedAt":"2026-10-01T10:26:47Z","contractId":"c-exercise","presentationStatus":"ended","healthDay":"2026-10-01","focused":false,"reason":"completed"},{"contractId":"c-meditation","focused":false,"lastUpdatedAt":"2026-10-01T10:26:46Z","healthDay":"2026-10-01","presentationStatus":"active"}],"supported":true,"enabled":true,"focusedOccurrence":{"healthDay":"2026-10-01","contractId":"c-walk"}}
+[bridge-stub] ◀ STUB_FAKE_HEALTH_TOTALS_SET {"spec":"steps=2000,exercise_minutes=31","requestId":"stub-16"}
+[bridge-stub] ◀ GOAL_REACHED {"activityId":"c-exercise:primary","reachedAt":"2026-10-01T10:26:47Z","metric":"exercise_minutes","value":31,"target":30,"notified":false}
+[bridge-stub] PASS GOAL_REACHED c-exercise:primary
+[bridge-stub] PASS LIVE_ACTIVITY_STATE_CHANGED is a broadcast
+[bridge-stub] ▶ GET_LIVE_ACTIVITY_STATE {}
+[bridge-stub] ◀ LIVE_ACTIVITY_STATE {"focusedOccurrence":{"healthDay":"2026-10-01","contractId":"c-walk"},"liveActivityBridgeSessionId":"97E7D73C-26EF-4D14-972E-04AB647AC8C9","tracked":[{"presentationStatus":"active","focused":true,"contractId":"c-walk","lastUpdatedAt":"2026-10-01T10:26:47Z","healthDay":"2026-10-01"},{"contractId":"c-exercise","focused":false,"reason":"completed","healthDay":"2026-10-01","lastUpdatedAt":"2026-10-01T10:26:47Z","presentationStatus":"ended"},{"contractId":"c-meditation","presentationStatus":"active","healthDay":"2026-10-01","focused":false,"lastUpdatedAt":"2026-10-01T10:26:46Z"}],"requestId":"stub-17","enabled":true,"supported":true}
+[bridge-stub] PASS Exercise ended as completed; Walking and Meditation untouched
+[bridge-stub] PASS Walking keeps priority
+[bridge-stub] ▶ STUB_LIST_LIVE_ACTIVITIES {}
+[bridge-stub] ◀ STUB_LIVE_ACTIVITIES {"requestId":"stub-18","activities":[{"status":"completed","health":[{"activityId":"c-exercise:primary","dataStatus":"fresh","reached":true,"target":30,"value":31}],"healthDay":"2026-10-01","id":"DD0577FB-093D-4995-AB29-A108B5A13696","contractId":"c-exercise","contractName":"Move 30","relevanceScore":0,"activityState":"active"},{"contractName":"Morning Walk","id":"9A36CC54-5771-4768-8058-F7B7955BA2DB","healthDay":"2026-10-01","relevanceScore":100,"status":"active","staleDate":"2026-10-01T11:26:47Z","activityState":"active","health":[{"target":8000,"reached":false,"value":2000,"dataStatus":"fresh","activityId":"c-walk:primary"}],"contractId":"c-walk"},{"activityState":"active","status":"active","timer":{"endsAt":"2026-10-01T10:36:45Z","activityId":"c-meditation","finished":false},"healthDay":"2026-10-01","relevanceScore":99,"staleDate":"2026-10-01T10:36:45Z","contractId":"c-meditation","contractName":"Meditation","id":"9302094F-3287-4907-90EC-1727A3A4986E","health":[]}]}
+[bridge-stub] FAIL Exercise final content says completed
+[bridge-stub] ▶ CLEAR_AUTH_SESSION {}
+[bridge-stub] ◀ AUTH_SESSION_CLEARED {"liveActivityBridgeSessionId":"D870EC66-4DA8-4E97-AA77-FAAAFB462E78","requestId":"stub-19"}
+[bridge-stub] ▶ GET_LIVE_ACTIVITY_STATE {}
+[bridge-stub] ◀ LIVE_ACTIVITY_STATE {"requestId":"stub-20","enabled":true,"supported":true,"liveActivityBridgeSessionId":"D870EC66-4DA8-4E97-AA77-FAAAFB462E78","tracked":[]}
+[bridge-stub] ▶ STUB_LIST_LIVE_ACTIVITIES {}
+[bridge-stub] ◀ STUB_LIVE_ACTIVITIES {"requestId":"stub-21","activities":[]}
+[bridge-stub] PASS logout removes every card and every tracked contract
+[bridge-stub] SCENARIO DONE
+com.jimmy.upwork.honoured: 26881

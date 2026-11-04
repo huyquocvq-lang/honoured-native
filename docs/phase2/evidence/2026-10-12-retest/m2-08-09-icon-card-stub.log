@@ -1,0 +1,9 @@
+PASS an Icon card starts
+PASS one Icon card is running
+PASS evening update reaches it
+PASS BROKEN result reaches it
+PASS HONOURED result reaches it
+PASS still exactly one card after every update
+SCENARIO DONE
+PASS the Icon card is gone
+SCENARIO DONE

@@ -1,0 +1,6 @@
+[bridge-stub] ◀ APPLE_SIGN_IN_FAILED {"message":"A Sign in with Apple request is already in progress","requestId":"stub-2","code":"failed"}
+[bridge-stub] PASS second request while the sheet is up fails immediately
+[bridge-stub] ◀ APPLE_SIGN_IN_FAILED {"code":"cancelled","requestId":"stub-1","message":"Sign in with Apple was cancelled"}
+[bridge-stub] PASS failure has code cancelled|failed and a message
+[bridge-stub] RESULT cancelled: Sign in with Apple was cancelled
+[bridge-stub] SCENARIO DONE

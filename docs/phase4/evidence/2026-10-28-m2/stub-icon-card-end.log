@@ -1,0 +1,9 @@
+[bridge-stub] ◀ NATIVE_READY {"bridgeVersion":2,"liveActivityBridgeSessionId":"1C60F998-AABF-4D46-AD83-04521BA7C369","platform":"ios","capabilities":{"sessionRefresh":{"supported":true,"protocolVersion":1},"wordTracker":{"sourceKinds":["word","text","rich_text","rich_text_directory","scrivener"],"protocolVersion":1,"supported":true},"googleSignIn":{"protocolVersion":1,"supported":true,"intents":["sign_in","link"],"transport":"trusted-auth-v1","configured":true},"liveActivities":{"minimumOS":"16.2","protocolVersion":1,"supported":true,"enabled":true},"iconRevisions":{"supported":true,"protocolVersion":1},"webCredentials":{"protocolVersion":1,"supported":true}}}
+[bridge-stub] ◀ NATIVE_READY {"capabilities":{"googleSignIn":{"intents":["sign_in","link"],"protocolVersion":1,"transport":"trusted-auth-v1","supported":true,"configured":true},"iconRevisions":{"supported":true,"protocolVersion":1},"liveActivities":{"minimumOS":"16.2","protocolVersion":1,"supported":true,"enabled":true},"sessionRefresh":{"protocolVersion":1,"supported":true},"webCredentials":{"protocolVersion":1,"supported":true},"wordTracker":{"supported":true,"sourceKinds":["word","text","rich_text","rich_text_directory","scrivener"],"protocolVersion":1}},"platform":"ios","bridgeVersion":2,"liveActivityBridgeSessionId":"1C60F998-AABF-4D46-AD83-04521BA7C369"}
+[bridge-stub] ▶ STUB_ICON_CARD {"phase":"end"}
+[bridge-stub] ◀ STUB_ICON_CARD {"phase":"end","outcome":"ended","requestId":"stub-1"}
+[bridge-stub] ▶ STUB_ICON_CARD {"phase":"count"}
+[bridge-stub] ◀ STUB_ICON_CARD {"outcome":"0","phase":"count","requestId":"stub-2"}
+[bridge-stub] PASS the Icon card is gone
+[bridge-stub] SCENARIO DONE
+com.jimmy.upwork.honoured: 15620

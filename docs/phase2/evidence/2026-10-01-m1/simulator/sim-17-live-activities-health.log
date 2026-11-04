@@ -1,0 +1,72 @@
+2026-10-01 17:26:55.690 Honoured[27125:2769900] Successfully load keyboard extensions
+[bridge-stub] ◀ NATIVE_READY {"bridgeVersion":2,"platform":"ios","capabilities":{"googleSignIn":{"supported":true,"protocolVersion":1,"transport":"trusted-auth-v1","configured":true,"intents":["sign_in","link"]},"liveActivities":{"minimumOS":"16.2","protocolVersion":1,"supported":true,"enabled":true}},"liveActivityBridgeSessionId":"AAF8EE1D-49AC-4604-8415-3A36C14D0BD6"}
+[bridge-stub] ◀ NATIVE_READY {"bridgeVersion":2,"capabilities":{"liveActivities":{"minimumOS":"16.2","enabled":true,"supported":true,"protocolVersion":1},"googleSignIn":{"protocolVersion":1,"configured":true,"supported":true,"intents":["sign_in","link"],"transport":"trusted-auth-v1"}},"liveActivityBridgeSessionId":"AAF8EE1D-49AC-4604-8415-3A36C14D0BD6","platform":"ios"}
+[bridge-stub] ▶ CLEAR_AUTH_SESSION {}
+[bridge-stub] ◀ AUTH_SESSION_CLEARED {"requestId":"stub-1","liveActivityBridgeSessionId":"BC7AE6B3-AF2F-4C15-AA22-73B22F4131C9"}
+[bridge-stub] ▶ STUB_SET_FAKE_HEALTH_TOTALS {"spec":null}
+[bridge-stub] ◀ STUB_FAKE_HEALTH_TOTALS_SET {"spec":null,"requestId":"stub-2"}
+[bridge-stub] ▶ SET_AUTH_SESSION {"userId":"stub-user-a","accessToken":"stub-access-token","refreshToken":"stub-refresh-token","expiresAt":1790854016}
+[bridge-stub] ◀ AUTH_SESSION_ACCEPTED {"requestId":"stub-3","liveActivityBridgeSessionId":"BC7AE6B3-AF2F-4C15-AA22-73B22F4131C9","userId":"stub-user-a"}
+[bridge-stub] ▶ SET_DAY_RESET_HOUR {"hour":0}
+[bridge-stub] ◀ DAY_RESET_HOUR_ACCEPTED {"hour":0,"requestId":"stub-4"}
+[bridge-stub] ▶ SET_GOALS {"goals":[{"activityId":"c-two:primary","activityName":"Walking","metric":"steps","target":8000,"unit":"count"},{"activityId":"c-two:secondary","activityName":"Active energy","metric":"active_energy","target":400,"unit":"kcal"}]}
+[bridge-stub] ◀ GOALS_ACCEPTED {"count":2,"requestId":"stub-5"}
+[bridge-stub] ▶ STUB_SET_FAKE_HEALTH_TOTALS {"spec":"steps=none,active_energy=none"}
+[bridge-stub] ◀ STUB_FAKE_HEALTH_TOTALS_SET {"spec":"steps=none,active_energy=none","requestId":"stub-6"}
+[bridge-stub] ▶ TRACK_CONTRACT {"bridgeSessionId":"BC7AE6B3-AF2F-4C15-AA22-73B22F4131C9","clientSequence":1,"reason":"opened","contract":{"contractId":"c-two","contractName":"Walk and burn","healthDay":"2026-10-01","expiresAt":"2026-10-01T16:26:56.475Z","timerActivityId":"c-two","completionPolicy":{"kind":"all_health_slots","requiredActivityIds":["c-two:primary","c-two:secondary"]},"activities":[{"activityId":"c-two:primary","slot":"primary","name":"Walking","mode":"health","metric":"steps","target":8000,"unit":"count"},{"activityId":"c-two:secondary","slot":"secondary","name":"Active energy","mode":"health","metric":"active_energy","target":400,"unit":"kcal"}]}}
+[bridge-stub] ◀ LIVE_ACTIVITY_STATE_CHANGED {"supported":true,"enabled":true,"tracked":[{"healthDay":"2026-10-01","lastUpdatedAt":"2026-10-01T10:26:56Z","focused":true,"contractId":"c-two","presentationStatus":"active"}],"focusedOccurrence":{"healthDay":"2026-10-01","contractId":"c-two"}}
+[bridge-stub] ◀ CONTRACT_TRACKING_ACCEPTED {"presentationStatus":"active","contractId":"c-two","healthDay":"2026-10-01","focused":true,"requestId":"stub-7"}
+[bridge-stub] PASS two Health slots: tracked
+[bridge-stub] ▶ STUB_LIST_LIVE_ACTIVITIES {}
+[bridge-stub] ◀ STUB_LIVE_ACTIVITIES {"activities":[{"activityState":"active","relevanceScore":100,"health":[{"target":8000,"value":null,"activityId":"c-two:primary","reached":false,"dataStatus":"noData"},{"dataStatus":"noData","value":null,"activityId":"c-two:secondary","target":400,"reached":false}],"staleDate":"2026-10-01T11:26:56Z","id":"CAD3A063-A31C-44C8-AD95-5423184E317A","healthDay":"2026-10-01","status":"active","contractId":"c-two","contractName":"Walk and burn"}],"requestId":"stub-8"}
+[bridge-stub] PASS two slots, one card
+[bridge-stub] PASS no data is not zero: value null, noData
+[bridge-stub] ▶ STUB_SET_FAKE_HEALTH_TOTALS {"spec":"steps=2000,active_energy=100"}
+[bridge-stub] ◀ STUB_FAKE_HEALTH_TOTALS_SET {"spec":"steps=2000,active_energy=100","requestId":"stub-9"}
+[bridge-stub] ▶ STUB_LIST_LIVE_ACTIVITIES {}
+[bridge-stub] ◀ STUB_LIVE_ACTIVITIES {"requestId":"stub-10","activities":[{"relevanceScore":100,"status":"active","health":[{"dataStatus":"fresh","value":2000,"activityId":"c-two:primary","target":8000,"reached":false},{"target":400,"value":100,"activityId":"c-two:secondary","reached":false,"dataStatus":"fresh"}],"staleDate":"2026-10-01T11:26:57Z","contractName":"Walk and burn","healthDay":"2026-10-01","id":"CAD3A063-A31C-44C8-AD95-5423184E317A","activityState":"active","contractId":"c-two"}]}
+[bridge-stub] PASS 25%: 2000 steps and 100 kcal, fresh
+[bridge-stub] ▶ STUB_SET_FAKE_HEALTH_TOTALS {"spec":"steps=locked,active_energy=locked"}
+[bridge-stub] ◀ STUB_FAKE_HEALTH_TOTALS_SET {"spec":"steps=locked,active_energy=locked","requestId":"stub-11"}
+[bridge-stub] ▶ STUB_LIST_LIVE_ACTIVITIES {}
+[bridge-stub] ◀ STUB_LIVE_ACTIVITIES {"activities":[{"activityState":"active","relevanceScore":100,"health":[{"target":8000,"value":2000,"activityId":"c-two:primary","reached":false,"dataStatus":"unavailable"},{"dataStatus":"unavailable","value":100,"activityId":"c-two:secondary","target":400,"reached":false}],"staleDate":"2026-10-01T11:26:57Z","id":"CAD3A063-A31C-44C8-AD95-5423184E317A","healthDay":"2026-10-01","status":"active","contractId":"c-two","contractName":"Walk and burn"}],"requestId":"stub-12"}
+[bridge-stub] PASS locked device keeps the last reading, marked unavailable
+[bridge-stub] ▶ STUB_SET_FAKE_HEALTH_TOTALS {"spec":"steps=error,active_energy=error"}
+[bridge-stub] ◀ STUB_FAKE_HEALTH_TOTALS_SET {"requestId":"stub-13","spec":"steps=error,active_energy=error"}
+[bridge-stub] ▶ STUB_LIST_LIVE_ACTIVITIES {}
+[bridge-stub] ◀ STUB_LIVE_ACTIVITIES {"activities":[{"activityState":"active","relevanceScore":100,"health":[{"dataStatus":"unavailable","value":2000,"activityId":"c-two:primary","target":8000,"reached":false},{"target":400,"value":100,"activityId":"c-two:secondary","reached":false,"dataStatus":"unavailable"}],"staleDate":"2026-10-01T11:26:57Z","id":"CAD3A063-A31C-44C8-AD95-5423184E317A","healthDay":"2026-10-01","status":"active","contractId":"c-two","contractName":"Walk and burn"}],"requestId":"stub-14"}
+[bridge-stub] PASS a failed read keeps it too
+[bridge-stub] ▶ STUB_SET_FAKE_HEALTH_TOTALS {"spec":"steps=6400,active_energy=320"}
+[bridge-stub] ◀ STUB_FAKE_HEALTH_TOTALS_SET {"requestId":"stub-15","spec":"steps=6400,active_energy=320"}
+[bridge-stub] ▶ STUB_LIST_LIVE_ACTIVITIES {}
+[bridge-stub] ◀ STUB_LIVE_ACTIVITIES {"activities":[{"relevanceScore":100,"status":"active","health":[{"target":8000,"value":6400,"activityId":"c-two:primary","reached":false,"dataStatus":"fresh"},{"dataStatus":"fresh","value":320,"activityId":"c-two:secondary","target":400,"reached":false}],"staleDate":"2026-10-01T11:26:58Z","contractName":"Walk and burn","healthDay":"2026-10-01","id":"CAD3A063-A31C-44C8-AD95-5423184E317A","activityState":"active","contractId":"c-two"}],"requestId":"stub-16"}
+[bridge-stub] PASS 80%: 6400 steps, 320 kcal, nothing reached
+[bridge-stub] ▶ STUB_SET_FAKE_HEALTH_TOTALS {"spec":"steps=1500,active_energy=320"}
+[bridge-stub] ◀ STUB_FAKE_HEALTH_TOTALS_SET {"requestId":"stub-17","spec":"steps=1500,active_energy=320"}
+[bridge-stub] ▶ STUB_LIST_LIVE_ACTIVITIES {}
+[bridge-stub] ◀ STUB_LIVE_ACTIVITIES {"activities":[{"healthDay":"2026-10-01","contractId":"c-two","id":"CAD3A063-A31C-44C8-AD95-5423184E317A","activityState":"active","health":[{"dataStatus":"fresh","value":1500,"activityId":"c-two:primary","target":8000,"reached":false},{"target":400,"value":320,"activityId":"c-two:secondary","reached":false,"dataStatus":"fresh"}],"staleDate":"2026-10-01T11:26:59Z","status":"active","contractName":"Walk and burn","relevanceScore":100}],"requestId":"stub-18"}
+[bridge-stub] PASS deleted samples: the total may go down
+[bridge-stub] ▶ STUB_SET_FAKE_HEALTH_TOTALS {"spec":"steps=9000,active_energy=320"}
+[bridge-stub] ◀ STUB_FAKE_HEALTH_TOTALS_SET {"requestId":"stub-19","spec":"steps=9000,active_energy=320"}
+[bridge-stub] ◀ GOAL_REACHED {"target":8000,"reachedAt":"2026-10-01T10:26:59Z","value":9000,"notified":false,"activityId":"c-two:primary","metric":"steps"}
+[bridge-stub] ▶ GET_LIVE_ACTIVITY_STATE {}
+[bridge-stub] ◀ LIVE_ACTIVITY_STATE {"supported":true,"tracked":[{"lastUpdatedAt":"2026-10-01T10:26:59Z","healthDay":"2026-10-01","focused":true,"contractId":"c-two","presentationStatus":"active"}],"requestId":"stub-20","enabled":true,"focusedOccurrence":{"contractId":"c-two","healthDay":"2026-10-01"},"liveActivityBridgeSessionId":"BC7AE6B3-AF2F-4C15-AA22-73B22F4131C9"}
+[bridge-stub] ▶ STUB_LIST_LIVE_ACTIVITIES {}
+[bridge-stub] ◀ STUB_LIVE_ACTIVITIES {"activities":[{"health":[{"dataStatus":"fresh","value":9000,"activityId":"c-two:primary","target":8000,"reached":true},{"target":400,"value":320,"activityId":"c-two:secondary","reached":false,"dataStatus":"fresh"}],"staleDate":"2026-10-01T11:26:59Z","healthDay":"2026-10-01","id":"CAD3A063-A31C-44C8-AD95-5423184E317A","contractId":"c-two","activityState":"active","relevanceScore":100,"status":"active","contractName":"Walk and burn"}],"requestId":"stub-21"}
+[bridge-stub] PASS primary reached, secondary not: the contract is not honoured
+[bridge-stub] ▶ STUB_SET_FAKE_HEALTH_TOTALS {"spec":"steps=9000,active_energy=450"}
+[bridge-stub] ◀ LIVE_ACTIVITY_STATE_CHANGED {"supported":true,"enabled":true,"tracked":[{"lastUpdatedAt":"2026-10-01T10:27:00Z","healthDay":"2026-10-01","reason":"completed","focused":false,"contractId":"c-two","presentationStatus":"ended"}]}
+[bridge-stub] ◀ STUB_FAKE_HEALTH_TOTALS_SET {"spec":"steps=9000,active_energy=450","requestId":"stub-22"}
+[bridge-stub] ◀ GOAL_REACHED {"target":400,"reachedAt":"2026-10-01T10:27:00Z","value":450,"notified":false,"activityId":"c-two:secondary","metric":"active_energy"}
+[bridge-stub] ▶ GET_LIVE_ACTIVITY_STATE {}
+[bridge-stub] ◀ LIVE_ACTIVITY_STATE {"supported":true,"tracked":[{"lastUpdatedAt":"2026-10-01T10:27:00Z","healthDay":"2026-10-01","reason":"completed","focused":false,"contractId":"c-two","presentationStatus":"ended"}],"requestId":"stub-23","enabled":true,"liveActivityBridgeSessionId":"BC7AE6B3-AF2F-4C15-AA22-73B22F4131C9"}
+[bridge-stub] PASS both slots reached: completed
+[bridge-stub] ▶ STUB_LIST_LIVE_ACTIVITIES {}
+[bridge-stub] ◀ STUB_LIVE_ACTIVITIES {"requestId":"stub-24","activities":[{"health":[{"dataStatus":"fresh","value":9000,"activityId":"c-two:primary","target":8000,"reached":true},{"target":400,"value":450,"activityId":"c-two:secondary","reached":true,"dataStatus":"fresh"}],"healthDay":"2026-10-01","id":"CAD3A063-A31C-44C8-AD95-5423184E317A","contractId":"c-two","activityState":"active","relevanceScore":0,"status":"completed","contractName":"Walk and burn"}]}
+[bridge-stub] PASS final content: completed, both reached
+[bridge-stub] ▶ SET_GOALS {"goals":[]}
+[bridge-stub] ◀ GOALS_ACCEPTED {"count":0,"requestId":"stub-25"}
+[bridge-stub] ▶ CLEAR_AUTH_SESSION {}
+[bridge-stub] ◀ AUTH_SESSION_CLEARED {"liveActivityBridgeSessionId":"E3D14205-C33F-4767-B9D2-0F4BB6E1AB3D","requestId":"stub-26"}
+[bridge-stub] SCENARIO DONE
+com.jimmy.upwork.honoured: 27125

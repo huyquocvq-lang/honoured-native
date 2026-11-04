@@ -1,0 +1,34 @@
+[bridge-stub] ◀ NATIVE_READY {"bridgeVersion":2,"capabilities":{"liveActivities":{"minimumOS":"16.2","protocolVersion":1,"enabled":true,"supported":true},"googleSignIn":{"protocolVersion":1,"intents":["sign_in","link"],"transport":"trusted-auth-v1","configured":true,"supported":true},"wordTracker":{"sourceKinds":["word","text","rich_text","rich_text_directory","scrivener"],"protocolVersion":1,"supported":true},"iconRevisions":{"protocolVersion":1,"supported":true},"webCredentials":{"protocolVersion":1,"supported":true},"sessionRefresh":{"supported":true,"protocolVersion":1}},"liveActivityBridgeSessionId":"1EE807C9-8266-493B-B428-285729D86BAD","platform":"ios"}
+[bridge-stub] ◀ NATIVE_READY {"capabilities":{"liveActivities":{"supported":true,"minimumOS":"16.2","enabled":true,"protocolVersion":1},"wordTracker":{"sourceKinds":["word","text","rich_text","rich_text_directory","scrivener"],"protocolVersion":1,"supported":true},"iconRevisions":{"supported":true,"protocolVersion":1},"googleSignIn":{"protocolVersion":1,"supported":true,"transport":"trusted-auth-v1","intents":["sign_in","link"],"configured":true},"webCredentials":{"protocolVersion":1,"supported":true},"sessionRefresh":{"protocolVersion":1,"supported":true}},"bridgeVersion":2,"liveActivityBridgeSessionId":"1EE807C9-8266-493B-B428-285729D86BAD","platform":"ios"}
+[bridge-stub] ▶ STUB_SET_FAKE_HEALTH_TOTALS {"spec":null}
+[bridge-stub] ◀ STUB_FAKE_HEALTH_TOTALS_SET {"spec":null,"requestId":"stub-1"}
+[bridge-stub] ▶ GET_HEALTH_STATUS {}
+[bridge-stub] ◀ HEALTH_PERMISSION_STATUS {"available":true,"perMetric":{"exercise_minutes":"notDetermined","distance_swimming":"notDetermined","basal_energy":"notDetermined","sleep":"notDetermined","heart_rate":"notDetermined","distance_cycling":"notDetermined","distance_walking_running":"notDetermined","active_energy":"notDetermined","steps":"notDetermined"},"requestId":"stub-2","motion":{"available":false,"authorization":"notDetermined"},"hasRecentData":false}
+[bridge-stub] PASS HEALTH_PERMISSION_STATUS carries hasRecentData
+[bridge-stub] ▶ GET_HEALTH_SOURCES {}
+[bridge-stub] ◀ HEALTH_SOURCES {"appliesTo":["distance_walking_running","steps"],"effectiveSourceId":null,"motion":{"available":false,"authorization":"notDetermined"},"effectiveSourceName":null,"requestId":"stub-3","fallback":false,"available":true,"sources":[{"id":"this_iphone","kind":"this_iphone","bundleIdentifier":"","name":"iPhone"}],"preference":{"mode":"automatic"}}
+[bridge-stub] PASS one fixed iPhone entry
+[bridge-stub] PASS Core Motion stays first when listed
+[bridge-stub] ▶ SET_HEALTH_SOURCE_PREFERENCE {"mode":"source","sourceId":"this_iphone"}
+[bridge-stub] ◀ HEALTH_SOURCE_PREFERENCE_ACCEPTED {"appliesTo":["distance_walking_running","steps"],"effectiveSourceId":null,"motion":{"available":false,"authorization":"notDetermined"},"effectiveSourceName":null,"requestId":"stub-4","fallback":true,"available":true,"sources":[{"kind":"this_iphone","bundleIdentifier":"","name":"iPhone","id":"this_iphone"}],"preference":{"sourceId":"this_iphone","mode":"source"}}
+[bridge-stub] PASS iPhone saved as an ordinary source
+[bridge-stub] PASS an iPhone with no steps falls back to the combined total
+[bridge-stub] ▶ GET_HEALTH_SOURCES {}
+[bridge-stub] ◀ HEALTH_SOURCES {"appliesTo":["distance_walking_running","steps"],"effectiveSourceId":null,"motion":{"available":false,"authorization":"notDetermined"},"effectiveSourceName":null,"requestId":"stub-5","fallback":true,"available":true,"sources":[{"kind":"this_iphone","bundleIdentifier":"","name":"iPhone","id":"this_iphone"}],"preference":{"sourceId":"this_iphone","mode":"source"}}
+[bridge-stub] PASS the choice is read back
+[bridge-stub] ▶ STUB_SET_FAKE_HEALTH_TOTALS {"spec":"steps=4000,active_energy=250"}
+[bridge-stub] ◀ STUB_FAKE_HEALTH_TOTALS_SET {"spec":"steps=4000,active_energy=250","requestId":"stub-6"}
+[bridge-stub] ▶ QUERY_HEALTH_METRICS {"metrics":["steps","active_energy"],"from":"2026-10-27T17:00:00.000Z","to":"2026-10-28T08:09:31.941Z"}
+[bridge-stub] ◀ HEALTH_METRICS {"requestId":"stub-7","from":"2026-10-27T17:00:00.000Z","to":"2026-10-28T08:09:31.941Z","metrics":{"active_energy":{"value":250,"unit":"kcal","source":{"effectiveSourceName":"Apple Health","mode":"aggregate","fallback":false,"effectiveSourceId":null}},"steps":{"source":{"effectiveSourceId":null,"fallback":true,"mode":"aggregate","effectiveSourceName":"Apple Health"},"value":4000,"unit":"count"}}}
+[bridge-stub] PASS fallback steps labelled as the aggregate
+[bridge-stub] PASS other metrics read the combined total
+[bridge-stub] ▶ GET_HEALTH_STATUS {}
+[bridge-stub] ◀ HEALTH_PERMISSION_STATUS {"available":true,"perMetric":{"active_energy":"notDetermined","distance_cycling":"notDetermined","basal_energy":"notDetermined","distance_walking_running":"notDetermined","heart_rate":"notDetermined","exercise_minutes":"notDetermined","sleep":"notDetermined","steps":"notDetermined","distance_swimming":"notDetermined"},"requestId":"stub-8","motion":{"authorization":"notDetermined","available":false},"hasRecentData":true}
+[bridge-stub] PASS readable steps count as recent data
+[bridge-stub] ▶ STUB_SET_FAKE_HEALTH_TOTALS {"spec":null}
+[bridge-stub] ◀ STUB_FAKE_HEALTH_TOTALS_SET {"spec":null,"requestId":"stub-9"}
+[bridge-stub] ▶ SET_HEALTH_SOURCE_PREFERENCE {"mode":"automatic"}
+[bridge-stub] ◀ HEALTH_SOURCE_PREFERENCE_ACCEPTED {"appliesTo":["distance_walking_running","steps"],"effectiveSourceId":null,"motion":{"authorization":"notDetermined","available":false},"effectiveSourceName":null,"requestId":"stub-10","fallback":false,"available":true,"sources":[{"id":"this_iphone","kind":"this_iphone","bundleIdentifier":"","name":"iPhone"}],"preference":{"mode":"automatic"}}
+[bridge-stub] PASS back to automatic
+[bridge-stub] SCENARIO DONE
+com.jimmy.upwork.honoured: 15692

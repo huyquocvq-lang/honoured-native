@@ -1,0 +1,50 @@
+== /work/00_schema.sql
+handle_new_user before the migration: 1842a362363b1202f01bb3bd9c25a2a8
+== /work/10_seed.sql
+== /db/email_opt_in_v1.sql
+== /db/email_opt_in_v1.sql
+== /work/30_tests.sql
+ok  existing account is not opted in and has no choice recorded
+ok  email sign-up with the box ticked is opted in
+ok  email sign-up keeps the name
+ok  email sign-up still starts the trial
+ok  email sign-up with the box clear records a no
+ok  Apple sign-up starts with no choice recorded
+ok  a direct update keeps consent
+ok  a direct update still changes the name
+ok  Apple sign-up choice is recorded
+ok  a later sign-in cannot overwrite it
+ok  Apple account is opted in from sign-up
+ok  email sign-up choice cannot be replaced by the sign-up call
+ok  U1 still opted in from email sign-up
+ok  an older account is not treated as a sign-up
+ok  a source other than sign-up is refused
+ok  a missing choice is refused
+ok  U4 still has no choice recorded
+ok  Settings toggle on
+ok  Settings toggle on is recorded with its source
+ok  Settings toggle off
+ok  Settings toggle off is recorded with its source
+ok  U1 turns it off in Settings
+ok  U1 off from Settings
+ok  other accounts are untouched
+ok  a client-inserted row starts opted out
+ok  a call without a user is refused
+ok  anon cannot set consent
+ok  anon cannot record a sign-up choice
+ok  opted in needs a time and a source
+ok  unknown sources are refused
+== /db/email_opt_in_v1_rollback.sql
+== /work/40_rollback_tests.sql
+ok  consent columns are gone
+ok  consent functions are gone
+ok  guard trigger is gone
+ok  sign-up still creates the profile
+ok  sign-up still starts the trial
+ok  handle_new_user is the production body again
+== /db/email_opt_in_v1.sql
+== /work/50_reapply_tests.sql
+ok  an account from the rolled-back window starts opted out
+ok  the guard is back
+ok  email sign-up records again after re-applying
+ALL STEPS PASSED

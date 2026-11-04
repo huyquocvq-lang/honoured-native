@@ -39,5 +39,8 @@ tmp/
 .playwright-mcp/
 
 # doc
-docs/
 .codex-tmp/
+
+# Python caches
+__pycache__/
+*.py[cod]

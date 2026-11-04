@@ -1,0 +1,12 @@
+Unified log, process Honoured, last 70 min on the iOS 26.5 simulator (   38172 lines). Occurrences of manuscript text, file names and paths:
+mother-in-law          0
+Chapter One            0
+café                   0
+retest1                0
+grace1                 0
+Manuscript             0
+Chapter-word           0
+Chapter-text           0
+Novel.scriv            0
+Honoured M3            0
+File Provider Storage  0

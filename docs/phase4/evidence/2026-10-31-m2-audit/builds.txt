@@ -1,0 +1,4 @@
+== Debug (iphonesimulator, ad-hoc signing)
+** BUILD SUCCEEDED **
+== Release (iphonesimulator, ad-hoc signing)
+** BUILD SUCCEEDED **

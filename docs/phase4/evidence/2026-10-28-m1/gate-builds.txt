@@ -1,0 +1,5 @@
+# M1 gate simulator builds, 28/10/2026, clean DerivedData
+## Debug, iphonesimulator, ad-hoc signed (CODE_SIGN_IDENTITY=-)
+** BUILD SUCCEEDED **
+## Release, iphonesimulator, CODE_SIGNING_ALLOWED=NO
+** BUILD SUCCEEDED **

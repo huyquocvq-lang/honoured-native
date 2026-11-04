@@ -1,0 +1,9 @@
+# TestFlight upload, 01/11/2026 18:47:43 +07 (Jimmy: "có publish đi và build 1 bản mới lên testflight")
+archive: Honoured 1.0.9 (4), com.jimmy.upwork.honoured, team 2N7M8MK5JN, widget 1.0.9 (4), HonouredWebAppURL https://honour-your-word.lovable.app, HonouredAppGroup group.com.jimmy.upwork.honoured, ITSAppUsesNonExemptEncryption false
+content: 1.0.9 (3) + the 1 Nov Dynamic Island layout (M2.8, uncommitted working tree: IconLiveActivityViews.swift, IconLiveActivity.swift and their tests); no native change for weekday targets; ios/project.yml build 3 -> 4 (uncommitted)
+gate: HonouredTests 288 tests, 0 failures (iPhone 17 Pro simulator)
+** ARCHIVE SUCCEEDED **
+Progress 100%: Uploaded package is processing.
+Progress 100%: Upload succeeded.
+Uploaded Honoured
+** EXPORT SUCCEEDED **

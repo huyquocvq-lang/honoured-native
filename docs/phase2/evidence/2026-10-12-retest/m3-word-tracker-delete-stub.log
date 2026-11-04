@@ -1,0 +1,29 @@
+== Run 1: deleted in the Files app; Honoured was in the background for over 90 s, so the page's requests timed out before native replied
+DELETE Chapter-delete.txt
+◀ WORD_SOURCE_STATE {"status":"selected","sourceKind":"text","requestId":"stub-4","contractId":"c-word-delete","sourceId":"49ea613a-ba95-42c4-896b-27feac41f2bb"}
+◀ WORD_SOURCE_STATE {"status":"selected","sourceKind":"text","requestId":"stub-5","contractId":"c-word-delete","sourceId":"49ea613a-ba95-42c4-896b-27feac41f2bb"}
+◀ WORD_SOURCE_STATE {"status":"selected","sourceKind":"text","requestId":"stub-6","contractId":"c-word-delete","sourceId":"49ea613a-ba95-42c4-896b-27feac41f2bb"}
+◀ WORD_SOURCE_STATE {"contractId":"c-word-delete","status":"selected","sourceKind":"text","sourceId":"49ea613a-ba95-42c4-896b-27feac41f2bb","requestId":"stub-7"}
+◀ WORD_SOURCE_STATE {"contractId":"c-word-delete","status":"selected","sourceKind":"text","sourceId":"49ea613a-ba95-42c4-896b-27feac41f2bb","requestId":"stub-8"}
+FAIL a deleted file -> needs_reconnect, same id
+FAIL and its read -> missing, recoverable
+RESTORE Chapter-delete.txt
+FAIL a recovered file is selected again, same id
+FAIL and reads the same count
+SCENARIO DONE
+◀ WORD_SOURCE_ERROR {"contractId":"c-word-delete","requestId":"stub-12","recoverable":true,"code":"in_progress"}
+◀ WORD_SOURCE_STATE {"contractId":"c-word-delete","sourceKind":"text","sourceId":"49ea613a-ba95-42c4-896b-27feac41f2bb","requestId":"stub-9","status":"needs_reconnect"}
+◀ WORD_SOURCE_STATE {"contractId":"c-word-delete","status":"needs_reconnect","sourceKind":"text","sourceId":"49ea613a-ba95-42c4-896b-27feac41f2bb","requestId":"stub-11"}
+◀ WORD_SOURCE_ERROR {"contractId":"c-word-delete","recoverable":true,"code":"missing","requestId":"stub-10"}
+
+== Run 2: the same move to File Provider Storage/.Trash and back, with Honoured in front
+PICK Chapter-delete.txt
+PASS picked as text
+PASS reads before the delete
+DELETE Chapter-delete.txt
+PASS a deleted file -> needs_reconnect, same id
+PASS and its read -> missing, recoverable
+RESTORE Chapter-delete.txt
+PASS a recovered file is selected again, same id
+PASS and reads the same count
+SCENARIO DONE

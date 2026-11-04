@@ -1,0 +1,49 @@
+[bridge-stub] ◀ NATIVE_READY {"capabilities":{"liveActivities":{"supported":true,"enabled":true,"protocolVersion":1,"minimumOS":"16.2"},"googleSignIn":{"transport":"trusted-auth-v1","configured":true,"protocolVersion":1,"supported":true,"intents":["sign_in","link"]}},"platform":"ios","bridgeVersion":2,"liveActivityBridgeSessionId":"21C41A12-015F-4CC9-80D2-77731B704530"}
+[bridge-stub] ◀ NATIVE_READY {"capabilities":{"liveActivities":{"protocolVersion":1,"enabled":true,"supported":true,"minimumOS":"16.2"},"googleSignIn":{"transport":"trusted-auth-v1","supported":true,"intents":["sign_in","link"],"protocolVersion":1,"configured":true}},"liveActivityBridgeSessionId":"21C41A12-015F-4CC9-80D2-77731B704530","platform":"ios","bridgeVersion":2}
+[bridge-stub] ▶ SET_GOALS {"goals":[{"activityId":"act-walk","activityName":"Walk","metric":"steps","target":8000,"unit":"count"},{"activityId":"act-burn","activityName":"Burn","metric":"active_energy","target":400,"unit":"kcal"},{"activityId":"act-swim","activityName":"Swim","metric":"distance_swimming","target":500,"unit":"meters"}]}
+[bridge-stub] ◀ GOALS_ACCEPTED {"requestId":"stub-1","count":3}
+[bridge-stub] PASS GOALS_ACCEPTED count 3
+[bridge-stub] ◀ GOAL_REACHED {"activityId":"act-walk","reachedAt":"2026-10-01T10:29:20Z","value":9000,"metric":"steps","notified":false,"target":8000}
+[bridge-stub] PASS GOAL_REACHED act-walk (9000 ≥ 8000) notified:false in-app
+[bridge-stub] PASS no GOAL_REACHED for act-burn (250 < 400) or act-swim (no data)
+[bridge-stub] ▶ SET_GOALS {"goals":[{"activityId":"act-walk","activityName":"Walk","metric":"steps","target":8000,"unit":"count"},{"activityId":"act-burn","activityName":"Burn","metric":"active_energy","target":400,"unit":"kcal"},{"activityId":"act-swim","activityName":"Swim","metric":"distance_swimming","target":500,"unit":"meters"}]}
+[bridge-stub] ◀ GOALS_ACCEPTED {"requestId":"stub-2","count":3}
+[bridge-stub] PASS re-sending goals does not repeat GOAL_REACHED act-walk (marker)
+[bridge-stub] ▶ ACTIVITY_COMPLETED {"activityId":"act-burn","source":"manual"}
+[bridge-stub] ◀ ACTIVITY_COMPLETION_ACCEPTED {"source":"manual","activityId":"act-burn","requestId":"stub-3"}
+[bridge-stub] PASS ACTIVITY_COMPLETED act-burn accepted
+[bridge-stub] ▶ SET_GOALS {"goals":[{"activityId":"act-walk","activityName":"Walk","metric":"steps","target":8000,"unit":"count"},{"activityId":"act-burn","activityName":"Burn","metric":"active_energy","target":400,"unit":"kcal"},{"activityId":"act-swim","activityName":"Swim","metric":"distance_swimming","target":500,"unit":"meters"},{"activityId":"ctr-7:primary","activityName":"Row","metric":"steps","target":100000,"unit":"count"}]}
+[bridge-stub] ◀ GOALS_ACCEPTED {"requestId":"stub-4","count":4}
+[bridge-stub] ▶ ACTIVITY_COMPLETED {"activityId":"ctr-7","source":"timer"}
+[bridge-stub] ◀ ACTIVITY_COMPLETION_ACCEPTED {"source":"timer","requestId":"stub-5","activityId":"ctr-7"}
+[bridge-stub] ▶ SET_GOALS {"goals":[{"activityId":"act-walk","activityName":"Walk","metric":"steps","target":8000,"unit":"count"},{"activityId":"act-burn","activityName":"Burn","metric":"active_energy","target":400,"unit":"kcal"},{"activityId":"act-swim","activityName":"Swim","metric":"distance_swimming","target":500,"unit":"meters"},{"activityId":"ctr-7:primary","activityName":"Row","metric":"steps","target":10,"unit":"count"}]}
+[bridge-stub] ◀ GOALS_ACCEPTED {"count":4,"requestId":"stub-6"}
+[bridge-stub] PASS slot goal ctr-7:primary stays silent after ACTIVITY_COMPLETED for ctr-7
+[bridge-stub] ▶ SET_GOALS {"goals":[{"activityId":"act-walk","activityName":"Walk","metric":"steps","target":8000,"unit":"count"},{"activityId":"act-burn","activityName":"Burn","metric":"active_energy","target":400,"unit":"kcal"},{"activityId":"act-swim","activityName":"Swim","metric":"distance_swimming","target":500,"unit":"meters"}]}
+[bridge-stub] ◀ GOALS_ACCEPTED {"count":3,"requestId":"stub-7"}
+[bridge-stub] ▶ ACTIVITY_COMPLETED {"activityId":"act-x","source":"bogus"}
+[bridge-stub] ◀ ERROR {"code":"invalid_activity_completion","requestId":"stub-8","message":"activityId and a source of timer, healthkit or manual are required"}
+[bridge-stub] PASS ACTIVITY_COMPLETED with unknown source → ERROR
+[bridge-stub] ▶ SET_GOALS {"goals":[{"activityId":"act-walk","activityName":"Walk","metric":"steps","target":8000,"unit":"count"},{"activityId":"act-burn","activityName":"Burn","metric":"active_energy","target":200,"unit":"kcal"},{"activityId":"act-swim","activityName":"Swim","metric":"distance_swimming","target":500,"unit":"meters"}]}
+[bridge-stub] ◀ GOALS_ACCEPTED {"requestId":"stub-9","count":3}
+[bridge-stub] PASS celebrated act-burn stays silent after target lowered
+[bridge-stub] ▶ SET_GOALS {"goals":[{"activityId":"act-walk","activityName":"Walk","metric":"steps","target":8000,"unit":"count"},{"activityId":"act-burn-2","activityName":"Burn 2","metric":"active_energy","target":200,"unit":"kcal"}]}
+[bridge-stub] ◀ GOALS_ACCEPTED {"count":2,"requestId":"stub-10"}
+[bridge-stub] ◀ GOAL_REACHED {"metric":"active_energy","reachedAt":"2026-10-01T10:29:30Z","activityId":"act-burn-2","value":250,"target":200,"notified":false}
+[bridge-stub] PASS GOAL_REACHED act-burn-2 (250 ≥ 200)
+[bridge-stub] ▶ SET_DAY_RESET_HOUR {"hour":19}
+[bridge-stub] ◀ DAY_RESET_HOUR_ACCEPTED {"hour":19,"requestId":"stub-11"}
+[bridge-stub] PASS DAY_RESET_HOUR_ACCEPTED
+[bridge-stub] ◀ GOAL_REACHED {"metric":"steps","notified":false,"activityId":"act-walk","reachedAt":"2026-10-01T10:29:30Z","value":9000,"target":8000}
+[bridge-stub] ◀ GOAL_REACHED {"metric":"active_energy","notified":false,"activityId":"act-burn-2","reachedAt":"2026-10-01T10:29:30Z","value":250,"target":200}
+[bridge-stub] PASS after reset-hour change both met goals are re-announced in-app once (act-burn-2, act-walk; notified:false)
+[bridge-stub] ▶ SET_DAY_RESET_HOUR {"hour":19}
+[bridge-stub] ◀ DAY_RESET_HOUR_ACCEPTED {"requestId":"stub-12","hour":19}
+[bridge-stub] PASS same reset hour again does not re-announce
+[bridge-stub] ▶ SET_GOALS {"goals":[]}
+[bridge-stub] ◀ GOALS_ACCEPTED {"count":0,"requestId":"stub-13"}
+[bridge-stub] PASS empty goals accepted
+[bridge-stub] ▶ SET_DAY_RESET_HOUR {"hour":0}
+[bridge-stub] ◀ DAY_RESET_HOUR_ACCEPTED {"requestId":"stub-14","hour":0}
+[bridge-stub] SCENARIO DONE
+com.jimmy.upwork.honoured: 31541

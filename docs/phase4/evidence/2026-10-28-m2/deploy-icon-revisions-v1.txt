@@ -1,0 +1,11 @@
+# icon_revisions_v1.sql deployed to Lovable Cloud (Postgres 17.6), 28/10/2026
+file md5: icon_revisions_v1.sql 1c2973aeeff64a548ed4e2b2b6c8a64d, rollback fb36e8e13947ec5117c9df1cee12d14c
+pre-checks: current_user postgres; postgres owns icon_days and the Icon functions; postgres reads storage.objects; icon_revisions absent
+function md5 on production after deploy = md5 printed by docs/db/tests/icon_revisions_v1/run.sh:
+  contracts_icon_days        bc7b184a1d698d49ca70dfe3dbf5f9dc  (was ba8878e4a12694e58e557769d5dd72b0)
+  icon_days_to_measure       889fc89d903a480a38839166c0bf3c91  (was b0df75c43f218c843a61fe4efb1ffe25)
+  icon_push_jobs             407c6a09205931926726918aad4f149f  (was d0763dedd128fb9dbda8f759bb8f267d)
+  record_icon_measurements   4363134aa2127eddbc6affb21256d825  (was 3e443e4f5a8ae4c80be38ce30c33e73a, v4)
+  revise_icon_target         80e9f0d165569ca31303b173280af22e  (new; execute: authenticated, service_role)
+  icon_revisions_immutable   401d66db9cbb67bd4d8adffcf6354af6  (new)
+smoke: 110 icon_days, 0 whose target differs from its contract, 0 without target_text; newest icon_days.updated_at 2026-10-28 03:05 UTC (before the deploy: backfill left it alone); update_icon_days_updated_at enabled; icon_revisions: RLS on, 1 policy, 0 rows, grants authenticated SELECT only, anon none

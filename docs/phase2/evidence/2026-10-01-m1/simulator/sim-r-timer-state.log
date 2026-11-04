@@ -1,0 +1,7 @@
+[bridge-stub] ◀ NATIVE_READY {"platform":"ios","bridgeVersion":2,"liveActivityBridgeSessionId":"0412539F-5EA4-47B4-B6CA-C4896FC03ACC","capabilities":{"liveActivities":{"enabled":true,"supported":true,"protocolVersion":1,"minimumOS":"16.2"},"googleSignIn":{"supported":true,"configured":true,"protocolVersion":1,"transport":"trusted-auth-v1","intents":["sign_in","link"]}}}
+[bridge-stub] ◀ NATIVE_READY {"platform":"ios","bridgeVersion":2,"liveActivityBridgeSessionId":"0412539F-5EA4-47B4-B6CA-C4896FC03ACC","capabilities":{"liveActivities":{"protocolVersion":1,"supported":true,"enabled":true,"minimumOS":"16.2"},"googleSignIn":{"supported":true,"intents":["sign_in","link"],"configured":true,"transport":"trusted-auth-v1","protocolVersion":1}}}
+[bridge-stub] ▶ GET_TIMER_STATE {}
+[bridge-stub] ◀ TIMER_STATE {"requestId":"stub-1","active":false}
+[bridge-stub] STATE {"requestId":"stub-1","active":false}
+[bridge-stub] SCENARIO DONE
+com.jimmy.upwork.honoured: 32455

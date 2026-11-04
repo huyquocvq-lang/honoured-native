@@ -1,0 +1,321 @@
+# 2026-10-31 19:22:12 +0700 docs/db/tests/icon_revisions_v1/run.sh, local Postgres 17.6 (embedded-postgres 17.6.0-beta.15)
+1c2973aeeff64a548ed4e2b2b6c8a64d icon_revisions_v1.sql
+5d8bdbe4ff2207f7f45e2c0fe4be5644 icon_revisions_v1_1.sql
+2327e5a4aaa2840349af3d42d2662bf1 icon_revisions_v1_1_rollback.sql
+d5e82c78ed4bbdaffc795f0826734fc8 icon_revisions_v1_rollback.sql
+# Pass 0: the stand-in is production
+== /work/00_schema.sql
+== /work/01_prod_functions.sql
+== /work/02_triggers.sql
+== /work/03_baseline_check.sql
+ok  baseline contracts_icon_days matches production
+ok  baseline contracts_icon_guard matches production
+ok  baseline contracts_icon_reserve matches production
+ok  baseline contracts_word_guard matches production
+ok  baseline expire_icon_days matches production
+ok  baseline icon_copy_affirmation matches production
+ok  baseline icon_copy_deadline matches production
+ok  baseline icon_cut matches production
+ok  baseline icon_days_to_measure matches production
+ok  baseline icon_push_facts matches production
+ok  baseline icon_push_jobs matches production
+ok  baseline icon_push_plan matches production
+ok  baseline icon_reserved_days matches production
+ok  baseline icon_schedule matches production
+ok  baseline icon_target_split matches production
+ok  baseline record_icon_measurements matches production
+ok  baseline record_word_reading matches production
+ok  baseline self_report_icon_day matches production
+ok  baseline update_updated_at_column matches production
+ok  every baseline function is present
+# Pass 1: migration, revisions, readers, rollback
+== /work/00_schema.sql
+== /work/01_prod_functions.sql
+== /work/02_triggers.sql
+== /work/10_seed.sql
+== /db/icon_revisions_v1_rollback.sql
+== /db/icon_revisions_v1.sql
+== /db/icon_revisions_v1.sql
+== /work/20_helpers.sql
+== /work/30_tests.sql
+ok  every day carries its signed target text
+ok  Health days carry the signed value in the metric unit
+ok  self-reported and Word days carry no value
+ok  every day starts on revision 0
+ok  the backfill leaves updated_at alone
+ok  B keeps 5 km as 5000 meters
+ok  ended-early days keep their target too
+ok  a new Icon's days carry its target
+ok  every day of the new Icon has it
+ok  authenticated cannot insert a revision
+ok  anon cannot call revise_icon_target
+ok  a request without a user is refused
+ok  A: the first revision takes effect from the next Icon day
+ok  A: today keeps the signed target
+ok  A: tomorrow is held to the revision
+ok  A: the last day too
+ok  A: a BROKEN day keeps its target
+ok  A: a HONOURED day keeps its target
+ok  A: a retry returns the same revision
+ok  A: a retry with other values still returns the recorded revision
+ok  A: one revision recorded
+ok  A: a lower target is a second revision
+ok  A: the second revision records the first as its previous target
+ok  A: the first revision is unchanged
+ok  A: tomorrow now holds the second revision
+ok  A: today still holds the signed target
+ok  A: the same target again is refused
+ok  A: 0 is refused
+ok  A: a negative target is refused
+ok  A: above the unit's maximum is refused
+ok  A: a fraction of a step is refused
+ok  A: NaN is refused
+ok  A: Infinity is refused
+ok  A: a missing target is invalid
+ok  A: a signature in another person's folder is refused
+ok  A: the contract's own signature is refused
+ok  A: an earlier revision's signature is refused
+ok  A: a path climbing out of the folder is refused
+ok  A: a path outside any user folder is refused
+ok  A: a signature that was never uploaded is refused
+ok  A: someone else's Icon is not found
+ok  A: an unknown Icon is not found
+ok  A: the refusals wrote nothing
+ok  A: nor any day
+ok  A's owner reads A's two revisions only
+ok  B: 7.5 km is 7500 meters
+ok  B: two decimals are refused
+ok  B: above 50 km is refused
+ok  B: 10.0 km is written 10 km
+ok  B: tomorrow is held to 10 km = 10000 meters
+ok  B's owner sees B's revisions only
+ok  C: a self-reported Icon is revised in its own unit
+ok  C: tomorrow is held to 30 reps
+ok  D: a Word Tracker Icon is not revisable
+ok  E: an Icon that ended early is not revisable
+ok  F: on its last day there is no next day to revise
+ok  G: Kiritimati revises from its own tomorrow
+ok  H: Pago Pago revises from its own tomorrow
+ok  G and H are on different local days
+ok  H: Pago Pago's today keeps its target
+ok  I: the revision starts on the next scheduled day
+ok  no contract changed
+ok  no contract was added
+ok  a revision cannot be edited
+ok  a revision cannot be deleted on its own
+ok  authenticated cannot edit a revision
+ok  authenticated cannot delete a revision
+ok  measure: today is measured against the signed target
+ok  record: 9000 today stays pending under the signed 10000
+ok  measure: a revised day is measured against its own target
+ok  record: 5000 turns that BROKEN day HONOURED under its 3000, not the signed 10000
+ok  push: tomorrow's morning card carries the revision
+ok  push: its facts say 8,000 STEPS
+ok  push: today's morning card keeps the signed target
+== /db/icon_revisions_v1.sql
+== /work/32_rerun_tests.sql
+ok  re-run: A tomorrow keeps its revision
+ok  re-run: A today keeps the signed target
+ok  re-run: the history is intact
+== /work/36_cascade_tests.sql
+ok  deleting C removes its revision
+ok  deleting B's account removes its revisions
+ok  the other revisions stay
+== /db/icon_revisions_v1_rollback.sql (must be refused)
+ok  refused: holds 5 revisions
+== /db/icon_revisions_v1_rollback.sql
+== /work/40_rollback_tests.sql
+ok  rollback: contracts_icon_days is production's again
+ok  rollback: icon_days_to_measure is production's again
+ok  rollback: icon_push_jobs is production's again
+ok  rollback: record_icon_measurements is production's again
+ok  rollback: revise_icon_target is gone
+ok  rollback: icon_revisions_immutable is gone
+ok  rollback: icon_revisions is gone
+ok  rollback: the per-day target columns are gone
+ok  rollback: the per-day constraints are gone
+ok  rollback: a new Icon still gets its days
+ok  rollback: A today is measured against the signed target
+== /db/icon_revisions_v1_rollback.sql
+== /db/icon_revisions_v1.sql
+== /work/50_reapply_tests.sql
+ok  re-apply: every day carries its signed target
+ok  re-apply: A can be revised again, starting at revision 1
+# Pass 2: two revisions of one Icon at the same time
+== /work/00_schema.sql
+== /work/01_prod_functions.sql
+== /work/02_triggers.sql
+== /work/10_seed.sql
+== /db/icon_revisions_v1.sql
+== /work/20_helpers.sql
+ok  a concurrent retry gets the same revision back
+ok  one revision recorded
+ok  a concurrent second revision queues behind the first
+ok  it records the first as its previous target
+ok  tomorrow holds the latest
+md5 after icon_revisions_v1: contracts_icon_days bc7b184a1d698d49ca70dfe3dbf5f9dc
+md5 after icon_revisions_v1: icon_days_to_measure 889fc89d903a480a38839166c0bf3c91
+md5 after icon_revisions_v1: icon_push_jobs 407c6a09205931926726918aad4f149f
+md5 after icon_revisions_v1: icon_revisions_immutable 401d66db9cbb67bd4d8adffcf6354af6
+md5 after icon_revisions_v1: record_icon_measurements 4363134aa2127eddbc6affb21256d825
+md5 after icon_revisions_v1: revise_icon_target 80e9f0d165569ca31303b173280af22e
+# Pass 3: icon_revisions_v1_1 on top of v1, with Supabase's default grants
+== /work/00_schema.sql
+== /work/01_prod_functions.sql
+== /work/02_triggers.sql
+== /work/05_supabase_defaults.sql
+== /work/10_seed.sql
+== /work/60_v1_1_seed.sql
+== /db/icon_revisions_v1.sql
+== /db/icon_revisions_v1_1_rollback.sql
+== /db/icon_revisions_v1_1.sql
+== /db/icon_revisions_v1_1.sql
+== /work/20_helpers.sql
+== /work/30_tests.sql
+ok  every day carries its signed target text
+ok  Health days carry the signed value in the metric unit
+ok  self-reported and Word days carry no value
+ok  every day starts on revision 0
+ok  the backfill leaves updated_at alone
+ok  B keeps 5 km as 5000 meters
+ok  ended-early days keep their target too
+ok  a new Icon's days carry its target
+ok  every day of the new Icon has it
+ok  authenticated cannot insert a revision
+ok  anon cannot call revise_icon_target
+ok  a request without a user is refused
+ok  A: the first revision takes effect from the next Icon day
+ok  A: today keeps the signed target
+ok  A: tomorrow is held to the revision
+ok  A: the last day too
+ok  A: a BROKEN day keeps its target
+ok  A: a HONOURED day keeps its target
+ok  A: a retry returns the same revision
+ok  A: a retry with other values still returns the recorded revision
+ok  A: one revision recorded
+ok  A: a lower target is a second revision
+ok  A: the second revision records the first as its previous target
+ok  A: the first revision is unchanged
+ok  A: tomorrow now holds the second revision
+ok  A: today still holds the signed target
+ok  A: the same target again is refused
+ok  A: 0 is refused
+ok  A: a negative target is refused
+ok  A: above the unit's maximum is refused
+ok  A: a fraction of a step is refused
+ok  A: NaN is refused
+ok  A: Infinity is refused
+ok  A: a missing target is invalid
+ok  A: a signature in another person's folder is refused
+ok  A: the contract's own signature is refused
+ok  A: an earlier revision's signature is refused
+ok  A: a path climbing out of the folder is refused
+ok  A: a path outside any user folder is refused
+ok  A: a signature that was never uploaded is refused
+ok  A: someone else's Icon is not found
+ok  A: an unknown Icon is not found
+ok  A: the refusals wrote nothing
+ok  A: nor any day
+ok  A's owner reads A's two revisions only
+ok  B: 7.5 km is 7500 meters
+ok  B: two decimals are refused
+ok  B: above 50 km is refused
+ok  B: 10.0 km is written 10 km
+ok  B: tomorrow is held to 10 km = 10000 meters
+ok  B's owner sees B's revisions only
+ok  C: a self-reported Icon is revised in its own unit
+ok  C: tomorrow is held to 30 reps
+ok  D: a Word Tracker Icon is not revisable
+ok  E: an Icon that ended early is not revisable
+ok  F: on its last day there is no next day to revise
+ok  G: Kiritimati revises from its own tomorrow
+ok  H: Pago Pago revises from its own tomorrow
+ok  G and H are on different local days
+ok  H: Pago Pago's today keeps its target
+ok  I: the revision starts on the next scheduled day
+ok  no contract changed
+ok  no contract was added
+ok  a revision cannot be edited
+ok  a revision cannot be deleted on its own
+ok  authenticated cannot edit a revision
+ok  authenticated cannot delete a revision
+ok  measure: today is measured against the signed target
+ok  record: 9000 today stays pending under the signed 10000
+ok  measure: a revised day is measured against its own target
+ok  record: 5000 turns that BROKEN day HONOURED under its 3000, not the signed 10000
+ok  push: tomorrow's morning card carries the revision
+ok  push: its facts say 8,000 STEPS
+ok  push: today's morning card keeps the signed target
+== /work/36_cascade_tests.sql
+ok  deleting C removes its revision
+ok  deleting B's account removes its revisions
+ok  the other revisions stay
+== /work/60_v1_1_tests.sql
+ok  v1.1: today is read after the row lock
+ok  mi: above 30 is refused
+ok  mi: two decimals are refused
+ok  mi: 4.5 is kept in meters in the signed proportion
+ok  min: above 120 is refused
+ok  min: 120 is the maximum
+ok  hrs: above 24 is refused
+ok  hrs: a self-reported Icon gets a text target and no value
+ok  kcal: above 2000 is refused
+ok  kcal: 2000 is the maximum
+ok  v1.1: a file in another of my Icons' folders is refused
+ok  v1.1: a file outside the revisions folder is refused
+ok  v1.1: a file in a folder below it is refused
+ok  v1.1: a file someone else uploaded to my folder does not count
+ok  v1.1: none of those made a revision
+ok  v1.1: A sees none of the other people's revisions
+ok  v1.1: (other people's revisions exist)
+ok  v1.1: anon cannot call revise_icon_target despite the default grant
+ok  v1.1: anon cannot read icon_revisions despite the default grant
+ok  v1.1: authenticated holds only SELECT on icon_revisions
+ok  v1.1: service_role cannot truncate icon_revisions
+ok  v1.1: not even the table owner can truncate icon_revisions
+ok  v1.1: a delete from another trigger is refused while the contract exists
+ok  v1.1: deleting an account still removes its revisions
+ok  v1.1: deleting a contract (Reset everything) still removes its revisions
+md5 after icon_revisions_v1_1: icon_revisions_immutable aaa8d362ce4f89601261e219c7864e31
+md5 after icon_revisions_v1_1: revise_icon_target aca7ea9cee15c372aa2f0c9b9787f280
+== /db/icon_revisions_v1_1_rollback.sql
+== /work/70_v1_1_rollback_tests.sql
+ok  v1.1 rollback: icon_revisions_immutable is v1 again
+ok  v1.1 rollback: revise_icon_target is v1 again
+ok  v1.1 rollback: the TRUNCATE trigger is gone
+ok  v1.1 rollback: service_role holds TRUNCATE again
+ok  v1.1 rollback: the revisions are kept
+ok  v1.1 rollback: the per-day targets are kept
+== /db/icon_revisions_v1_1_rollback.sql
+== /db/icon_revisions_v1_1.sql
+== /db/icon_revisions_v1_rollback.sql (must be refused)
+ok  refused: holds
+== /db/icon_revisions_v1_rollback.sql
+== /work/40_rollback_tests.sql
+ok  rollback: contracts_icon_days is production's again
+ok  rollback: icon_days_to_measure is production's again
+ok  rollback: icon_push_jobs is production's again
+ok  rollback: record_icon_measurements is production's again
+ok  rollback: revise_icon_target is gone
+ok  rollback: icon_revisions_immutable is gone
+ok  rollback: icon_revisions is gone
+ok  rollback: the per-day target columns are gone
+ok  rollback: the per-day constraints are gone
+ok  rollback: a new Icon still gets its days
+ok  rollback: A today is measured against the signed target
+== /db/icon_revisions_v1_1_rollback.sql (must be refused)
+ok  refused: nothing for icon_revisions_v1_1_rollback.sql to undo
+== /db/icon_revisions_v1_1.sql (must be refused)
+ok  refused: needs icon_revisions_v1.sql applied first
+# Pass 4: rolling back v1 while a revision commits
+== /work/00_schema.sql
+== /work/01_prod_functions.sql
+== /work/02_triggers.sql
+== /work/10_seed.sql
+== /db/icon_revisions_v1.sql
+== /work/20_helpers.sql
+== /db/icon_revisions_v1_rollback.sql (must be refused)
+ok  refused: holds 1 revisions
+ok  the revision committed meanwhile is kept
+ALL STEPS PASSED
+exit=0

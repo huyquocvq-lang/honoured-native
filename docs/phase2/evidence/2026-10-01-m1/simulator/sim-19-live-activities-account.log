@@ -1,0 +1,45 @@
+2026-10-01 17:27:17.382 Honoured[27629:2771687] Successfully load keyboard extensions
+[bridge-stub] ◀ NATIVE_READY {"platform":"ios","bridgeVersion":2,"capabilities":{"liveActivities":{"protocolVersion":1,"enabled":true,"supported":true,"minimumOS":"16.2"},"googleSignIn":{"protocolVersion":1,"intents":["sign_in","link"],"configured":true,"transport":"trusted-auth-v1","supported":true}},"liveActivityBridgeSessionId":"6B6B8F77-7F39-4E14-8F75-3E0EF3C416C1"}
+[bridge-stub] ◀ NATIVE_READY {"platform":"ios","bridgeVersion":2,"capabilities":{"googleSignIn":{"protocolVersion":1,"intents":["sign_in","link"],"configured":true,"transport":"trusted-auth-v1","supported":true},"liveActivities":{"protocolVersion":1,"enabled":true,"supported":true,"minimumOS":"16.2"}},"liveActivityBridgeSessionId":"6B6B8F77-7F39-4E14-8F75-3E0EF3C416C1"}
+[bridge-stub] ▶ CLEAR_AUTH_SESSION {}
+[bridge-stub] ◀ AUTH_SESSION_CLEARED {"liveActivityBridgeSessionId":"2D4E0B27-6370-4ED5-AECB-8A817FFC1DA7","requestId":"stub-1"}
+[bridge-stub] ▶ STUB_SET_FAKE_HEALTH_TOTALS {"spec":null}
+[bridge-stub] ◀ STUB_FAKE_HEALTH_TOTALS_SET {"spec":null,"requestId":"stub-2"}
+[bridge-stub] ▶ SET_AUTH_SESSION {"userId":"stub-user-a","accessToken":"stub-access-token","refreshToken":"stub-refresh-token","expiresAt":1790854038}
+[bridge-stub] ◀ AUTH_SESSION_ACCEPTED {"userId":"stub-user-a","liveActivityBridgeSessionId":"2D4E0B27-6370-4ED5-AECB-8A817FFC1DA7","requestId":"stub-3"}
+[bridge-stub] ▶ SET_DAY_RESET_HOUR {"hour":0}
+[bridge-stub] ◀ DAY_RESET_HOUR_ACCEPTED {"hour":0,"requestId":"stub-4"}
+[bridge-stub] ▶ SET_GOALS {"goals":[{"activityId":"c-acct:primary","activityName":"Walking","metric":"steps","target":8000,"unit":"count"}]}
+[bridge-stub] ◀ GOALS_ACCEPTED {"count":1,"requestId":"stub-5"}
+[bridge-stub] ▶ STUB_SET_FAKE_HEALTH_TOTALS {"spec":"steps=1234"}
+[bridge-stub] ◀ STUB_FAKE_HEALTH_TOTALS_SET {"spec":"steps=1234","requestId":"stub-6"}
+[bridge-stub] ▶ TRACK_CONTRACT {"bridgeSessionId":"2D4E0B27-6370-4ED5-AECB-8A817FFC1DA7","clientSequence":1,"reason":"opened","contract":{"contractId":"c-acct","contractName":"Walk A","healthDay":"2026-10-01","expiresAt":"2026-10-01T16:27:18.187Z","timerActivityId":"c-acct","completionPolicy":{"kind":"all_health_slots","requiredActivityIds":["c-acct:primary"]},"activities":[{"activityId":"c-acct:primary","slot":"primary","name":"Walking","mode":"health","metric":"steps","target":8000,"unit":"count"}]}}
+[bridge-stub] ◀ LIVE_ACTIVITY_STATE_CHANGED {"enabled":true,"supported":true,"focusedOccurrence":{"healthDay":"2026-10-01","contractId":"c-acct"},"tracked":[{"focused":true,"healthDay":"2026-10-01","lastUpdatedAt":"2026-10-01T10:27:18Z","contractId":"c-acct","presentationStatus":"active"}]}
+[bridge-stub] ◀ CONTRACT_TRACKING_ACCEPTED {"contractId":"c-acct","healthDay":"2026-10-01","focused":true,"presentationStatus":"active","requestId":"stub-7"}
+[bridge-stub] PASS user A's card is active
+[bridge-stub] ▶ SET_AUTH_SESSION {"userId":"stub-user-a","accessToken":"stub-access-token","refreshToken":"stub-refresh-token","expiresAt":1790854038}
+[bridge-stub] ◀ AUTH_SESSION_ACCEPTED {"requestId":"stub-8","userId":"stub-user-a","liveActivityBridgeSessionId":"2D4E0B27-6370-4ED5-AECB-8A817FFC1DA7"}
+[bridge-stub] PASS a token refresh for the same user keeps the session id
+[bridge-stub] ▶ GET_LIVE_ACTIVITY_STATE {}
+[bridge-stub] ◀ LIVE_ACTIVITY_STATE {"tracked":[{"contractId":"c-acct","healthDay":"2026-10-01","focused":true,"lastUpdatedAt":"2026-10-01T10:27:18Z","presentationStatus":"active"}],"supported":true,"enabled":true,"focusedOccurrence":{"healthDay":"2026-10-01","contractId":"c-acct"},"liveActivityBridgeSessionId":"2D4E0B27-6370-4ED5-AECB-8A817FFC1DA7","requestId":"stub-9"}
+[bridge-stub] PASS …and the tracking
+[bridge-stub] ▶ SET_AUTH_SESSION {"userId":"stub-user-b","accessToken":"stub-access-token","refreshToken":"stub-refresh-token","expiresAt":1790854038}
+[bridge-stub] ◀ LIVE_ACTIVITY_STATE_CHANGED {"tracked":[],"enabled":true,"supported":true}
+[bridge-stub] ◀ AUTH_SESSION_ACCEPTED {"userId":"stub-user-b","requestId":"stub-10","liveActivityBridgeSessionId":"40171090-833B-4CD6-A0E1-DB102C1EFCE4"}
+[bridge-stub] PASS another user gets a new session id
+[bridge-stub] ▶ GET_LIVE_ACTIVITY_STATE {}
+[bridge-stub] ◀ LIVE_ACTIVITY_STATE {"requestId":"stub-11","enabled":true,"tracked":[],"liveActivityBridgeSessionId":"40171090-833B-4CD6-A0E1-DB102C1EFCE4","supported":true}
+[bridge-stub] ▶ STUB_LIST_LIVE_ACTIVITIES {}
+[bridge-stub] ◀ STUB_LIVE_ACTIVITIES {"activities":[],"requestId":"stub-12"}
+[bridge-stub] PASS switching user ends every card of user A
+[bridge-stub] ▶ TRACK_CONTRACT {"bridgeSessionId":"2D4E0B27-6370-4ED5-AECB-8A817FFC1DA7","clientSequence":2,"reason":"opened","contract":{"contractId":"c-acct","contractName":"Walk A","healthDay":"2026-10-01","expiresAt":"2026-10-01T16:27:18.187Z","timerActivityId":"c-acct","completionPolicy":{"kind":"all_health_slots","requiredActivityIds":["c-acct:primary"]},"activities":[{"activityId":"c-acct:primary","slot":"primary","name":"Walking","mode":"health","metric":"steps","target":8000,"unit":"count"}]}}
+[bridge-stub] ◀ ERROR {"message":"bridgeSessionId does not belong to this page and account; use the latest liveActivityBridgeSessionId","code":"stale_bridge_session","requestId":"stub-13"}
+[bridge-stub] PASS user A's session id is refused for user B
+[bridge-stub] ▶ CLEAR_AUTH_SESSION {}
+[bridge-stub] ◀ AUTH_SESSION_CLEARED {"requestId":"stub-14","liveActivityBridgeSessionId":"C2E6E96F-5969-49B1-91E2-9C326BC3DFDC"}
+[bridge-stub] PASS CLEAR_AUTH_SESSION returns a fresh session id
+[bridge-stub] ▶ TRACK_CONTRACT {"bridgeSessionId":"C2E6E96F-5969-49B1-91E2-9C326BC3DFDC","clientSequence":1,"reason":"opened","contract":{"contractId":"c-acct","contractName":"Walk A","healthDay":"2026-10-01","expiresAt":"2026-10-01T16:27:18.187Z","timerActivityId":"c-acct","completionPolicy":{"kind":"all_health_slots","requiredActivityIds":["c-acct:primary"]},"activities":[{"activityId":"c-acct:primary","slot":"primary","name":"Walking","mode":"health","metric":"steps","target":8000,"unit":"count"}]}}
+[bridge-stub] ◀ ERROR {"requestId":"stub-15","code":"auth_session_required","message":"Send SET_AUTH_SESSION before Live Activity mutations"}
+[bridge-stub] PASS signed out: nothing is tracked until a session is set
+[bridge-stub] SCENARIO DONE
+com.jimmy.upwork.honoured: 27629

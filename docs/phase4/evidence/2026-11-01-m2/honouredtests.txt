@@ -1,0 +1,22 @@
+01/11/2026 — expanded Dynamic Island laid out like the Lock Screen (client request): count top right, day above the cut-off
+Command (from ios/): xcodebuild -project Honoured.xcodeproj -scheme Honoured -destination 'platform=iOS Simulator,name=iPhone 17 Pro' -derivedDataPath ~/Library/Developer/Xcode/DerivedData/Honoured-sim CODE_SIGNING_ALLOWED=NO test
+Test Case '-[HonouredTests.IconLiveActivityTests testEveryIconCardRendersInEveryPresentation]' passed (1.033 seconds).
+Test Case '-[HonouredTests.IconLiveActivityTests testFactsNormaliseLabelsAndCutFreeText]' passed (0.003 seconds).
+Test Case '-[HonouredTests.IconLiveActivityTests testHeaderFallsBackWhenTheDayIsNotADate]' passed (0.001 seconds).
+Test Case '-[HonouredTests.IconLiveActivityTests testHeaderShowsTheIconDayAsTheClientWroteIt]' passed (0.001 seconds).
+Test Case '-[HonouredTests.IconLiveActivityTests testLongestCardFitsTheFourKilobyteLimit]' passed (0.000 seconds).
+Test Case '-[HonouredTests.IconLiveActivityTests testSessionNumbersStayInRange]' passed (0.000 seconds).
+Test Case '-[HonouredTests.IconLiveActivityTests testShortValueFollowsTheTargetUnit]' passed (0.061 seconds).
+Test Case '-[HonouredTests.IconLiveActivityTests testTheReadingRoundTripsAndIsLeftOutWhenUnknown]' passed (0.001 seconds).
+Test Suite 'IconLiveActivityTests' passed at 2026-11-01 17:21:18.830.
+	 Executed 288 tests, with 0 failures (0 unexpected) in 9.111 (10.426) seconds
+	 Executed 288 tests, with 0 failures (0 unexpected) in 9.111 (10.428) seconds
+** TEST SUCCEEDED **
+
+Right edge of each text line in the expanded renders (px at 2x; 740 px wide):
+icon-expanded-evening-with-steps.png width 740 ["y42-58: right 701", "y108-132: right 531", "y160-176: right 701", "y199-218: right 701"]
+icon-expanded-long-text.png width 740 ["y42-58: right 699", "y109-132: right 693", "y160-176: right 701", "y199-218: right 701"]
+icon-expanded-midnight-cutoff.png width 740 ["y42-58: right 701", "y160-176: right 701", "y198-218: right 702"]
+icon-expanded-broken.png width 740 ["y42-58: right 701", "y114-132: right 390", "y160-176: right 701", "y199-218: right 701"]
+
+Simulator build (Debug, generic iOS Simulator, CODE_SIGNING_ALLOWED=NO): BUILD SUCCEEDED

@@ -1,0 +1,36 @@
+2026-10-01 17:26:32.714 Honoured[26660:2768071] Successfully load keyboard extensions
+[bridge-stub] ◀ NATIVE_READY {"capabilities":{"liveActivities":{"minimumOS":"16.2","protocolVersion":1,"enabled":true,"supported":true},"googleSignIn":{"configured":true,"transport":"trusted-auth-v1","supported":true,"protocolVersion":1,"intents":["sign_in","link"]}},"platform":"ios","liveActivityBridgeSessionId":"84D76699-ACF4-44A8-9808-06C6081986C2","bridgeVersion":2}
+[bridge-stub] ◀ NATIVE_READY {"liveActivityBridgeSessionId":"84D76699-ACF4-44A8-9808-06C6081986C2","bridgeVersion":2,"capabilities":{"googleSignIn":{"transport":"trusted-auth-v1","intents":["sign_in","link"],"supported":true,"protocolVersion":1,"configured":true},"liveActivities":{"enabled":true,"supported":true,"minimumOS":"16.2","protocolVersion":1}},"platform":"ios"}
+[bridge-stub] PASS starts in portrait
+[bridge-stub] ▶ STUB_REQUEST_ORIENTATION {"orientation":"landscape"}
+[bridge-stub] ◀ STUB_ORIENTATION {"requestId":"stub-1","landscape":false}
+[bridge-stub] PASS portrait-only refuses landscape
+[bridge-stub] ▶ SET_LANDSCAPE_ALLOWED {"allowed":1}
+[bridge-stub] ◀ ERROR {"requestId":"stub-2","message":"allowed must be a boolean","code":"invalid_landscape_state"}
+[bridge-stub] PASS a non-boolean is rejected
+[bridge-stub] ▶ SET_LANDSCAPE_ALLOWED {"allowed":true}
+[bridge-stub] ◀ ORIENTATION_STATE {"requestId":"stub-3","landscapeAllowed":true}
+[bridge-stub] PASS ORIENTATION_STATE landscapeAllowed true with requestId
+[bridge-stub] ▶ STUB_REQUEST_ORIENTATION {"orientation":"landscape"}
+[bridge-stub] ◀ STUB_ORIENTATION {"requestId":"stub-4","landscape":true}
+[bridge-stub] PASS allowed -> the page turns landscape
+[bridge-stub] ▶ SET_LANDSCAPE_ALLOWED {"allowed":false}
+[bridge-stub] ◀ ORIENTATION_STATE {"requestId":"stub-5","landscapeAllowed":false}
+[bridge-stub] PASS not allowed -> back to portrait at once
+[bridge-stub] ▶ STUB_REQUEST_ORIENTATION {"orientation":"landscape"}
+[bridge-stub] ◀ STUB_ORIENTATION {"landscape":false,"requestId":"stub-6"}
+[bridge-stub] PASS portrait-only again refuses landscape
+[bridge-stub] ▶ SET_LANDSCAPE_ALLOWED {"allowed":true}
+[bridge-stub] ◀ ORIENTATION_STATE {"requestId":"stub-7","landscapeAllowed":true}
+[bridge-stub] ▶ STUB_REQUEST_ORIENTATION {"orientation":"landscape"}
+[bridge-stub] ◀ STUB_ORIENTATION {"requestId":"stub-8","landscape":true}
+[bridge-stub] PASS landscape again before the reload
+[bridge-stub] reloading in landscape
+[bridge-stub] ◀ NATIVE_READY {"bridgeVersion":2,"capabilities":{"liveActivities":{"protocolVersion":1,"supported":true,"enabled":true,"minimumOS":"16.2"},"googleSignIn":{"configured":true,"intents":["sign_in","link"],"supported":true,"protocolVersion":1,"transport":"trusted-auth-v1"}},"platform":"ios","liveActivityBridgeSessionId":"091D769B-99BE-410C-9FCC-AD173AE6C8B2"}
+[bridge-stub] ◀ NATIVE_READY {"liveActivityBridgeSessionId":"091D769B-99BE-410C-9FCC-AD173AE6C8B2","bridgeVersion":2,"capabilities":{"liveActivities":{"protocolVersion":1,"supported":true,"enabled":true,"minimumOS":"16.2"},"googleSignIn":{"configured":true,"supported":true,"transport":"trusted-auth-v1","protocolVersion":1,"intents":["sign_in","link"]}},"platform":"ios"}
+[bridge-stub] PASS a reload returns the shell to portrait
+[bridge-stub] ▶ STUB_REQUEST_ORIENTATION {"orientation":"landscape"}
+[bridge-stub] ◀ STUB_ORIENTATION {"requestId":"stub-1","landscape":false}
+[bridge-stub] PASS the reloaded page cannot turn landscape until it asks
+[bridge-stub] SCENARIO DONE
+com.jimmy.upwork.honoured: 26660

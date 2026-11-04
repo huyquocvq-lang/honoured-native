@@ -1,0 +1,41 @@
+31/10/2026 — Lock Screen Icon card layout (client request): count top right, day above the cut-off
+Command (from ios/): xcodebuild -project Honoured.xcodeproj -scheme Honoured -destination 'platform=iOS Simulator,name=iPhone 17 Pro' -derivedDataPath ~/Library/Developer/Xcode/DerivedData/Honoured-sim CODE_SIGNING_ALLOWED=NO test
+Test Case '-[HonouredTests.IconLiveActivityTests testHeaderFallsBackWhenTheDayIsNotADate]' passed (0.000 seconds).
+Test Case '-[HonouredTests.IconLiveActivityTests testHeaderShowsTheIconDayAsTheClientWroteIt]' passed (0.001 seconds).
+Test Case '-[HonouredTests.IconLiveActivityTests testLongestCardFitsTheFourKilobyteLimit]' passed (0.000 seconds).
+Test Case '-[HonouredTests.IconLiveActivityTests testRevisionFilesShareTheIconsStemAndKeepTheOldName]' passed (0.001 seconds).
+Test Case '-[HonouredTests.IconLiveActivityTests testRevisionListRoundTripsAsJSON]' passed (0.034 seconds).
+Test Case '-[HonouredTests.IconLiveActivityTests testSessionNumbersStayInRange]' passed (0.000 seconds).
+Test Case '-[HonouredTests.IconLiveActivityTests testShortValueFollowsTheTargetUnit]' passed (0.001 seconds).
+Test Case '-[HonouredTests.IconLiveActivityTests testSignatureFileNameIsStableAndPathFree]' passed (0.000 seconds).
+Test Case '-[HonouredTests.IconLiveActivityTests testTheReadingRoundTripsAndIsLeftOutWhenUnknown]' passed (0.001 seconds).
+Test Case '-[HonouredTests.IconLiveActivityTests testWithoutAnAppGroupNothingIsStoredOrRead]' passed (0.001 seconds).
+Test Suite 'IconLiveActivityTests' passed at 2026-10-31 19:00:09.471.
+	 Executed 17 tests, with 0 failures (0 unexpected) in 0.842 (0.846) seconds
+	 Executed 13 tests, with 0 failures (0 unexpected) in 0.015 (0.017) seconds
+	 Executed 5 tests, with 0 failures (0 unexpected) in 0.165 (0.167) seconds
+	 Executed 2 tests, with 0 failures (0 unexpected) in 0.001 (0.001) seconds
+	 Executed 53 tests, with 0 failures (0 unexpected) in 3.537 (3.568) seconds
+	 Executed 3 tests, with 0 failures (0 unexpected) in 0.006 (0.007) seconds
+	 Executed 4 tests, with 0 failures (0 unexpected) in 0.002 (0.003) seconds
+	 Executed 15 tests, with 0 failures (0 unexpected) in 0.016 (0.019) seconds
+	 Executed 2 tests, with 0 failures (0 unexpected) in 0.504 (0.504) seconds
+	 Executed 11 tests, with 0 failures (0 unexpected) in 0.020 (0.022) seconds
+	 Executed 11 tests, with 0 failures (0 unexpected) in 0.006 (0.009) seconds
+	 Executed 5 tests, with 0 failures (0 unexpected) in 0.009 (0.010) seconds
+	 Executed 6 tests, with 0 failures (0 unexpected) in 0.002 (0.003) seconds
+	 Executed 4 tests, with 0 failures (0 unexpected) in 0.214 (0.216) seconds
+	 Executed 4 tests, with 0 failures (0 unexpected) in 0.010 (0.012) seconds
+	 Executed 20 tests, with 0 failures (0 unexpected) in 0.087 (0.091) seconds
+	 Executed 278 tests, with 0 failures (0 unexpected) in 5.742 (5.832) seconds
+	 Executed 278 tests, with 0 failures (0 unexpected) in 5.742 (5.834) seconds
+** TEST SUCCEEDED **
+
+Right edge of each text line in the Lock Screen renders (px at 2x; card 720 px wide):
+icon-lock-honoured.png width 720 ["y42-58: right 689", "y107-125: right 373", "y155-176: right 689", "y204-226: right 689"]
+icon-lock-midnight-cutoff.png width 720 ["y43-59: right 689", "y153-169: right 689", "y203-225: right 690"]
+icon-lock-long-text-large-text.png width 720 ["y45-67: right 687", "y116-147: right 686", "y180-202: right 688", "y237-264: right 689"]
+icon-lock-morning-no-because.png width 720 ["y43-59: right 689", "y106-124: right 366", "y150-166: right 689", "y198-220: right 689"]
+icon-lock-broken-large-text.png width 720 ["y45-67: right 689", "y116-148: right 455", "y178-209: right 689", "y243-270: right 689"]
+
+Simulator build (Debug, generic iOS Simulator, CODE_SIGNING_ALLOWED=NO): BUILD SUCCEEDED

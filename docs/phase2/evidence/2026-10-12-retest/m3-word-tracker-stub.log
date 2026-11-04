@@ -1,0 +1,44 @@
+PASS capability wordTracker v1, supported, five source kinds
+PASS no bound session -> invalid_payload
+PASS CLEAR_WORD_SOURCES -> WORD_SOURCES_CLEARED
+PASS missing contractId -> invalid_payload
+PASS contractId over 256 characters -> invalid_payload
+PASS no source yet -> none, contractId echoed
+PASS READ with a malformed sourceId -> invalid_payload
+PASS READ without a source -> missing, recoverable
+PASS REMOVE without a source -> source_mismatch
+PASS SELECT with a non-string sourceId -> invalid_payload, no picker
+PASS SET_WORD_REMINDERS with a non-list -> invalid_payload
+PASS 33 reminders -> invalid_payload
+PASS same-origin iframe gets no reply
+PICK Cancel
+PASS closing the picker -> cancelled, recoverable
+PASS a second SELECT while the picker is up -> in_progress
+PICK Chapter-word.docx
+PASS docx -> WORD_SOURCE_SELECTED word with only an opaque id
+PICK Chapter-text.txt
+PASS txt -> WORD_SOURCE_SELECTED text with only an opaque id
+PICK Chapter-rich.rtf
+PASS rtf -> WORD_SOURCE_SELECTED rich_text with only an opaque id
+PICK Chapter-package.rtfd
+PASS rtfd -> WORD_SOURCE_SELECTED rich_text_directory with only an opaque id
+PICK Novel.scriv
+PASS scriv -> WORD_SOURCE_SELECTED scrivener with only an opaque id
+PICK Notes.md
+PASS a Markdown file -> unsupported_type
+PASS docx state selected with the same id
+PASS docx read -> only count, readAt, modifiedAt and revision
+PASS txt state selected with the same id
+PASS txt read -> only count, readAt, modifiedAt and revision
+PASS rtf state selected with the same id
+PASS rtf read -> only count, readAt, modifiedAt and revision
+PASS rtfd state selected with the same id
+PASS rtfd read -> only count, readAt, modifiedAt and revision
+PASS scriv state selected with the same id
+PASS scriv read -> only count, readAt, modifiedAt and revision
+COUNTS {"docx":49,"txt":49,"rtf":49,"rtfd":49,"scriv":49}
+PASS every format counts the same chapter
+PASS each read has its own random revision
+PASS READ with another contract's source id -> source_mismatch
+PASS a second read of the same source while one runs -> in_progress
+SCENARIO DONE

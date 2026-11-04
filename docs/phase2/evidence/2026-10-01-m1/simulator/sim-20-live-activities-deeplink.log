@@ -1,0 +1,33 @@
+2026-10-01 17:27:22.736 Honoured[27757:2772245] Successfully load keyboard extensions
+[bridge-stub] ◀ NATIVE_READY {"bridgeVersion":2,"liveActivityBridgeSessionId":"AE18BD85-EF68-4FFC-B0A2-045D1A02E176","capabilities":{"googleSignIn":{"protocolVersion":1,"transport":"trusted-auth-v1","intents":["sign_in","link"],"supported":true,"configured":true},"liveActivities":{"protocolVersion":1,"minimumOS":"16.2","supported":true,"enabled":true}},"platform":"ios"}
+[bridge-stub] ◀ NATIVE_READY {"bridgeVersion":2,"liveActivityBridgeSessionId":"AE18BD85-EF68-4FFC-B0A2-045D1A02E176","capabilities":{"liveActivities":{"protocolVersion":1,"minimumOS":"16.2","supported":true,"enabled":true},"googleSignIn":{"protocolVersion":1,"transport":"trusted-auth-v1","intents":["sign_in","link"],"supported":true,"configured":true}},"platform":"ios"}
+[bridge-stub] ▶ CLEAR_AUTH_SESSION {}
+[bridge-stub] ◀ AUTH_SESSION_CLEARED {"liveActivityBridgeSessionId":"D617317D-9A73-4F20-81D9-A9557544FE23","requestId":"stub-1"}
+[bridge-stub] ▶ STUB_SET_FAKE_HEALTH_TOTALS {"spec":null}
+[bridge-stub] ◀ STUB_FAKE_HEALTH_TOTALS_SET {"requestId":"stub-2","spec":null}
+[bridge-stub] ▶ SET_AUTH_SESSION {"userId":"stub-user-a","accessToken":"stub-access-token","refreshToken":"stub-refresh-token","expiresAt":1790854043}
+[bridge-stub] ◀ AUTH_SESSION_ACCEPTED {"liveActivityBridgeSessionId":"D617317D-9A73-4F20-81D9-A9557544FE23","userId":"stub-user-a","requestId":"stub-3"}
+[bridge-stub] ▶ SET_DAY_RESET_HOUR {"hour":0}
+[bridge-stub] ◀ DAY_RESET_HOUR_ACCEPTED {"requestId":"stub-4","hour":0}
+[bridge-stub] ▶ SET_GOALS {"goals":[{"activityId":"c-link:primary","activityName":"Walking","metric":"steps","target":8000,"unit":"count"}]}
+[bridge-stub] ◀ GOALS_ACCEPTED {"count":1,"requestId":"stub-5"}
+[bridge-stub] ▶ STUB_SET_FAKE_HEALTH_TOTALS {"spec":"steps=100"}
+[bridge-stub] ◀ STUB_FAKE_HEALTH_TOTALS_SET {"spec":"steps=100","requestId":"stub-6"}
+[bridge-stub] ▶ TRACK_CONTRACT {"bridgeSessionId":"D617317D-9A73-4F20-81D9-A9557544FE23","clientSequence":1,"reason":"opened","contract":{"contractId":"c-link","contractName":"Walk","healthDay":"2026-10-01","expiresAt":"2026-10-01T16:27:23.506Z","timerActivityId":"c-link","completionPolicy":{"kind":"all_health_slots","requiredActivityIds":["c-link:primary"]},"activities":[{"activityId":"c-link:primary","slot":"primary","name":"Walking","mode":"health","metric":"steps","target":8000,"unit":"count"}]}}
+[bridge-stub] ◀ LIVE_ACTIVITY_STATE_CHANGED {"supported":true,"tracked":[{"contractId":"c-link","healthDay":"2026-10-01","presentationStatus":"active","lastUpdatedAt":"2026-10-01T10:27:23Z","focused":true}],"focusedOccurrence":{"contractId":"c-link","healthDay":"2026-10-01"},"enabled":true}
+[bridge-stub] ◀ CONTRACT_TRACKING_ACCEPTED {"requestId":"stub-7","healthDay":"2026-10-01","presentationStatus":"active","contractId":"c-link","focused":true}
+[bridge-stub] ▶ STUB_OPEN_DEEP_LINK {"contractId":"c-link","healthDay":"2026-10-01"}
+[bridge-stub] ◀ STUB_DEEP_LINK_OPENED {"requestId":"stub-8","url":"honoured://contract/c-link?day=2026-10-01&occurrence=0E7BB686-6AE3-4911-BA7D-7D35FCA98393","handled":true}
+[bridge-stub] PASS the card link opens through the system
+[bridge-stub] ◀ LIVE_ACTIVITY_OPENED {"healthDay":"2026-10-01","eventId":"79402661-7F1B-4930-8D79-E07A813CFE8B","contractId":"c-link"}
+[bridge-stub] PASS LIVE_ACTIVITY_OPENED with eventId, contractId and healthDay
+[bridge-stub] ▶ STUB_OPEN_DEEP_LINK {"url":"honoured://contract/c-link?day=2026-10-01&occurrence=00000000-0000-0000-0000-000000000000"}
+[bridge-stub] ◀ STUB_DEEP_LINK_OPENED {"url":"honoured://contract/c-link?day=2026-10-01&occurrence=00000000-0000-0000-0000-000000000000","requestId":"stub-9","handled":true}
+[bridge-stub] PASS a token that is not ours opens nothing
+[bridge-stub] ▶ STUB_OPEN_DEEP_LINK {"url":"honoured://contract/c-link/extra?day=bad"}
+[bridge-stub] ◀ STUB_DEEP_LINK_OPENED {"url":"honoured://contract/c-link/extra?day=bad","requestId":"stub-10","handled":true}
+[bridge-stub] PASS a malformed link is ignored
+[bridge-stub] ▶ CLEAR_AUTH_SESSION {}
+[bridge-stub] ◀ AUTH_SESSION_CLEARED {"requestId":"stub-11","liveActivityBridgeSessionId":"319403BD-FEEE-439D-B1A7-C78CBB7A94C6"}
+[bridge-stub] SCENARIO DONE
+com.jimmy.upwork.honoured: 27757

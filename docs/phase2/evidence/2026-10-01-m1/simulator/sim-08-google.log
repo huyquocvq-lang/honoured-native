@@ -1,0 +1,76 @@
+2026-10-01 17:25:09.376 Honoured[24707:2760764] Successfully load keyboard extensions
+[bridge-stub] ◀ NATIVE_READY {"capabilities":{"liveActivities":{"minimumOS":"16.2","protocolVersion":1,"supported":true,"enabled":true},"googleSignIn":{"supported":true,"protocolVersion":1,"intents":["sign_in","link"],"configured":true,"transport":"trusted-auth-v1"}},"platform":"ios","liveActivityBridgeSessionId":"A5849569-393A-4709-A781-16B9BE20B11B","bridgeVersion":2}
+[bridge-stub] ◀ NATIVE_READY {"liveActivityBridgeSessionId":"A5849569-393A-4709-A781-16B9BE20B11B","bridgeVersion":2,"platform":"ios","capabilities":{"googleSignIn":{"transport":"trusted-auth-v1","supported":true,"protocolVersion":1,"configured":true,"intents":["sign_in","link"]},"liveActivities":{"enabled":true,"minimumOS":"16.2","protocolVersion":1,"supported":true}}}
+[bridge-stub] ▶ GET_PLATFORM_INFO {}
+[bridge-stub] ◀ PLATFORM_INFO {"requestId":"stub-1","liveActivityBridgeSessionId":"A5849569-393A-4709-A781-16B9BE20B11B","capabilities":{"googleSignIn":{"intents":["sign_in","link"],"configured":true,"supported":true,"protocolVersion":1,"transport":"trusted-auth-v1"},"liveActivities":{"protocolVersion":1,"supported":true,"enabled":true,"minimumOS":"16.2"}},"bridgeVersion":2,"platform":"ios"}
+[bridge-stub] PASS capability googleSignIn supported + configured + trusted-auth-v1
+[bridge-stub] ▶ CLEAR_AUTH_SESSION {}
+[bridge-stub] ◀ AUTH_SESSION_CLEARED {"liveActivityBridgeSessionId":"17796459-9180-4C94-B379-B2D6D1D784DB","requestId":"stub-2"}
+[bridge-stub] ▶ SIGN_IN_WITH_GOOGLE {"intent":"sign_in","authContextId":"made-up"}
+[bridge-stub] ◀ GOOGLE_SIGN_IN_FAILED {"authContextId":"made-up","message":"The sign-in request no longer matches this page. Try again.","code":"stale_context","requestId":"stub-3"}
+[bridge-stub] PASS no synced context -> stale_context
+[bridge-stub] ▶ SYNC_AUTH_CONTEXT {"userId":null}
+[bridge-stub] ◀ AUTH_CONTEXT_SYNCED {"authContextId":"5763E875-7B5E-44EC-B87E-E5BD4BBFC16C","userId":null,"requestId":"stub-4"}
+[bridge-stub] ▶ SYNC_AUTH_CONTEXT {"userId":null}
+[bridge-stub] ◀ AUTH_CONTEXT_SYNCED {"authContextId":"5763E875-7B5E-44EC-B87E-E5BD4BBFC16C","userId":null,"requestId":"stub-5"}
+[bridge-stub] PASS same user + page -> same context id
+[bridge-stub] ▶ SIGN_IN_WITH_GOOGLE {"intent":"link","authContextId":"5763E875-7B5E-44EC-B87E-E5BD4BBFC16C"}
+[bridge-stub] ◀ GOOGLE_SIGN_IN_FAILED {"authContextId":"5763E875-7B5E-44EC-B87E-E5BD4BBFC16C","message":"link needs a signed-in context.","code":"invalid_payload","requestId":"stub-6"}
+[bridge-stub] PASS link on a signed-out context -> invalid_payload
+[bridge-stub] ▶ SIGN_IN_WITH_GOOGLE {"intent":"bogus","authContextId":"5763E875-7B5E-44EC-B87E-E5BD4BBFC16C"}
+[bridge-stub] ◀ GOOGLE_SIGN_IN_FAILED {"authContextId":"5763E875-7B5E-44EC-B87E-E5BD4BBFC16C","message":"intent must be sign_in or link.","code":"invalid_payload","requestId":"stub-7"}
+[bridge-stub] PASS unknown intent -> invalid_payload
+[bridge-stub] ▶ SIGN_IN_WITH_GOOGLE {"intent":"sign_in","authContextId":"5763E875-7B5E-44EC-B87E-E5BD4BBFC16C"}
+[bridge-stub] ▶ SIGN_IN_WITH_GOOGLE {"intent":"sign_in","authContextId":"5763E875-7B5E-44EC-B87E-E5BD4BBFC16C"}
+[bridge-stub] ◀ GOOGLE_SIGN_IN_FAILED {"authContextId":"5763E875-7B5E-44EC-B87E-E5BD4BBFC16C","message":"Another sign-in is already in progress.","code":"in_progress","requestId":"stub-8"}
+[bridge-stub] PASS second request while the UI is up -> in_progress
+[bridge-stub] ▶ SIGN_IN_WITH_APPLE {}
+[bridge-stub] ◀ APPLE_SIGN_IN_FAILED {"code":"failed","message":"Another sign-in is already in progress","requestId":"stub-9"}
+[bridge-stub] PASS Apple while Google is up -> refused, no sheet
+[bridge-stub] ◀ GOOGLE_SIGN_IN_SUCCESS {"accessToken":"<accessToken 24 chars>","authContextId":"5763E875-7B5E-44EC-B87E-E5BD4BBFC16C","idToken":"<idToken 91 chars>","requestId":"g-first","intent":"sign_in","rawNonce":"<rawNonce 64 chars>"}
+[bridge-stub] PASS sign_in -> GOOGLE_SIGN_IN_SUCCESS for the same request + context
+[bridge-stub] PASS raw nonce is 64 hex chars and its SHA-256 is the nonce Google got
+[bridge-stub] PASS iOS returns an access token
+[bridge-stub] ▶ SIGN_IN_WITH_GOOGLE {"intent":"sign_in","authContextId":"5763E875-7B5E-44EC-B87E-E5BD4BBFC16C"}
+[bridge-stub] ◀ GOOGLE_SIGN_IN_FAILED {"authContextId":"5763E875-7B5E-44EC-B87E-E5BD4BBFC16C","message":"This requestId was already used.","code":"invalid_payload","requestId":"g-first"}
+[bridge-stub] PASS reused requestId -> invalid_payload, no second credential
+[bridge-stub] ▶ SIGN_IN_WITH_GOOGLE {"intent":"sign_in","authContextId":"5763E875-7B5E-44EC-B87E-E5BD4BBFC16C"}
+[bridge-stub] ▶ CANCEL_GOOGLE_SIGN_IN {"authContextId":"5763E875-7B5E-44EC-B87E-E5BD4BBFC16C","targetRequestId":"g-cancel"}
+[bridge-stub] ◀ GOOGLE_SIGN_IN_FAILED {"authContextId":"5763E875-7B5E-44EC-B87E-E5BD4BBFC16C","message":"Google sign-in was cancelled.","code":"cancelled","requestId":"g-cancel"}
+[bridge-stub] ◀ GOOGLE_SIGN_IN_CANCEL_ACCEPTED {"requestId":"stub-10","targetRequestId":"g-cancel","cancelled":true}
+[bridge-stub] PASS cancel accepted
+[bridge-stub] PASS cancelled request answered once with cancelled
+[bridge-stub] PASS the SDK result after cancel is dropped
+[bridge-stub] ▶ SET_AUTH_SESSION {"userId":"stub-google-user-a","accessToken":"stub-access-token","refreshToken":"stub-refresh-token","expiresAt":1790853914}
+[bridge-stub] ◀ AUTH_SESSION_ACCEPTED {"liveActivityBridgeSessionId":"17796459-9180-4C94-B379-B2D6D1D784DB","userId":"stub-google-user-a","requestId":"stub-11"}
+[bridge-stub] ▶ SYNC_AUTH_CONTEXT {"userId":"stub-google-user-a"}
+[bridge-stub] ◀ AUTH_CONTEXT_SYNCED {"authContextId":"FF2623C1-585D-4B59-B098-76D4C3878782","requestId":"stub-12","userId":"stub-google-user-a"}
+[bridge-stub] PASS a different owner gets a new context
+[bridge-stub] ▶ SIGN_IN_WITH_GOOGLE {"intent":"sign_in","authContextId":"5763E875-7B5E-44EC-B87E-E5BD4BBFC16C"}
+[bridge-stub] ◀ GOOGLE_SIGN_IN_FAILED {"message":"The sign-in request no longer matches this page. Try again.","authContextId":"5763E875-7B5E-44EC-B87E-E5BD4BBFC16C","requestId":"stub-13","code":"stale_context"}
+[bridge-stub] PASS the old context is stale
+[bridge-stub] ▶ SIGN_IN_WITH_GOOGLE {"intent":"link","authContextId":"FF2623C1-585D-4B59-B098-76D4C3878782"}
+[bridge-stub] ▶ SET_AUTH_SESSION {"userId":"stub-google-user-a","accessToken":"stub-access-token","refreshToken":"stub-refresh-token","expiresAt":1790853914}
+[bridge-stub] ◀ AUTH_SESSION_ACCEPTED {"liveActivityBridgeSessionId":"17796459-9180-4C94-B379-B2D6D1D784DB","userId":"stub-google-user-a","requestId":"stub-14"}
+[bridge-stub] ◀ GOOGLE_SIGN_IN_SUCCESS {"idToken":"<idToken 91 chars>","authContextId":"FF2623C1-585D-4B59-B098-76D4C3878782","requestId":"g-link","intent":"link","accessToken":"<accessToken 24 chars>","rawNonce":"<rawNonce 64 chars>"}
+[bridge-stub] PASS token refresh for the same user keeps the link attempt
+[bridge-stub] ▶ SIGN_IN_WITH_GOOGLE {"intent":"link","authContextId":"FF2623C1-585D-4B59-B098-76D4C3878782"}
+[bridge-stub] ▶ SET_AUTH_SESSION {"userId":"stub-google-user-b","accessToken":"stub-access-token","refreshToken":"stub-refresh-token","expiresAt":1790853916}
+[bridge-stub] ◀ AUTH_SESSION_ACCEPTED {"userId":"stub-google-user-b","liveActivityBridgeSessionId":"7669C25D-D78F-4507-8F05-A8FBF2935EAB","requestId":"stub-15"}
+[bridge-stub] PASS owner change during the attempt -> result dropped
+[bridge-stub] ▶ SIGN_IN_WITH_GOOGLE {"intent":"link","authContextId":"FF2623C1-585D-4B59-B098-76D4C3878782"}
+[bridge-stub] ◀ GOOGLE_SIGN_IN_FAILED {"authContextId":"FF2623C1-585D-4B59-B098-76D4C3878782","message":"The sign-in request no longer matches this page. Try again.","requestId":"stub-16","code":"stale_context"}
+[bridge-stub] PASS then the old context is stale
+[bridge-stub] ▶ SYNC_AUTH_CONTEXT {"userId":"stub-google-user-b"}
+[bridge-stub] ◀ AUTH_CONTEXT_SYNCED {"authContextId":"1EA4C320-99A1-4C75-859B-D1C5F85834E6","userId":"stub-google-user-b","requestId":"stub-17"}
+[bridge-stub] ▶ CLEAR_GOOGLE_SIGN_IN {"authContextId":"1EA4C320-99A1-4C75-859B-D1C5F85834E6"}
+[bridge-stub] ◀ GOOGLE_SIGN_IN_CLEARED {"authContextId":"24633771-2D25-4CDD-8D11-F30BE39D21C6","providerCleared":true,"requestId":"stub-18"}
+[bridge-stub] PASS clear -> new context, provider cleared
+[bridge-stub] ▶ SIGN_IN_WITH_GOOGLE {"intent":"link","authContextId":"1EA4C320-99A1-4C75-859B-D1C5F85834E6"}
+[bridge-stub] ◀ GOOGLE_SIGN_IN_FAILED {"authContextId":"1EA4C320-99A1-4C75-859B-D1C5F85834E6","message":"The sign-in request no longer matches this page. Try again.","requestId":"stub-19","code":"stale_context"}
+[bridge-stub] PASS context before clear is stale
+[bridge-stub] PASS same-origin iframe gets no reply
+[bridge-stub] ▶ CLEAR_AUTH_SESSION {}
+[bridge-stub] ◀ AUTH_SESSION_CLEARED {"liveActivityBridgeSessionId":"5D7948A0-825B-45BE-BDB0-1AD333DA73CA","requestId":"stub-20"}
+[bridge-stub] SCENARIO DONE
+com.jimmy.upwork.honoured: 24707

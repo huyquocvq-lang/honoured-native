@@ -1,0 +1,9 @@
+[bridge-stub] ◀ NATIVE_READY {"liveActivityBridgeSessionId":"939A61C2-A260-4F7B-9348-DFA23F8B8EED","bridgeVersion":2,"platform":"ios","capabilities":{"iconRevisions":{"protocolVersion":1,"supported":true},"webCredentials":{"protocolVersion":1,"supported":true},"wordTracker":{"protocolVersion":1,"supported":true,"sourceKinds":["word","text","rich_text","rich_text_directory","scrivener"]},"liveActivities":{"supported":true,"minimumOS":"16.2","enabled":true,"protocolVersion":1},"googleSignIn":{"configured":true,"supported":true,"transport":"trusted-auth-v1","protocolVersion":1,"intents":["sign_in","link"]},"sessionRefresh":{"protocolVersion":1,"supported":true}}}
+[bridge-stub] ◀ NATIVE_READY {"liveActivityBridgeSessionId":"939A61C2-A260-4F7B-9348-DFA23F8B8EED","platform":"ios","bridgeVersion":2,"capabilities":{"webCredentials":{"protocolVersion":1,"supported":true},"wordTracker":{"sourceKinds":["word","text","rich_text","rich_text_directory","scrivener"],"protocolVersion":1,"supported":true},"liveActivities":{"supported":true,"enabled":true,"minimumOS":"16.2","protocolVersion":1},"sessionRefresh":{"protocolVersion":1,"supported":true},"iconRevisions":{"supported":true,"protocolVersion":1},"googleSignIn":{"intents":["sign_in","link"],"supported":true,"protocolVersion":1,"configured":true,"transport":"trusted-auth-v1"}}}
+[bridge-stub] ▶ STUB_ICON_CARD {"phase":"end"}
+[bridge-stub] ◀ STUB_ICON_CARD {"requestId":"stub-1","outcome":"ended","phase":"end"}
+[bridge-stub] ▶ STUB_ICON_CARD {"phase":"count"}
+[bridge-stub] ◀ STUB_ICON_CARD {"requestId":"stub-2","outcome":"0","phase":"count"}
+[bridge-stub] PASS the Icon card is gone
+[bridge-stub] SCENARIO DONE
+com.jimmy.upwork.honoured: 9965

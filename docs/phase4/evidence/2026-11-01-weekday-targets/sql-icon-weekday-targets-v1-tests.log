@@ -1,0 +1,248 @@
+# 2026-11-01 18:27:55 +0700 docs/db/tests/icon_weekday_targets_v1/run.sh, local Postgres 17.6 (embedded-postgres 17.6.0-beta.15)
+fd5cbd19bd90821ef6f8ccc7abb94ba1 icon_weekday_targets_v1.sql
+982f0a7ec398347e50b47b31e3748ddb icon_weekday_targets_v1_rollback.sql
+1c2973aeeff64a548ed4e2b2b6c8a64d icon_revisions_v1.sql
+5d8bdbe4ff2207f7f45e2c0fe4be5644 icon_revisions_v1_1.sql
+8baed90b52a6711a0660a1e13fd5e4e1 icon_revisions_v1_rollback.sql
+# Pass 1: every revision check still holds with weekday targets in place
+== /db/tests/icon_revisions_v1/00_schema.sql
+== /db/tests/icon_revisions_v1/01_prod_functions.sql
+== /db/tests/icon_revisions_v1/02_triggers.sql
+== /db/tests/icon_revisions_v1/05_supabase_defaults.sql
+== /db/tests/icon_revisions_v1/10_seed.sql
+== /db/tests/icon_revisions_v1/60_v1_1_seed.sql
+== /db/icon_revisions_v1.sql
+== /db/icon_revisions_v1_1.sql
+== /db/icon_weekday_targets_v1.sql
+== /db/icon_weekday_targets_v1.sql
+== /db/tests/icon_revisions_v1/20_helpers.sql
+== /db/tests/icon_revisions_v1/30_tests.sql
+ok  every day carries its signed target text
+ok  Health days carry the signed value in the metric unit
+ok  self-reported and Word days carry no value
+ok  every day starts on revision 0
+ok  the backfill leaves updated_at alone
+ok  B keeps 5 km as 5000 meters
+ok  ended-early days keep their target too
+ok  a new Icon's days carry its target
+ok  every day of the new Icon has it
+ok  authenticated cannot insert a revision
+ok  anon cannot call revise_icon_target
+ok  a request without a user is refused
+ok  A: the first revision takes effect from the next Icon day
+ok  A: today keeps the signed target
+ok  A: tomorrow is held to the revision
+ok  A: the last day too
+ok  A: a BROKEN day keeps its target
+ok  A: a HONOURED day keeps its target
+ok  A: a retry returns the same revision
+ok  A: a retry with other values still returns the recorded revision
+ok  A: one revision recorded
+ok  A: a lower target is a second revision
+ok  A: the second revision records the first as its previous target
+ok  A: the first revision is unchanged
+ok  A: tomorrow now holds the second revision
+ok  A: today still holds the signed target
+ok  A: the same target again is refused
+ok  A: 0 is refused
+ok  A: a negative target is refused
+ok  A: above the unit's maximum is refused
+ok  A: a fraction of a step is refused
+ok  A: NaN is refused
+ok  A: Infinity is refused
+ok  A: a missing target is invalid
+ok  A: a signature in another person's folder is refused
+ok  A: the contract's own signature is refused
+ok  A: an earlier revision's signature is refused
+ok  A: a path climbing out of the folder is refused
+ok  A: a path outside any user folder is refused
+ok  A: a signature that was never uploaded is refused
+ok  A: someone else's Icon is not found
+ok  A: an unknown Icon is not found
+ok  A: the refusals wrote nothing
+ok  A: nor any day
+ok  A's owner reads A's two revisions only
+ok  B: 7.5 km is 7500 meters
+ok  B: two decimals are refused
+ok  B: above 50 km is refused
+ok  B: 10.0 km is written 10 km
+ok  B: tomorrow is held to 10 km = 10000 meters
+ok  B's owner sees B's revisions only
+ok  C: a self-reported Icon is revised in its own unit
+ok  C: tomorrow is held to 30 reps
+ok  D: a Word Tracker Icon is not revisable
+ok  E: an Icon that ended early is not revisable
+ok  F: on its last day there is no next day to revise
+ok  G: Kiritimati revises from its own tomorrow
+ok  H: Pago Pago revises from its own tomorrow
+ok  G and H are on different local days
+ok  H: Pago Pago's today keeps its target
+ok  I: the revision starts on the next scheduled day
+ok  no contract changed
+ok  no contract was added
+ok  a revision cannot be edited
+ok  a revision cannot be deleted on its own
+ok  authenticated cannot edit a revision
+ok  authenticated cannot delete a revision
+ok  measure: today is measured against the signed target
+ok  record: 9000 today stays pending under the signed 10000
+ok  measure: a revised day is measured against its own target
+ok  record: 5000 turns that BROKEN day HONOURED under its 3000, not the signed 10000
+ok  push: tomorrow's morning card carries the revision
+ok  push: its facts say 8,000 STEPS
+ok  push: today's morning card keeps the signed target
+== /db/tests/icon_revisions_v1/36_cascade_tests.sql
+ok  deleting C removes its revision
+ok  deleting B's account removes its revisions
+ok  the other revisions stay
+== /db/tests/icon_revisions_v1/60_v1_1_tests.sql
+ok  v1.1: today is read after the row lock
+ok  mi: above 30 is refused
+ok  mi: two decimals are refused
+ok  mi: 4.5 is kept in meters in the signed proportion
+ok  min: above 120 is refused
+ok  min: 120 is the maximum
+ok  hrs: above 24 is refused
+ok  hrs: a self-reported Icon gets a text target and no value
+ok  kcal: above 2000 is refused
+ok  kcal: 2000 is the maximum
+ok  v1.1: a file in another of my Icons' folders is refused
+ok  v1.1: a file outside the revisions folder is refused
+ok  v1.1: a file in a folder below it is refused
+ok  v1.1: a file someone else uploaded to my folder does not count
+ok  v1.1: none of those made a revision
+ok  v1.1: A sees none of the other people's revisions
+ok  v1.1: (other people's revisions exist)
+ok  v1.1: anon cannot call revise_icon_target despite the default grant
+ok  v1.1: anon cannot read icon_revisions despite the default grant
+ok  v1.1: authenticated holds only SELECT on icon_revisions
+ok  v1.1: service_role cannot truncate icon_revisions
+ok  v1.1: not even the table owner can truncate icon_revisions
+ok  v1.1: a delete from another trigger is refused while the contract exists
+ok  v1.1: deleting an account still removes its revisions
+ok  v1.1: deleting a contract (Reset everything) still removes its revisions
+# Pass 2: weekday targets, weekday revisions, push facts, rollback
+== /db/tests/icon_revisions_v1/00_schema.sql
+== /db/tests/icon_revisions_v1/01_prod_functions.sql
+== /db/tests/icon_revisions_v1/02_triggers.sql
+== /db/tests/icon_revisions_v1/05_supabase_defaults.sql
+== /db/tests/icon_revisions_v1/10_seed.sql
+== /db/icon_revisions_v1.sql
+== /db/icon_revisions_v1_1.sql
+== /db/icon_weekday_targets_v1_rollback.sql
+== /db/icon_weekday_targets_v1.sql
+== /db/tests/icon_revisions_v1/20_helpers.sql
+== /work/20_helpers.sql
+== /work/30_tests.sql
+ok  21: the signed weekday targets are kept
+ok  21: every day starts on its weekday's target
+ok  21: all 14 days exist
+ok  22: a 7.5 km weekday is 7500 meters
+ok  22: the other weekdays keep 5 km as 5000 meters
+ok  23: a self-reported Icon gets text targets and no value
+ok  24: the same target on every day is stored as none
+ok  24: its days hold the signed target
+ok  26: Monday and Wednesday days hold their targets
+ok  a missing weekday is refused
+ok  a weekday outside the Icon is refused
+ok  another unit is refused
+ok  above the unit's maximum is refused
+ok  zero is refused
+ok  a decimal the unit does not allow is refused
+ok  two decimals of km are refused
+ok  a number not written as the web writes it is refused
+ok  a target that is not text is refused
+ok  primary_target must be the first weekday's
+ok  a target that is not "<number> <unit>" cannot hold weekday targets
+ok  not an object is refused
+ok  a Word Tracker Icon has one target
+ok  nothing was written for the refused terms
+ok  an ordinary contract drops weekday targets
+ok  signed weekday targets cannot be changed
+ok  the upsert went through for the free text
+ok  21: today is measured against today's weekday target
+ok  21: the push job carries tomorrow's weekday target
+ok  r1: revision 1 from the same weekday next week
+ok  r1: one change, with its weekday's previous target
+ok  r1: today keeps its target
+ok  r1: next week's day holds the revision
+ok  r1: no other weekday changed
+ok  r2: revision 2, first effective tomorrow, four days
+ok  r2: the history row holds the first change and both changes
+ok  r2: tomorrow and a week later hold 12000
+ok  r2: the day after holds 13000
+ok  r2: next week's revision 1 day is untouched
+ok  r2 again: the same revision, marked duplicate
+ok  the same targets again are refused as unchanged
+ok  r3: only the changed weekday is recorded
+ok  every day: revise_icon_target still revises from tomorrow
+ok  every day: every pending day after today holds 15000
+ok  a weekday revision then starts from the every-day target
+ok  an empty object is refused
+ok  an array is refused
+ok  weekday 8 is refused
+ok  a weekday name is refused
+ok  above the maximum is refused
+ok  zero is refused
+ok  a decimal of steps is refused
+ok  a number as text is refused
+ok  a signature outside the Icon's revisions folder is refused
+ok  a signature used before is refused
+ok  a signature never uploaded is refused
+ok  another person's Icon is not found
+ok  refusals wrote nothing
+ok  km: two decimals are refused
+ok  km: 6.5 km is 6500 meters, from 5 km
+ok  self-reported: a text target and no values
+ok  a weekday with no Icon day left is refused
+ok  today's weekday has no Icon day left either
+ok  a weekday the Icon does not hold is refused
+ok  Wednesday alone changes from the next Wednesday
+ok  Mondays keep 4000
+ok  a Word Tracker Icon is not supported
+ok  an Icon that ended is not active
+ok  a revision's changes cannot be edited
+ok  changes must be a non-empty array
+ok  anon cannot call revise_icon_targets despite the default grant
+ok  push facts: a revised day carries its revision
+ok  push facts: today, never revised, says 0
+ok  push facts: a day of another Icon's revision 1
+ok  push facts: no day, no key
+ok  push facts: a job without a contract id has no key and no error
+ok  push facts: a contract id that is not a uuid has no key and no error
+ok  push facts: every other key is as before
+== /db/icon_weekday_targets_v1.sql
+md5 after icon_weekday_targets_v1: contracts_icon_days dbc8968992cb54558dd4f097d16ed221
+md5 after icon_weekday_targets_v1: contracts_icon_guard b29e8ef41fc29f0d55c48092acf7c5f3
+md5 after icon_weekday_targets_v1: icon_push_facts ec9b2ae4012553c2945e80c6f0de8b58
+md5 after icon_weekday_targets_v1: revise_icon_targets b7484ec78c2f35bccd2f77847fbf8713
+== /db/icon_revisions_v1_rollback.sql (must be refused)
+ok  refused: icon_weekday_targets_v1.sql is in place
+== /db/icon_weekday_targets_v1_rollback.sql (must be refused)
+ok  refused: Icons hold weekday targets
+== /db/icon_weekday_targets_v1_rollback.sql
+== /work/40_rollback_tests.sql
+ok  rollback: contracts_icon_days is back
+ok  rollback: contracts_icon_guard is back
+ok  rollback: icon_push_facts is back
+ok  rollback: revise_icon_target is back
+ok  rollback: revise_icon_targets is gone
+ok  rollback: the new columns are gone
+ok  rollback: the revisions stay
+ok  rollback: days keep the targets they held
+ok  rollback: an every-day revision still works
+== /db/icon_weekday_targets_v1_rollback.sql
+== /db/icon_weekday_targets_v1.sql
+== /work/50_reapply_tests.sql
+ok  re-apply: a new Icon starts on its weekday targets
+ok  re-apply: a weekday revision works
+# Pass 3: refused on top of icon_revisions_v1.sql alone
+== /db/tests/icon_revisions_v1/00_schema.sql
+== /db/tests/icon_revisions_v1/01_prod_functions.sql
+== /db/tests/icon_revisions_v1/02_triggers.sql
+== /db/tests/icon_revisions_v1/05_supabase_defaults.sql
+== /db/tests/icon_revisions_v1/10_seed.sql
+== /db/icon_revisions_v1.sql
+== /db/icon_weekday_targets_v1.sql (must be refused)
+ok  refused: needs icon_revisions_v1_1.sql applied first
+ALL STEPS PASSED

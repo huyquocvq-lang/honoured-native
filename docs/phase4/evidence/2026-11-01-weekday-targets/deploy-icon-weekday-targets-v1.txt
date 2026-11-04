@@ -1,0 +1,16 @@
+# icon_revisions_v1_1.sql + icon_weekday_targets_v1.sql deployed to Lovable Cloud (Postgres 17.6), 01/11/2026 ~18:30 +07 (Jimmy: "duyệt, đồng ý làm đi")
+file md5: icon_revisions_v1_1.sql 5d8bdbe4ff2207f7f45e2c0fe4be5644, icon_weekday_targets_v1.sql fd5cbd19bd90821ef6f8ccc7abb94ba1, rollback 982f0a7ec398347e50b47b31e3748ddb
+pre-checks: revise_icon_target 80e9f0d1… and icon_revisions_immutable 401d66db… (v1 as deployed 28/10); contracts_icon_guard 05d2aad1…, contracts_icon_days bc7b184a…, icon_push_facts 3d396c2e… (expected); 0 revisions; revise_icon_targets absent
+after icon_revisions_v1_1.sql:
+  revise_icon_target        aca7ea9cee15c372aa2f0c9b9787f280  (= local test)
+  icon_revisions_immutable  aaa8d362ce4f89601261e219c7864e31  (= local test)
+  icon_revisions_no_truncate trigger present; service_role TRUNCATE false
+after icon_weekday_targets_v1.sql (all = md5 printed by docs/db/tests/icon_weekday_targets_v1/run.sh):
+  contracts_icon_guard   b29e8ef41fc29f0d55c48092acf7c5f3
+  contracts_icon_days    dbc8968992cb54558dd4f097d16ed221
+  icon_push_facts        ec9b2ae4012553c2945e80c6f0de8b58
+  revise_icon_targets    b7484ec78c2f35bccd2f77847fbf8713  (execute: authenticated yes, anon no)
+  columns: contracts.icon_day_targets jsonb, icon_revisions.changes jsonb; 0 contracts with day targets, 0 revisions
+smoke (one DO block ending in RAISE, so everything rolled back; user without an active Icon, Asia/Ho_Chi_Minh, signed Sun 1 Nov):
+  SMOKE (rolled back): days=14 wrong_day_targets=0 | storage ok | revise={"ok": true, "days": 2, "changes": [{"weekday": 1, "targetText": "12000 steps", "targetValue": 12000, "effectiveDay": "2026-11-02", "previousTargetText": "5000 steps", "previousTargetValue": 5000}], "revision": 1, "duplicate": false, "targetText": "12000 steps", "targetValue": 12000, "effectiveDay": "2026-11-02"} | tomorrow=12000 steps/12000/1 next_week=12000 steps/12000/1 today=11000 steps/11000/0 | facts_tomorrow_rev=1 | push_jobs_ok=0 | upsert_locked=5000 steps
+after smoke (11:33 UTC): 0 smoke contracts, 0 smoke storage objects, 0 revisions, 0 contracts with day targets

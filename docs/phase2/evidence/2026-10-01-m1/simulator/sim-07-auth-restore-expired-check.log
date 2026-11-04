@@ -1,0 +1,12 @@
+2026-10-01 17:24:56.950 Honoured[24322:2759549] Successfully load keyboard extensions
+[bridge-stub] ◀ NATIVE_READY {"capabilities":{"liveActivities":{"minimumOS":"16.2","enabled":true,"protocolVersion":1,"supported":true},"googleSignIn":{"transport":"trusted-auth-v1","intents":["sign_in","link"],"protocolVersion":1,"supported":true,"configured":true}},"bridgeVersion":2,"platform":"ios","liveActivityBridgeSessionId":"6FEFF268-30E8-4CC0-8E03-9DB822FF1079"}
+[bridge-stub] ◀ NATIVE_READY {"bridgeVersion":2,"platform":"ios","capabilities":{"liveActivities":{"protocolVersion":1,"enabled":true,"supported":true,"minimumOS":"16.2"},"googleSignIn":{"transport":"trusted-auth-v1","intents":["sign_in","link"],"protocolVersion":1,"supported":true,"configured":true}},"liveActivityBridgeSessionId":"6FEFF268-30E8-4CC0-8E03-9DB822FF1079"}
+[bridge-stub] PASS an expired session that cannot be refreshed is never offered to the page
+[bridge-stub] ▶ STUB_REFRESH_SESSION {}
+[bridge-stub] ◀ STUB_REFRESH_RESULT {"requestId":"stub-1","outcome":"error: notConfigured"}
+[bridge-stub] PASS the refresh restore depends on did not produce a session
+[bridge-stub] refresh outcome: error: notConfigured
+[bridge-stub] ▶ CLEAR_AUTH_SESSION {}
+[bridge-stub] ◀ AUTH_SESSION_CLEARED {"liveActivityBridgeSessionId":"868FE449-A767-4A35-84FB-F1D698A41E4B","requestId":"stub-2"}
+[bridge-stub] SCENARIO DONE
+com.jimmy.upwork.honoured: 24322

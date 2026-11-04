@@ -1,0 +1,5 @@
+# M2 simulator builds, 28/10/2026
+## Debug, iphonesimulator, ad-hoc signed
+** BUILD SUCCEEDED **
+## Release, iphonesimulator, CODE_SIGNING_ALLOWED=NO
+** BUILD SUCCEEDED **

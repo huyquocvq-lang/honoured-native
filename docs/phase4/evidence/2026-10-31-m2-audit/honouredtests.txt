@@ -1,0 +1,86 @@
+# HonouredTests after the M2 audit fixes, 2026-10-31 19:32:38 +0700, iPhone 17 Pro simulator (iOS 26.5)
+Test Suite 'All tests' started at 2026-10-31 19:28:29.902.
+Test Suite 'HonouredTests.xctest' started at 2026-10-31 19:28:29.903.
+Test Suite 'AuthSupportTests' started at 2026-10-31 19:28:29.903.
+Test Suite 'AuthSupportTests' passed at 2026-10-31 19:28:30.079.
+	 Executed 7 tests, with 0 failures (0 unexpected) in 0.174 (0.176) seconds
+Test Suite 'ContractDeepLinkTests' started at 2026-10-31 19:28:30.080.
+Test Suite 'ContractDeepLinkTests' passed at 2026-10-31 19:28:30.096.
+	 Executed 3 tests, with 0 failures (0 unexpected) in 0.015 (0.016) seconds
+Test Suite 'GoalDiagnosticsCoreTests' started at 2026-10-31 19:28:30.096.
+Test Suite 'GoalDiagnosticsCoreTests' passed at 2026-10-31 19:28:30.112.
+	 Executed 13 tests, with 0 failures (0 unexpected) in 0.013 (0.016) seconds
+Test Suite 'GoogleAuthStateTests' started at 2026-10-31 19:28:30.112.
+Test Suite 'GoogleAuthStateTests' passed at 2026-10-31 19:28:30.118.
+	 Executed 7 tests, with 0 failures (0 unexpected) in 0.004 (0.005) seconds
+Test Suite 'HealthDailyLedgerTests' started at 2026-10-31 19:28:30.118.
+Test Suite 'HealthDailyLedgerTests' passed at 2026-10-31 19:28:30.124.
+	 Executed 9 tests, with 0 failures (0 unexpected) in 0.004 (0.006) seconds
+Test Suite 'HealthDayMathTests' started at 2026-10-31 19:28:30.124.
+Test Suite 'HealthDayMathTests' passed at 2026-10-31 19:28:30.149.
+	 Executed 6 tests, with 0 failures (0 unexpected) in 0.024 (0.025) seconds
+Test Suite 'HealthSourcePreferenceTests' started at 2026-10-31 19:28:30.149.
+Test Suite 'HealthSourcePreferenceTests' passed at 2026-10-31 19:28:30.160.
+	 Executed 20 tests, with 0 failures (0 unexpected) in 0.007 (0.011) seconds
+Test Suite 'HealthSyncPayloadTests' started at 2026-10-31 19:28:30.160.
+Test Suite 'HealthSyncPayloadTests' passed at 2026-10-31 19:28:30.197.
+	 Executed 6 tests, with 0 failures (0 unexpected) in 0.034 (0.037) seconds
+Test Suite 'IconCardPlanTests' started at 2026-10-31 19:28:30.197.
+Test Suite 'IconCardPlanTests' passed at 2026-10-31 19:28:30.217.
+	 Executed 32 tests, with 0 failures (0 unexpected) in 0.015 (0.020) seconds
+Test Suite 'IconLiveActivityTests' started at 2026-10-31 19:28:30.217.
+Test Suite 'IconLiveActivityTests' passed at 2026-10-31 19:28:31.069.
+	 Executed 12 tests, with 0 failures (0 unexpected) in 0.849 (0.852) seconds
+Test Suite 'IconMeasurementTests' started at 2026-10-31 19:28:31.069.
+Test Suite 'IconMeasurementTests' passed at 2026-10-31 19:28:31.088.
+	 Executed 13 tests, with 0 failures (0 unexpected) in 0.016 (0.019) seconds
+Test Suite 'IconSignatureCacheTests' started at 2026-10-31 19:28:31.088.
+Test Suite 'IconSignatureCacheTests' passed at 2026-10-31 19:28:31.117.
+	 Executed 15 tests, with 0 failures (0 unexpected) in 0.026 (0.029) seconds
+Test Suite 'IconSignatureImageTests' started at 2026-10-31 19:28:31.117.
+Test Suite 'IconSignatureImageTests' passed at 2026-10-31 19:28:31.307.
+	 Executed 5 tests, with 0 failures (0 unexpected) in 0.188 (0.190) seconds
+Test Suite 'LiveActivityBridgeSessionTests' started at 2026-10-31 19:28:31.307.
+Test Suite 'LiveActivityBridgeSessionTests' passed at 2026-10-31 19:28:31.309.
+	 Executed 2 tests, with 0 failures (0 unexpected) in 0.001 (0.001) seconds
+Test Suite 'LiveActivityEngineTests' started at 2026-10-31 19:28:31.309.
+Test Suite 'LiveActivityEngineTests' passed at 2026-10-31 19:28:34.926.
+	 Executed 53 tests, with 0 failures (0 unexpected) in 3.583 (3.618) seconds
+Test Suite 'LiveActivityFormatTests' started at 2026-10-31 19:28:34.927.
+Test Suite 'LiveActivityFormatTests' passed at 2026-10-31 19:28:34.940.
+	 Executed 3 tests, with 0 failures (0 unexpected) in 0.011 (0.013) seconds
+Test Suite 'LiveActivityPresenterTests' started at 2026-10-31 19:28:34.940.
+Test Suite 'LiveActivityPresenterTests' passed at 2026-10-31 19:28:34.948.
+	 Executed 4 tests, with 0 failures (0 unexpected) in 0.005 (0.007) seconds
+Test Suite 'LiveActivityProtocolTests' started at 2026-10-31 19:28:34.948.
+Test Suite 'LiveActivityProtocolTests' passed at 2026-10-31 19:28:34.977.
+	 Executed 15 tests, with 0 failures (0 unexpected) in 0.025 (0.029) seconds
+Test Suite 'LiveActivityViewRenderTests' started at 2026-10-31 19:28:34.977.
+Test Suite 'LiveActivityViewRenderTests' passed at 2026-10-31 19:28:35.698.
+	 Executed 2 tests, with 0 failures (0 unexpected) in 0.719 (0.720) seconds
+Test Suite 'MotionModelsTests' started at 2026-10-31 19:28:35.698.
+Test Suite 'MotionModelsTests' passed at 2026-10-31 19:28:35.732.
+	 Executed 11 tests, with 0 failures (0 unexpected) in 0.032 (0.034) seconds
+Test Suite 'MotionProbeCoreTests' started at 2026-10-31 19:28:35.732.
+Test Suite 'MotionProbeCoreTests' passed at 2026-10-31 19:28:35.741.
+	 Executed 11 tests, with 0 failures (0 unexpected) in 0.007 (0.009) seconds
+Test Suite 'MotionProbeTimelineTests' started at 2026-10-31 19:28:35.741.
+Test Suite 'MotionProbeTimelineTests' passed at 2026-10-31 19:28:35.751.
+	 Executed 5 tests, with 0 failures (0 unexpected) in 0.009 (0.010) seconds
+Test Suite 'PushTokenSupportTests' started at 2026-10-31 19:28:35.751.
+Test Suite 'PushTokenSupportTests' passed at 2026-10-31 19:28:35.755.
+	 Executed 6 tests, with 0 failures (0 unexpected) in 0.003 (0.004) seconds
+Test Suite 'SessionRefreshTests' started at 2026-10-31 19:28:35.755.
+Test Suite 'SessionRefreshTests' passed at 2026-10-31 19:28:35.974.
+	 Executed 4 tests, with 0 failures (0 unexpected) in 0.217 (0.219) seconds
+Test Suite 'WebCredentialTests' started at 2026-10-31 19:28:35.974.
+Test Suite 'WebCredentialTests' passed at 2026-10-31 19:28:35.985.
+	 Executed 4 tests, with 0 failures (0 unexpected) in 0.009 (0.011) seconds
+Test Suite 'WordTrackerCoreTests' started at 2026-10-31 19:28:35.985.
+Test Suite 'WordTrackerCoreTests' passed at 2026-10-31 19:28:36.125.
+	 Executed 20 tests, with 0 failures (0 unexpected) in 0.136 (0.140) seconds
+Test Suite 'HonouredTests.xctest' passed at 2026-10-31 19:28:36.125.
+	 Executed 288 tests, with 0 failures (0 unexpected) in 6.127 (6.222) seconds
+Test Suite 'All tests' passed at 2026-10-31 19:28:36.126.
+	 Executed 288 tests, with 0 failures (0 unexpected) in 6.127 (6.224) seconds
+** TEST SUCCEEDED **

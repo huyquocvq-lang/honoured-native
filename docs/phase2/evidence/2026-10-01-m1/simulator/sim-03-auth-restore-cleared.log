@@ -1,0 +1,9 @@
+2026-10-01 17:24:35.050 Honoured[23852:2757077] Successfully load keyboard extensions
+[bridge-stub] ◀ NATIVE_READY {"liveActivityBridgeSessionId":"248598C4-4E91-4D6B-B2B5-88FF34D897E4","platform":"ios","capabilities":{"googleSignIn":{"transport":"trusted-auth-v1","protocolVersion":1,"supported":true,"configured":true,"intents":["sign_in","link"]},"liveActivities":{"protocolVersion":1,"supported":true,"minimumOS":"16.2","enabled":true}},"bridgeVersion":2}
+[bridge-stub] ◀ NATIVE_READY {"platform":"ios","capabilities":{"liveActivities":{"supported":true,"minimumOS":"16.2","enabled":true,"protocolVersion":1},"googleSignIn":{"intents":["sign_in","link"],"configured":true,"supported":true,"transport":"trusted-auth-v1","protocolVersion":1}},"liveActivityBridgeSessionId":"248598C4-4E91-4D6B-B2B5-88FF34D897E4","bridgeVersion":2}
+[bridge-stub] PASS after logout and a relaunch nothing is restored
+[bridge-stub] ▶ STUB_AUTH_STATE {}
+[bridge-stub] ◀ STUB_AUTH_STATE {"expiresAt":null,"userId":null,"requestId":"stub-1"}
+[bridge-stub] PASS Keychain is still empty after the relaunch
+[bridge-stub] SCENARIO DONE
+com.jimmy.upwork.honoured: 23852

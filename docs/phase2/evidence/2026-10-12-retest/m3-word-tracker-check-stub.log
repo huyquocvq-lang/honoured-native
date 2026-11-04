@@ -1,0 +1,27 @@
+PASS renamed docx and moved rtf are still selected
+PASS deleted txt -> needs_reconnect, keeping its id
+PASS the renamed docx still reads
+PASS and again once its bookmark is refreshed
+PASS the moved rtf still reads
+PASS the deleted txt -> missing, recoverable
+PICK Chapter-text-v2.txt
+PASS reconnecting keeps the locked source id
+PASS the reconnected txt reads
+COUNTS {"docxRenamed":49,"rtfMoved":49,"rtfdEdited":60,"scrivEdited":71,"txtReconnected":54}
+PASS another account has no source for the same contract
+PASS and cannot read user A's source
+PASS B clearing its sources leaves A's
+PASS REMOVE with another id -> source_mismatch
+PASS REMOVE -> none, and it stays removed
+PICK Allow
+PASS only the future reminder is scheduled, authorized
+PASS iOS holds exactly that reminder
+PASS the same list again changes nothing
+PASS an empty list cancels it
+PASS an account switch cancels every reminder
+PASS sign-out cancels every reminder
+PASS sign-out keeps the sources
+PASS CLEAR_WORD_SOURCES removes every source of the account
+PASS a reminder 45 s ahead is scheduled
+HOME reminder fires at 2026-10-12T03:31:27.254Z
+SCENARIO DONE

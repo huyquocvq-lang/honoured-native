@@ -1,0 +1,20 @@
+Published web app: https://honour-your-word.lovable.app (fetched 2026-10-01T10:31Z, 6 JS chunks)
+linkIdentity                                               2 chunk(s)
+To turn notifications off, change it in iPhone Settings    1 chunk(s)
+reset couldn                                               1 chunk(s)
+data-pull-refresh                                          1 chunk(s)
+GET_HEALTH_SOURCES                                         1 chunk(s)
+SET_HEALTH_SOURCE_PREFERENCE                               1 chunk(s)
+SET_AUTH_SESSION                                           1 chunk(s)
+SET_LANDSCAPE_ALLOWED                                      1 chunk(s)
+icon_weekdays                                              1 chunk(s)
+self_report_icon_day                                       1 chunk(s)
+Results are verified by the Honoured iPhone app.           1 chunk(s)
+
+Chunks:
+apple-revoke.functions-CeflW-km.js
+auth-middleware-DKfMC8gZ.js
+index-Djer5siI.js
+reset-Dcz-uyeH.js
+routes-DEaPtBW3.js
+sign-out-CC2b6zfW.js

@@ -1,0 +1,15 @@
+2026-10-01 17:24:29.763 Honoured[23680:2756579] Successfully load keyboard extensions
+[bridge-stub] ◀ NATIVE_READY {"platform":"ios","bridgeVersion":2,"capabilities":{"liveActivities":{"supported":true,"enabled":true,"protocolVersion":1,"minimumOS":"16.2"},"googleSignIn":{"transport":"trusted-auth-v1","configured":true,"intents":["sign_in","link"],"protocolVersion":1,"supported":true}},"liveActivityBridgeSessionId":"814EB3E1-0DC8-43DB-AA9A-C91F17A05DA0"}
+[bridge-stub] ◀ NATIVE_READY {"liveActivityBridgeSessionId":"814EB3E1-0DC8-43DB-AA9A-C91F17A05DA0","bridgeVersion":2,"platform":"ios","capabilities":{"liveActivities":{"minimumOS":"16.2","enabled":true,"protocolVersion":1,"supported":true},"googleSignIn":{"configured":true,"protocolVersion":1,"transport":"trusted-auth-v1","supported":true,"intents":["sign_in","link"]}}}
+[bridge-stub] ◀ AUTH_SESSION_UPDATED {"expiresAt":1790857466,"userId":"stub-restore-user-a","refreshToken":"stub-refresh-a","source":"native_restore","accessToken":"stub-access-a"}
+[bridge-stub] PASS cold start offers the stored session to the new page (source native_restore)
+[bridge-stub] PASS restored session is user A with its own tokens and expiry
+[bridge-stub] PASS restore is a broadcast, not a reply
+[bridge-stub] PASS exactly one restore per page load
+[bridge-stub] ▶ CLEAR_AUTH_SESSION {}
+[bridge-stub] ◀ AUTH_SESSION_CLEARED {"liveActivityBridgeSessionId":"9D99113C-66C9-4BC6-BD54-0AA9EC431862","requestId":"stub-1"}
+[bridge-stub] ▶ STUB_AUTH_STATE {}
+[bridge-stub] ◀ STUB_AUTH_STATE {"userId":null,"expiresAt":null,"requestId":"stub-2"}
+[bridge-stub] PASS logout clears the stored session
+[bridge-stub] SCENARIO DONE
+com.jimmy.upwork.honoured: 23680

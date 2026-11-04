@@ -1,0 +1,29 @@
+Test Suite 'AuthSupportTests' passed at 2026-10-01 17:30:22.322.
+	 Executed 7 tests, with 0 failures (0 unexpected) in 0.157 (0.159) seconds
+Test Suite 'ContractDeepLinkTests' passed at 2026-10-01 17:30:22.334.
+	 Executed 3 tests, with 0 failures (0 unexpected) in 0.010 (0.012) seconds
+Test Suite 'GoogleAuthStateTests' passed at 2026-10-01 17:30:22.342.
+	 Executed 7 tests, with 0 failures (0 unexpected) in 0.006 (0.008) seconds
+Test Suite 'HealthDayMathTests' passed at 2026-10-01 17:30:22.346.
+	 Executed 3 tests, with 0 failures (0 unexpected) in 0.003 (0.004) seconds
+Test Suite 'HealthSourcePreferenceTests' passed at 2026-10-01 17:30:22.351.
+	 Executed 7 tests, with 0 failures (0 unexpected) in 0.003 (0.005) seconds
+Test Suite 'IconMeasurementTests' passed at 2026-10-01 17:30:22.366.
+	 Executed 8 tests, with 0 failures (0 unexpected) in 0.012 (0.014) seconds
+Test Suite 'LiveActivityBridgeSessionTests' passed at 2026-10-01 17:30:22.367.
+	 Executed 2 tests, with 0 failures (0 unexpected) in 0.001 (0.001) seconds
+Test Suite 'LiveActivityEngineTests' passed at 2026-10-01 17:30:25.913.
+	 Executed 53 tests, with 0 failures (0 unexpected) in 3.515 (3.546) seconds
+Test Suite 'LiveActivityFormatTests' passed at 2026-10-01 17:30:25.927.
+	 Executed 3 tests, with 0 failures (0 unexpected) in 0.012 (0.014) seconds
+Test Suite 'LiveActivityPresenterTests' passed at 2026-10-01 17:30:25.935.
+	 Executed 4 tests, with 0 failures (0 unexpected) in 0.006 (0.007) seconds
+Test Suite 'LiveActivityProtocolTests' passed at 2026-10-01 17:30:25.962.
+	 Executed 15 tests, with 0 failures (0 unexpected) in 0.024 (0.027) seconds
+Test Suite 'LiveActivityViewRenderTests' passed at 2026-10-01 17:30:26.640.
+	 Executed 2 tests, with 0 failures (0 unexpected) in 0.677 (0.677) seconds
+Test Suite 'HonouredTests.xctest' passed at 2026-10-01 17:30:26.640.
+	 Executed 114 tests, with 0 failures (0 unexpected) in 4.426 (4.477) seconds
+Test Suite 'All tests' passed at 2026-10-01 17:30:26.640.
+	 Executed 114 tests, with 0 failures (0 unexpected) in 4.426 (4.480) seconds
+** TEST SUCCEEDED **

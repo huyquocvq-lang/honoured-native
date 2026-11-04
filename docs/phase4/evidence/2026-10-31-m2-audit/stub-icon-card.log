@@ -1,0 +1,22 @@
+[bridge-stub] ◀ NATIVE_READY {"platform":"ios","capabilities":{"webCredentials":{"supported":true,"protocolVersion":1},"wordTracker":{"supported":true,"sourceKinds":["word","text","rich_text","rich_text_directory","scrivener"],"protocolVersion":1},"liveActivities":{"supported":true,"protocolVersion":1,"enabled":true,"minimumOS":"16.2"},"sessionRefresh":{"protocolVersion":1,"supported":true},"iconRevisions":{"protocolVersion":1,"supported":true},"googleSignIn":{"protocolVersion":1,"supported":true,"configured":true,"transport":"trusted-auth-v1","intents":["sign_in","link"]}},"liveActivityBridgeSessionId":"ECF4378E-5D25-46A2-B4C9-6E7F369AF897","bridgeVersion":2}
+[bridge-stub] ◀ NATIVE_READY {"platform":"ios","liveActivityBridgeSessionId":"ECF4378E-5D25-46A2-B4C9-6E7F369AF897","capabilities":{"webCredentials":{"supported":true,"protocolVersion":1},"sessionRefresh":{"supported":true,"protocolVersion":1},"liveActivities":{"enabled":true,"supported":true,"minimumOS":"16.2","protocolVersion":1},"wordTracker":{"protocolVersion":1,"sourceKinds":["word","text","rich_text","rich_text_directory","scrivener"],"supported":true},"googleSignIn":{"configured":true,"protocolVersion":1,"transport":"trusted-auth-v1","intents":["sign_in","link"],"supported":true},"iconRevisions":{"protocolVersion":1,"supported":true}},"bridgeVersion":2}
+[bridge-stub] ▶ STUB_ICON_CARD {"phase":"start"}
+[bridge-stub] ◀ STUB_ICON_CARD {"phase":"start","requestId":"stub-1","outcome":"started"}
+[bridge-stub] PASS an Icon card starts
+[bridge-stub] ▶ STUB_ICON_CARD {"phase":"count"}
+[bridge-stub] ◀ STUB_ICON_CARD {"requestId":"stub-2","phase":"count","outcome":"1"}
+[bridge-stub] PASS one Icon card is running
+[bridge-stub] ▶ STUB_ICON_CARD {"phase":"evening"}
+[bridge-stub] ◀ STUB_ICON_CARD {"outcome":"updated 1","requestId":"stub-3","phase":"evening"}
+[bridge-stub] PASS evening update reaches it
+[bridge-stub] ▶ STUB_ICON_CARD {"phase":"broken"}
+[bridge-stub] ◀ STUB_ICON_CARD {"outcome":"updated 1","requestId":"stub-4","phase":"broken"}
+[bridge-stub] PASS BROKEN result reaches it
+[bridge-stub] ▶ STUB_ICON_CARD {"phase":"honoured"}
+[bridge-stub] ◀ STUB_ICON_CARD {"requestId":"stub-5","phase":"honoured","outcome":"updated 1"}
+[bridge-stub] PASS HONOURED result reaches it
+[bridge-stub] ▶ STUB_ICON_CARD {"phase":"count"}
+[bridge-stub] ◀ STUB_ICON_CARD {"outcome":"1","requestId":"stub-6","phase":"count"}
+[bridge-stub] PASS still exactly one card after every update
+[bridge-stub] SCENARIO DONE
+com.jimmy.upwork.honoured: 9909

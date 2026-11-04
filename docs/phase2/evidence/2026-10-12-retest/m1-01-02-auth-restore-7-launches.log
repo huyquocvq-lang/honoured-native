@@ -1,0 +1,33 @@
+== sim-01-auth-restore-setup
+[bridge-stub] PASS session for user A accepted
+[bridge-stub] PASS Keychain holds user A
+[bridge-stub] SCENARIO DONE
+== sim-02-auth-restore-check
+[bridge-stub] PASS cold start offers the stored session to the new page (source native_restore)
+[bridge-stub] PASS restored session is user A with its own tokens and expiry
+[bridge-stub] PASS restore is a broadcast, not a reply
+[bridge-stub] PASS exactly one restore per page load
+[bridge-stub] PASS logout clears the stored session
+[bridge-stub] SCENARIO DONE
+== sim-03-auth-restore-cleared
+[bridge-stub] PASS after logout and a relaunch nothing is restored
+[bridge-stub] PASS Keychain is still empty after the relaunch
+[bridge-stub] SCENARIO DONE
+== sim-04-auth-restore-setup
+[bridge-stub] PASS session for user A accepted
+[bridge-stub] PASS Keychain holds user A
+[bridge-stub] SCENARIO DONE
+== sim-05-auth-restore-race
+[bridge-stub] PASS the page login during load is accepted (user B)
+[bridge-stub] PASS the older stored session (user A) is never offered
+[bridge-stub] PASS Keychain holds user B, not A
+[bridge-stub] SCENARIO DONE
+== sim-06-auth-restore-expired-setup
+[bridge-stub] PASS expired session stored
+[bridge-stub] SCENARIO DONE
+== sim-07-auth-restore-expired-check
+[bridge-stub] PASS an expired session that cannot be refreshed is never offered to the page
+[bridge-stub] ◀ STUB_REFRESH_RESULT {"outcome":"error: notConfigured","requestId":"stub-1"}
+[bridge-stub] PASS the refresh restore depends on did not produce a session
+[bridge-stub] refresh outcome: error: notConfigured
+[bridge-stub] SCENARIO DONE
