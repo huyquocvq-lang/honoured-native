@@ -26,6 +26,10 @@ val revenueCatEntitlementId = env("REVENUECAT_ENTITLEMENT_ID")
 // Public Web application client ID: the audience of Google ID tokens. Empty
 // turns Google Sign-In off (capability configured: false).
 val googleWebClientId = env("GOOGLE_WEB_CLIENT_ID")
+// Public Supabase URL and anon key, for the native session refresh. Empty turns
+// the native session off (capabilities.sessionRefresh.supported: false).
+val supabaseUrl = env("SUPABASE_URL")
+val supabaseAnonKey = env("SUPABASE_ANON_KEY")
 if (revenueCatEntitlementId.isNotEmpty()) {
     logger.lifecycle(
         "warning: REVENUECAT_ENTITLEMENT_ID=$revenueCatEntitlementId — this build checks a " +
@@ -47,6 +51,9 @@ android {
         buildConfigField("String", "HONOURED_WEB_APP_URL", "\"$honouredWebAppUrl\"")
         buildConfigField("String", "REVENUECAT_ENTITLEMENT_ID", "\"$revenueCatEntitlementId\"")
         buildConfigField("String", "GOOGLE_WEB_CLIENT_ID", "\"$googleWebClientId\"")
+        buildConfigField("String", "SUPABASE_URL", "\"$supabaseUrl\"")
+        buildConfigField("String", "SUPABASE_ANON_KEY", "\"$supabaseAnonKey\"")
+        testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }
 
     buildFeatures {
@@ -80,4 +87,10 @@ dependencies {
     implementation("org.jetbrains.kotlinx:kotlinx-coroutines-android:1.9.0")
 
     testImplementation("junit:junit:4.13.2")
+    // Android's org.json is a stub in local unit tests.
+    testImplementation("org.json:json:20240303")
+    testImplementation("org.jetbrains.kotlinx:kotlinx-coroutines-test:1.9.0")
+
+    androidTestImplementation("androidx.test.ext:junit:1.2.1")
+    androidTestImplementation("androidx.test:runner:1.6.2")
 }

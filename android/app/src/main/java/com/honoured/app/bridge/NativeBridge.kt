@@ -7,14 +7,59 @@ import com.honoured.app.AppConfig
 import com.honoured.app.auth.AuthBridge
 import com.honoured.app.billing.PurchaseOutcome
 import com.honoured.app.billing.SubscriptionService
+import com.honoured.app.session.SessionServices
+import kotlinx.coroutines.launch
 import org.json.JSONObject
 
 class NativeBridge(
     private val activity: Activity,
     private val webView: WebView,
-    /** Capabilities added to NATIVE_READY / PLATFORM_INFO (Google Sign-In). */
+    private val session: SessionServices,
+    /** Capabilities added to NATIVE_READY / PLATFORM_INFO. */
     private val capabilities: () -> JSONObject = { JSONObject() },
 ) {
+    /**
+     * Broadcasts raised while the page is not ready, flushed after its first
+     * message (`docs/phase1/bridge.md`, "Event queue"). Main thread only.
+     */
+    private val events = BridgeEventQueue(
+        dispatch = { type, payload -> send(type, payload) },
+        drainStored = { session.events.drain() },
+    )
+    private val registryKey = "bridge-pending-${System.identityHashCode(this)}"
+
+    init {
+        // Nothing of the previous account may reach the next page.
+        session.registry.register(registryKey) { webView.post { events.clear() } }
+    }
+
+    /** A main-frame navigation started (`onPageStarted`). Main thread. */
+    fun pageWillChange() = events.pageWillChange()
+
+    /** A broadcast without secrets. Main thread. */
+    fun broadcast(type: String, payload: JSONObject) = events.broadcast(type, payload)
+
+    /**
+     * An event the person would notice losing (a tapped link or notification):
+     * persisted first, so it survives a relaunch, then delivered once the page
+     * is ready. Never for anything carrying a token.
+     */
+    fun broadcastDurable(type: String, payload: JSONObject) {
+        session.scope.launch {
+            runCatching { session.events.append(type, payload) }
+            webView.post { if (events.isWebReady) session.scope.launch { flushStoredNow() } }
+        }
+    }
+
+    private fun flushStoredNow() {
+        val stored = runCatching { session.events.drain() }.getOrDefault(emptyList())
+        if (stored.isEmpty()) return
+        webView.post { stored.forEach { send(it.type, it.payload) } }
+    }
+
+    fun destroy() {
+        session.registry.unregister(registryKey)
+    }
 
     /** Same payload for every NATIVE_READY / PLATFORM_INFO path. */
     fun readyPayload(): JSONObject = JSONObject()
@@ -32,194 +77,202 @@ class NativeBridge(
             send(replyType, replyPayload, requestId)
         }
 
-        when (type) {
-            "APP_READY" -> reply("NATIVE_READY", readyPayload())
-            "GET_PLATFORM_INFO" -> reply("PLATFORM_INFO", readyPayload())
-            // Google auth runs only on the origin-scoped HonouredAuth transport.
-            in AuthBridge.MESSAGE_TYPES -> reply(
-                "ERROR",
-                JSONObject()
-                    .put("message", "$type is only accepted on the secure auth transport")
-                    .put("code", "insecure_transport")
-            )
-            "IDENTIFY_USER" -> {
-                val userId = payload.optString("userId")
-                if (userId.isBlank()) {
-                    reply("IDENTIFY_FAILED", JSONObject().put("message", "Missing userId"))
-                } else {
-                    SubscriptionService.identify(userId) { outcome ->
-                        when (outcome) {
-                            is PurchaseOutcome.Completed -> {
-                                reply("IDENTIFY_SUCCESS", outcome.status)
-                                // The already-identified shortcut skips the CustomerInfo
-                                // fetch, so its payload carries no verdict. Broadcasting it
-                                // as a status would read as "not subscribed". A verdict for a
-                                // user RevenueCat is no longer bound to is not sent.
-                                if (outcome.status.has("isSubscribed") && SubscriptionService.isIdentified(userId)) {
-                                    reply("ACCESS_STATUS", outcome.status)
+        try {
+            when (type) {
+                "APP_READY" -> reply("NATIVE_READY", readyPayload())
+                "GET_PLATFORM_INFO" -> reply("PLATFORM_INFO", readyPayload())
+                // Google auth runs only on the origin-scoped HonouredAuth transport.
+                in AuthBridge.MESSAGE_TYPES -> reply(
+                    "ERROR",
+                    JSONObject()
+                        .put("message", "$type is only accepted on the secure auth transport")
+                        .put("code", "insecure_transport")
+                )
+                "IDENTIFY_USER" -> {
+                    val userId = payload.optString("userId")
+                    if (userId.isBlank()) {
+                        reply("IDENTIFY_FAILED", JSONObject().put("message", "Missing userId"))
+                    } else {
+                        SubscriptionService.identify(userId) { outcome ->
+                            when (outcome) {
+                                is PurchaseOutcome.Completed -> {
+                                    reply("IDENTIFY_SUCCESS", outcome.status)
+                                    // The already-identified shortcut skips the CustomerInfo
+                                    // fetch, so its payload carries no verdict. Broadcasting it
+                                    // as a status would read as "not subscribed". A verdict for a
+                                    // user RevenueCat is no longer bound to is not sent.
+                                    if (outcome.status.has("isSubscribed") && SubscriptionService.isIdentified(userId)) {
+                                        reply("ACCESS_STATUS", outcome.status)
+                                    }
                                 }
+                                PurchaseOutcome.Cancelled -> reply(
+                                    "IDENTIFY_FAILED",
+                                    JSONObject().put("message", "Unexpected cancellation")
+                                )
+                                is PurchaseOutcome.Failed -> reply(
+                                    "IDENTIFY_FAILED",
+                                    JSONObject().put("message", outcome.message)
+                                )
                             }
-                            PurchaseOutcome.Cancelled -> reply(
-                                "IDENTIFY_FAILED",
-                                JSONObject().put("message", "Unexpected cancellation")
-                            )
-                            is PurchaseOutcome.Failed -> reply(
-                                "IDENTIFY_FAILED",
-                                JSONObject().put("message", outcome.message)
-                            )
                         }
                     }
                 }
-            }
-            "LOGOUT_USER" -> SubscriptionService.logout { outcome ->
-                when (outcome) {
-                    is PurchaseOutcome.Completed -> {
-                        reply("LOGOUT_SUCCESS", JSONObject().put("isSubscribed", false))
-                        // A sign-in queued after this logout may already own the identity.
-                        if (SubscriptionService.isAnonymous) {
-                            reply(
-                                "ACCESS_STATUS",
-                                JSONObject().put("isSubscribed", false).put("source", "logout")
-                            )
-                        }
-                    }
-                    PurchaseOutcome.Cancelled -> reply(
-                        "LOGOUT_FAILED",
-                        JSONObject().put("message", "Unexpected cancellation")
-                    )
-                    is PurchaseOutcome.Failed -> reply(
-                        "LOGOUT_FAILED",
-                        JSONObject().put("message", outcome.message)
-                    )
-                }
-            }
-            "CHECK_ACCESS" -> {
-                val userId = payload.optString("userId")
-                if (userId.isBlank()) {
-                    reply(
-                        "ACCESS_STATUS",
-                        JSONObject().put("isSubscribed", false).put("source", "missing_user_id")
-                    )
-                    return
-                }
-                SubscriptionService.identify(userId) { identifyOutcome ->
-                    when (identifyOutcome) {
-                        is PurchaseOutcome.Completed -> SubscriptionService.checkAccess { status ->
-                            if (SubscriptionService.isIdentified(userId)) {
-                                reply("ACCESS_STATUS", status)
-                            } else {
+                "LOGOUT_USER" -> SubscriptionService.logout { outcome ->
+                    when (outcome) {
+                        is PurchaseOutcome.Completed -> {
+                            reply("LOGOUT_SUCCESS", JSONObject().put("isSubscribed", false))
+                            // A sign-in queued after this logout may already own the identity.
+                            if (SubscriptionService.isAnonymous) {
                                 reply(
                                     "ACCESS_STATUS",
-                                    JSONObject().put("isSubscribed", false).put("source", "identity_changed")
+                                    JSONObject().put("isSubscribed", false).put("source", "logout")
                                 )
                             }
                         }
                         PurchaseOutcome.Cancelled -> reply(
-                            "ACCESS_STATUS",
-                            JSONObject().put("isSubscribed", false).put("source", "identify_cancelled")
+                            "LOGOUT_FAILED",
+                            JSONObject().put("message", "Unexpected cancellation")
                         )
                         is PurchaseOutcome.Failed -> reply(
-                            "ACCESS_STATUS",
-                            JSONObject()
-                                .put("isSubscribed", false)
-                                .put("source", "identify_failed")
-                                .put("message", identifyOutcome.message)
+                            "LOGOUT_FAILED",
+                            JSONObject().put("message", outcome.message)
                         )
                     }
                 }
-            }
-            "START_PURCHASE" -> {
-                val userId = payload.optString("userId")
-                val packageIdentifier = payload.optString("packageIdentifier").takeIf { it.isNotBlank() }
-                if (userId.isBlank()) {
-                    reply("PURCHASE_FAILED", JSONObject().put("message", "Missing userId"))
-                    return
-                }
-                activity.runOnUiThread {
+                "CHECK_ACCESS" -> {
+                    val userId = payload.optString("userId")
+                    if (userId.isBlank()) {
+                        reply(
+                            "ACCESS_STATUS",
+                            JSONObject().put("isSubscribed", false).put("source", "missing_user_id")
+                        )
+                        return
+                    }
                     SubscriptionService.identify(userId) { identifyOutcome ->
                         when (identifyOutcome) {
-                            is PurchaseOutcome.Completed -> {
-                                SubscriptionService.purchase(activity, packageIdentifier) { outcome ->
-                                    when (outcome) {
-                                        is PurchaseOutcome.Completed -> {
-                                            reply("PURCHASE_SUCCESS", outcome.status)
-                                            reply("ACCESS_STATUS", outcome.status)
-                                        }
-                                        PurchaseOutcome.Cancelled -> reply("PURCHASE_CANCELLED", JSONObject())
-                                        is PurchaseOutcome.Failed -> reply(
-                                            "PURCHASE_FAILED",
-                                            JSONObject().put("message", outcome.message)
-                                        )
-                                    }
+                            is PurchaseOutcome.Completed -> SubscriptionService.checkAccess { status ->
+                                if (SubscriptionService.isIdentified(userId)) {
+                                    reply("ACCESS_STATUS", status)
+                                } else {
+                                    reply(
+                                        "ACCESS_STATUS",
+                                        JSONObject().put("isSubscribed", false).put("source", "identity_changed")
+                                    )
                                 }
                             }
                             PurchaseOutcome.Cancelled -> reply(
-                                "PURCHASE_FAILED",
+                                "ACCESS_STATUS",
+                                JSONObject().put("isSubscribed", false).put("source", "identify_cancelled")
+                            )
+                            is PurchaseOutcome.Failed -> reply(
+                                "ACCESS_STATUS",
+                                JSONObject()
+                                    .put("isSubscribed", false)
+                                    .put("source", "identify_failed")
+                                    .put("message", identifyOutcome.message)
+                            )
+                        }
+                    }
+                }
+                "START_PURCHASE" -> {
+                    val userId = payload.optString("userId")
+                    val packageIdentifier = payload.optString("packageIdentifier").takeIf { it.isNotBlank() }
+                    if (userId.isBlank()) {
+                        reply("PURCHASE_FAILED", JSONObject().put("message", "Missing userId"))
+                        return
+                    }
+                    activity.runOnUiThread {
+                        SubscriptionService.identify(userId) { identifyOutcome ->
+                            when (identifyOutcome) {
+                                is PurchaseOutcome.Completed -> {
+                                    SubscriptionService.purchase(activity, packageIdentifier) { outcome ->
+                                        when (outcome) {
+                                            is PurchaseOutcome.Completed -> {
+                                                reply("PURCHASE_SUCCESS", outcome.status)
+                                                reply("ACCESS_STATUS", outcome.status)
+                                            }
+                                            PurchaseOutcome.Cancelled -> reply("PURCHASE_CANCELLED", JSONObject())
+                                            is PurchaseOutcome.Failed -> reply(
+                                                "PURCHASE_FAILED",
+                                                JSONObject().put("message", outcome.message)
+                                            )
+                                        }
+                                    }
+                                }
+                                PurchaseOutcome.Cancelled -> reply(
+                                    "PURCHASE_FAILED",
+                                    JSONObject().put("message", "Could not identify signed-in user")
+                                )
+                                is PurchaseOutcome.Failed -> reply(
+                                    "PURCHASE_FAILED",
+                                    JSONObject().put("message", identifyOutcome.message)
+                                )
+                            }
+                        }
+                    }
+                }
+                "RESTORE_PURCHASES" -> {
+                    val userId = payload.optString("userId")
+                    if (userId.isBlank()) {
+                        reply("RESTORE_FAILED", JSONObject().put("message", "Missing userId"))
+                        return
+                    }
+                    SubscriptionService.identify(userId) { identifyOutcome ->
+                        when (identifyOutcome) {
+                            is PurchaseOutcome.Completed -> SubscriptionService.restore { outcome ->
+                                when (outcome) {
+                                    is PurchaseOutcome.Completed -> {
+                                        reply("RESTORE_SUCCESS", outcome.status)
+                                        reply("ACCESS_STATUS", outcome.status)
+                                    }
+                                    PurchaseOutcome.Cancelled -> reply(
+                                        "RESTORE_SUCCESS",
+                                        JSONObject().put("isSubscribed", false)
+                                    )
+                                    is PurchaseOutcome.Failed -> reply(
+                                        "RESTORE_FAILED",
+                                        JSONObject().put("message", outcome.message)
+                                    )
+                                }
+                            }
+                            PurchaseOutcome.Cancelled -> reply(
+                                "RESTORE_FAILED",
                                 JSONObject().put("message", "Could not identify signed-in user")
                             )
                             is PurchaseOutcome.Failed -> reply(
-                                "PURCHASE_FAILED",
+                                "RESTORE_FAILED",
                                 JSONObject().put("message", identifyOutcome.message)
                             )
                         }
                     }
                 }
-            }
-            "RESTORE_PURCHASES" -> {
-                val userId = payload.optString("userId")
-                if (userId.isBlank()) {
-                    reply("RESTORE_FAILED", JSONObject().put("message", "Missing userId"))
-                    return
-                }
-                SubscriptionService.identify(userId) { identifyOutcome ->
-                    when (identifyOutcome) {
-                        is PurchaseOutcome.Completed -> SubscriptionService.restore { outcome ->
-                            when (outcome) {
-                                is PurchaseOutcome.Completed -> {
-                                    reply("RESTORE_SUCCESS", outcome.status)
-                                    reply("ACCESS_STATUS", outcome.status)
-                                }
-                                PurchaseOutcome.Cancelled -> reply(
-                                    "RESTORE_SUCCESS",
-                                    JSONObject().put("isSubscribed", false)
-                                )
-                                is PurchaseOutcome.Failed -> reply(
-                                    "RESTORE_FAILED",
-                                    JSONObject().put("message", outcome.message)
-                                )
-                            }
-                        }
-                        PurchaseOutcome.Cancelled -> reply(
-                            "RESTORE_FAILED",
-                            JSONObject().put("message", "Could not identify signed-in user")
-                        )
-                        is PurchaseOutcome.Failed -> reply(
-                            "RESTORE_FAILED",
-                            JSONObject().put("message", identifyOutcome.message)
-                        )
-                    }
-                }
-            }
-            "START_SESSION" -> reply(
-                "ERROR",
-                JSONObject().put(
-                    "message",
-                    "Trial sessions are enforced by Supabase RPC from the authenticated web app"
+                "START_SESSION" -> reply(
+                    "ERROR",
+                    JSONObject().put(
+                        "message",
+                        "Trial sessions are enforced by Supabase RPC from the authenticated web app"
+                    )
                 )
-            )
-            // Live Activities are iOS-only. The web app checks the capability in
-            // NATIVE_READY first; a stray call still gets a correlated answer.
-            "TRACK_CONTRACT", "SYNC_TRACKED_CONTRACTS", "STOP_TRACKING_CONTRACT",
-            "GET_LIVE_ACTIVITY_STATE" -> reply(
-                "ERROR",
-                JSONObject()
-                    .put("message", "$type is not implemented on Android")
-                    .put("code", "not_implemented")
-            )
-            else -> reply(
-                "ERROR",
-                JSONObject().put("message", "Unsupported bridge message: $type")
-            )
+                // No Icon card on Android: there is no signature cache to bring up to date.
+                "SYNC_ICON_REVISIONS" -> reply("ICON_REVISIONS_SYNCED", JSONObject().put("synced", true))
+                // Live Activities are iOS-only. The web app checks the capability in
+                // NATIVE_READY first; a stray call still gets a correlated answer.
+                "TRACK_CONTRACT", "SYNC_TRACKED_CONTRACTS", "STOP_TRACKING_CONTRACT",
+                "GET_LIVE_ACTIVITY_STATE" -> reply(
+                    "ERROR",
+                    JSONObject()
+                        .put("message", "$type is not implemented on Android")
+                        .put("code", "not_implemented")
+                )
+                else -> reply(
+                    "ERROR",
+                    JSONObject().put("message", "Unsupported bridge message: $type")
+                )
+            }
+        } finally {
+            // Any message proves the page's bridge module runs: flush what
+            // waited, after the (synchronous) reply to this message.
+            webView.post { events.inboundMessageReceived() }
         }
     }
 

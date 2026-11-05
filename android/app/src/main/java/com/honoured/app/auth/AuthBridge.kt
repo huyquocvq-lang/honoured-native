@@ -3,12 +3,16 @@ package com.honoured.app.auth
 import android.annotation.SuppressLint
 import android.app.Activity
 import android.net.Uri
+import android.os.Handler
+import android.os.Looper
 import android.webkit.WebView
 import androidx.webkit.JavaScriptReplyProxy
 import androidx.webkit.WebMessageCompat
 import androidx.webkit.WebViewCompat
 import androidx.webkit.WebViewFeature
 import com.honoured.app.AppConfig
+import com.honoured.app.session.SessionMessageHandler
+import com.honoured.app.session.SessionServices
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
@@ -17,8 +21,9 @@ import org.json.JSONArray
 import org.json.JSONObject
 
 /**
- * Google Sign-In over an origin-scoped `WebMessageListener` named
- * `HonouredAuth` (`docs/bridge.md`, "Google Sign-In"). The object is injected
+ * Google Sign-In and the native session hand-off over an origin-scoped
+ * `WebMessageListener` named `HonouredAuth` (`docs/phase1/bridge.md`, "Google
+ * Sign-In", "v2 — auth session", "Session refresh"). The object is injected
  * only into frames of the exact configured origin; messages are further
  * accepted only from the main frame, and every reply goes back through the
  * requesting frame's own reply proxy. The legacy `HonouredNative` interface
@@ -28,6 +33,7 @@ class AuthBridge(
     private val activity: Activity,
     private val webView: WebView,
     private val scope: CoroutineScope,
+    private val session: SessionServices,
 ) : WebViewCompat.WebMessageListener {
     private val origin = TrustedWebOrigin.from(AppConfig.WEB_APP_URL)
     private val coordinator = GoogleSignInCoordinator(
@@ -36,6 +42,15 @@ class AuthBridge(
     )
     private val state = GoogleAuthState()
     private val gate = ProviderPresentationGate()
+    private val main = Handler(Looper.getMainLooper())
+    private val sessionHandler = SessionMessageHandler(
+        store = session.store,
+        refresher = session.refresher,
+        mutations = session.mutations,
+        registry = session.registry,
+        scope = session.scope,
+        onOwnerChanged = { userId -> state.sessionOwnerChanged(userId) },
+    )
 
     /** The reply proxy of the document that synced the current context. */
     private var contextProxy: JavaScriptReplyProxy? = null
@@ -55,6 +70,14 @@ class AuthBridge(
         .put("configured", coordinator.isConfigured)
         .put("transport", "trusted-auth-v1")
         .put("intents", JSONArray().put("sign_in").put("link"))
+
+    /**
+     * `capabilities.sessionRefresh.supported`: this shell takes the session on
+     * the trusted transport and is the only refresher. Needs the secure
+     * transport and Supabase config (HTTPS URL, anon key).
+     */
+    val isSessionSupported: Boolean
+        get() = isSupported && installed && session.isConfigured
 
     /** Must run before the first page load so the object is injected into it. */
     @SuppressLint("RequiresFeature")
@@ -115,6 +138,13 @@ class AuthBridge(
             "SIGN_IN_WITH_GOOGLE" -> start(payload, requestId, replyProxy, reply)
             "CANCEL_GOOGLE_SIGN_IN" -> cancel(payload, replyProxy, reply)
             "CLEAR_GOOGLE_SIGN_IN" -> clear(reply)
+            in SessionMessageHandler.MESSAGE_TYPES -> {
+                if (!isSessionSupported) {
+                    reply("ERROR", JSONObject().put("code", "unsupported").put("message", "$type is not supported by this build"))
+                    return
+                }
+                sessionHandler.handle(type, payload, documentReply(replyProxy, requestId))
+            }
             else -> reply(
                 "ERROR",
                 JSONObject().put("code", "unsupported_message").put("message", "Unsupported auth message: $type"),
@@ -229,6 +259,23 @@ class AuthBridge(
         }
     }
 
+    /**
+     * A reply that may come from a background thread, minutes later: delivered
+     * on the main thread, and only if the document that asked is still loaded
+     * from the trusted origin. Otherwise it is dropped, never queued.
+     */
+    private fun documentReply(proxy: JavaScriptReplyProxy, requestId: String?): (String, JSONObject) -> Unit {
+        val generation = state.documentGeneration
+        return { type, payload ->
+            main.post {
+                val trusted = origin
+                if (trusted != null && installed && state.documentGeneration == generation && trusted.matches(webView.url)) {
+                    post(proxy, type, payload, requestId)
+                }
+            }
+        }
+    }
+
     private fun failure(failure: GoogleAuthFailure, contextId: String?): JSONObject = JSONObject()
         .put("code", failure.code)
         .put("message", failure.message)
@@ -250,6 +297,7 @@ class AuthBridge(
         const val TIMEOUT_MS = 120_000L
 
         /** Auth message types the legacy `HonouredNative` interface must refuse. */
-        val MESSAGE_TYPES = setOf("SYNC_AUTH_CONTEXT", "SIGN_IN_WITH_GOOGLE", "CANCEL_GOOGLE_SIGN_IN", "CLEAR_GOOGLE_SIGN_IN")
+        val MESSAGE_TYPES = setOf("SYNC_AUTH_CONTEXT", "SIGN_IN_WITH_GOOGLE", "CANCEL_GOOGLE_SIGN_IN", "CLEAR_GOOGLE_SIGN_IN") +
+            SessionMessageHandler.MESSAGE_TYPES
     }
 }

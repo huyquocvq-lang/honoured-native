@@ -89,6 +89,20 @@ class GoogleAuthState(private val makeId: () -> String = { UUID.randomUUID().toS
     /** `CLEAR_GOOGLE_SIGN_IN`: invalidate now, hand back a fresh signed-out context. */
     fun clear(): GoogleAuthContext = replaceContext(null)
 
+    /**
+     * The native session changed owner (`SET_AUTH_SESSION` for another person,
+     * or `CLEAR_AUTH_SESSION` with null): every Google attempt of the old
+     * context is void. A token refresh for the same person keeps the context,
+     * so a link flow in progress survives. Same rule as iOS.
+     */
+    fun sessionOwnerChanged(userId: String?) {
+        val current = context ?: return
+        if (userId != null && current.userId == userId) return
+        context = null
+        attempt = null
+        usedRequestIds.clear()
+    }
+
     private fun replaceContext(userId: String?): GoogleAuthContext {
         attempt = null
         usedRequestIds.clear()

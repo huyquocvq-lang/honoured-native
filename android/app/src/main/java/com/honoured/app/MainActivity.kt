@@ -22,7 +22,6 @@ import android.webkit.WebViewClient
 import android.widget.Button
 import android.widget.ProgressBar
 import android.widget.TextView
-import org.json.JSONObject
 import androidx.activity.OnBackPressedCallback
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.core.content.ContextCompat
@@ -30,7 +29,9 @@ import androidx.appcompat.app.AppCompatActivity
 import androidx.lifecycle.lifecycleScope
 import com.honoured.app.auth.AuthBridge
 import com.honoured.app.billing.SubscriptionService
+import com.honoured.app.bridge.Capabilities
 import com.honoured.app.bridge.NativeBridge
+import com.honoured.app.session.SessionServices
 
 class MainActivity : AppCompatActivity() {
     private lateinit var webView: WebView
@@ -130,8 +131,11 @@ class MainActivity : AppCompatActivity() {
 
         // The secure auth transport must be installed before the first load so
         // HonouredAuth is injected into the page.
-        authBridge = AuthBridge(this, webView, lifecycleScope).also { it.install() }
-        bridge = NativeBridge(this, webView) { JSONObject().put("googleSignIn", authBridge.capability()) }
+        val session = SessionServices.get(this)
+        authBridge = AuthBridge(this, webView, lifecycleScope, session).also { it.install() }
+        bridge = NativeBridge(this, webView, session) {
+            Capabilities.build(authBridge.capability(), authBridge.isSessionSupported)
+        }
         webView.addJavascriptInterface(bridge, "HonouredNative")
 
         findViewById<Button>(R.id.retryButton).setOnClickListener { load() }
@@ -205,6 +209,7 @@ class MainActivity : AppCompatActivity() {
         pendingMicrophoneRequest?.deny()
         pendingMicrophoneRequest = null
         authBridge.destroy()
+        bridge.destroy()
         webView.removeJavascriptInterface("HonouredNative")
         (webView.parent as? ViewGroup)?.removeView(webView)
         webView.destroy()
@@ -224,8 +229,10 @@ class MainActivity : AppCompatActivity() {
         }
 
         override fun onPageStarted(view: WebView, url: String?, favicon: android.graphics.Bitmap?) {
-            // A new main-frame document: no Google result may reach the old one.
+            // A new main-frame document: no Google result or session reply may
+            // reach the old one, and broadcasts wait for the new one.
             authBridge.documentWillChange()
+            bridge.pageWillChange()
         }
 
         override fun onReceivedError(

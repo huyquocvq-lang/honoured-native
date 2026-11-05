@@ -490,13 +490,20 @@ Same trusted transport as Google Sign-In: accepted only from the main frame of t
 
 ---
 
-## Session refresh (iOS)
+## Session refresh (iOS and Android)
 
 The page and native share one Supabase session. Supabase rotates the refresh token on every refresh, and a refresh with a token that was already used revokes the whole session, so two refreshers holding copies of the same token sign the person out and stop native's background work. Native refreshes on its own (background HealthKit uploads, Icon checks, push registration), so inside the app it is the only refresher: the page hands every refresh to native, which refreshes its own copy (the newest) once, however many callers ask at the same time, and returns Supabase's response.
 
 ### Capability
 
-`NATIVE_READY` and `PLATFORM_INFO` carry `capabilities.sessionRefresh: { protocolVersion: 1, supported }`. `supported` is `false` when the configured web app URL is not HTTPS. No `sessionRefresh` key (an older shell, Android, a browser): the page refreshes for itself as before.
+`NATIVE_READY` and `PLATFORM_INFO` carry `capabilities.sessionRefresh: { protocolVersion: 1, supported }`. `supported` is `false` when the configured web app URL is not HTTPS. No `sessionRefresh` key (an older shell, a browser): the page refreshes for itself as before.
+
+**Android (Phase 5 M2).** The Android shell adds `transport: "trusted-auth-v1"` to the capability. There it covers the whole hand-off, not only the refresh: `SET_AUTH_SESSION`, `CLEAR_AUTH_SESSION` and `REFRESH_AUTH_SESSION` are accepted **only** on the `HonouredAuth` transport (see Google Sign-In → Transport), and the legacy `HonouredNative` interface answers them with `ERROR { code: "insecure_transport" }` without reading the payload. `supported` is `true` only when the WebView has `WEB_MESSAGE_LISTENER`, the web app URL is HTTPS and the build has the Supabase URL and anon key. Rules for the web app on Android:
+
+- Send `SET_AUTH_SESSION` / `CLEAR_AUTH_SESSION` / `REFRESH_AUTH_SESSION` on `HonouredAuth`, and only when `capabilities.sessionRefresh.supported` is `true` with `transport: "trusted-auth-v1"`. Otherwise send no session at all and refresh for yourself.
+- Once the page sends a session to native it must also hand every refresh to native (rules below). Storing a refresh token native does not refresh, or refreshing one native stores, is exactly the refresh-token reuse this section prevents.
+- Replies come back as a `message` event on `HonouredAuth` (the existing adapter re-dispatches them as `honoured:native`), only to the document that asked; a reply for a document that has since reloaded is dropped.
+- Android does not broadcast `AUTH_SESSION_UPDATED` / `AUTH_SESSION_INVALID` yet (no background refresh before Phase 5 M4).
 
 ### Message
 

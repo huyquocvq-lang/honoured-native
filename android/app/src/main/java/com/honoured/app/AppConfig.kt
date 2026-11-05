@@ -26,6 +26,14 @@ object AppConfig {
     val GOOGLE_WEB_CLIENT_ID: String
         get() = BuildConfig.GOOGLE_WEB_CLIENT_ID.trim()
 
+    /** Supabase project URL for the native session refresh (HTTPS). Public. */
+    val SUPABASE_URL: String
+        get() = BuildConfig.SUPABASE_URL.trim()
+
+    /** Supabase anon (publishable) key. Public: the same value ships in the web app. */
+    val SUPABASE_ANON_KEY: String
+        get() = BuildConfig.SUPABASE_ANON_KEY.trim()
+
     val WEB_APP_HOST: String
         get() = Uri.parse(WEB_APP_URL).host.orEmpty()
 }
