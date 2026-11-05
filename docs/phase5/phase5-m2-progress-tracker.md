@@ -23,8 +23,8 @@ Trạng thái dùng như tracker Phase 4: `NOT STARTED`, `IN PROGRESS`, `BLOCKED
 | D6 | Sign in with Apple trên Android | CHỐT 04/11: EXCLUDED (dùng Link Google / đặt mật khẩu trên iPhone) |
 | D7 | Copy "iPhone app" trên Android | CHỜ KHÁCH |
 | D8 | Revise target trên Android | CHỐT 04/11: INCLUDED (kéo theo chế độ target theo thứ khi tạo Icon, `Contract.tsx:1139, 1254`) |
-| D9 | Testament Timer trên Android (R1): web chờ `TIMER_COMPLETED` mà Android không gửi, nên contract dùng timer sẽ BROKEN | CHỜ JIMMY. Đề xuất phương án A: sửa web cùng lần gửi G1 |
-| W5 | Nút Google trên Android rơi vào OAuth web khi không có capability (R3) | Đề xuất gửi cùng G1 |
+| D9 | Testament Timer trên Android (R1): web chờ `TIMER_COMPLETED` mà Android không gửi, nên contract dùng timer sẽ BROKEN | CHỐT 05/11: phương án A (Jimmy đồng ý). Đã nằm trong Lovable `727722d8`: `nativeOwnsTimer()` = iOS hoặc `testamentTimer.supported` |
+| W5 | Nút Google trên Android rơi vào OAuth web khi không có capability (R3) | Đã nằm trong Lovable `727722d8`: `showGoogleButton(platform, usable)`, OAuth web chỉ cho trình duyệt thường |
 | W6 | Contract / Icon đo bằng Health tạo trên Android chưa xác minh được tới M3/M4 (R2) | CHỜ KHÁCH: cảnh báo, chặn hay chỉ ghi chú |
 
 ## Task
@@ -42,7 +42,7 @@ Trạng thái dùng như tracker Phase 4: `NOT STARTED`, `IN PROGRESS`, `BLOCKED
 | B4 | Hàng đợi sự kiện bền | 3 | CODE DONE | `bridge/NativeEventStore.kt`, `BridgeEventQueue.kt`; `NativeBridge` flush sau message đầu tiên của trang |
 | B5 | Dọn dữ liệu khi đăng xuất / đổi tài khoản | 2 | CODE DONE | `session/SerialMutationQueue.kt` (`AccountScopedRegistry`), `GoogleAuthState.sessionOwnerChanged` |
 | B6 | Test bridge / phiên | 1 | CODE DONE | Unit `testDebugUnitTest` 49/49 pass (38 test mới: store, refresher, handler, event queue, capability, owner change). Instrumentation `connectedDebugAndroidTest` trên emulator API 35 (WebView 124): 6/6 pass. Gồm Keystore thật (round trip, IV ngẫu nhiên, sửa 1 byte bị phát hiện, mất khoá thì quên phiên); production web thật: `HonouredNative` từ chối SET/REFRESH với `insecure_transport` và không lưu gì; `HonouredAuth` nhận SET (ACCEPTED không có token), từ chối refresh cho user khác (`other_user`), refresh bằng token giả tới Supabase thật bị trả về `invalid_session` và giữ nguyên phiên đang lưu, CLEAR xoá phiên. Logcat không chứa token test |
-| G1 | Adapter web + gate capability (Lovable) | 3 | NOT STARTED | Gửi sau khi native E2E trên emulator |
+| G1 | Adapter web + gate capability (Lovable) | 3 | CODE DONE, CHỜ DUYỆT PUBLISH | Lovable `727722d8` (8.9 credit), chưa publish (production vẫn `df0dc04d`). Gồm W1 (SET/CLEAR/REFRESH chỉ qua `HonouredAuth` khi `androidSessionHandOff()`), W2 (`CONTRACT_LINK_OPENED`), W5, D9. Vitest 898/898 ở UTC; ở Asia/Saigon và Los Angeles chỉ fail P5-B02 (có từ trước). `tsc` sạch. Test cũ chạy trên code mới: 5 fail, cả 5 là test giả lập shell Android dự kiến đổi hành vi (token/timer qua kênh cũ) hoặc mock thiếu export mới. A/B bridge (script `50-ab-bridge.mjs`, mock Supabase): **iOS** cùng tập message, cùng kênh, cùng payload key so với production; thứ tự chỉ lệch ở `GET_TIMER_STATE` thứ hai, lệch cả giữa hai lần chạy production nên là do timing; refresh vẫn qua native. **Android cũ**: không còn SET/CLEAR/timer, trang tự refresh, ẩn Google khi chưa cấu hình. **Android mới**: SET/CLEAR/REFRESH chỉ qua `HonouredAuth`, trang không tự dùng refresh token |
 | G2 | Copy / trạng thái Health trên Android | 2 | BLOCKED | D7 |
 | G3 | Kiểm parity trên WebView | 2 | BLOCKED | D2, D5 |
 | G4 | Test Lovable / browser / WebView | 4 | NOT STARTED | |
@@ -61,6 +61,6 @@ Trạng thái dùng như tracker Phase 4: `NOT STARTED`, `IN PROGRESS`, `BLOCKED
 
 | ID | Task | Mô tả | Severity | Trạng thái |
 |---|---|---|---|---|
-| P5-M2-B01 | G1 / D9 | R1: Testament Timer trên Android không bao giờ hoàn thành, nên contract BROKEN. Lỗi có từ trước trên production Android | High | OPEN, chờ D9 |
-| P5-M2-B02 | G1 / W5 | R3: thiếu Google config thì nút Google trên Android mở OAuth web, ra trình duyệt ngoài, app không đăng nhập | Medium | OPEN |
+| P5-M2-B01 | G1 / D9 | R1: Testament Timer trên Android không bao giờ hoàn thành, nên contract BROKEN. Lỗi có từ trước trên production Android | High | FIXED trong Lovable `727722d8`, chờ publish |
+| P5-M2-B02 | G1 / W5 | R3: thiếu Google config thì nút Google trên Android mở OAuth web, ra trình duyệt ngoài, app không đăng nhập | Medium | FIXED trong Lovable `727722d8`, chờ publish |
 | P5-M2-B03 | G2 / D7 | R5: Home Android hiện "Connect Apple Health" với nút Set up không có tác dụng | Medium | OPEN, gộp W3 |
