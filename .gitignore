@@ -44,3 +44,4 @@ tmp/
 # Python caches
 __pycache__/
 *.py[cod]
+android/.kotlin/
