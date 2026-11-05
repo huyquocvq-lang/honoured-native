@@ -22,13 +22,16 @@ Trạng thái dùng như tracker Phase 4: `NOT STARTED`, `IN PROGRESS`, `BLOCKED
 | D5 | 2 tài khoản test | CHỜ JIMMY |
 | D6 | Sign in with Apple trên Android | CHỐT 04/11: EXCLUDED (dùng Link Google / đặt mật khẩu trên iPhone) |
 | D7 | Copy "iPhone app" trên Android | CHỜ KHÁCH |
-| D8 | Revise target trên Android | CHỐT 04/11: INCLUDED |
+| D8 | Revise target trên Android | CHỐT 04/11: INCLUDED (kéo theo chế độ target theo thứ khi tạo Icon, `Contract.tsx:1139, 1254`) |
+| D9 | Testament Timer trên Android (R1): web chờ `TIMER_COMPLETED` mà Android không gửi, nên contract dùng timer sẽ BROKEN | CHỜ JIMMY. Đề xuất phương án A: sửa web cùng lần gửi G1 |
+| W5 | Nút Google trên Android rơi vào OAuth web khi không có capability (R3) | Đề xuất gửi cùng G1 |
+| W6 | Contract / Icon đo bằng Health tạo trên Android chưa xác minh được tới M3/M4 (R2) | CHỜ KHÁCH: cảnh báo, chặn hay chỉ ghi chú |
 
 ## Task
 
 | # | Task | Giờ | Trạng thái | Evidence |
 |---|---|---:|---|---|
-| A1 | Audit baseline + bảng parity | 2 | IN PROGRESS | `android-parity-matrix.md` (đang soạn) |
+| A1 | Audit baseline + bảng parity | 2 | CODE DONE (draft, chờ D1) | `android-parity-matrix.md`: 106 workflow (INCLUDED 59, ADAPTED 9, EXCLUDED 12, DEFERRED M3/M4/M5 9/10/7), 13 rủi ro R1–R13, 14 dòng copy D7. Baseline: Lovable `df0dc04d`; md5 50 hàm SQL `evidence/m2/supabase-function-md5-2026-11-05.tsv`; iOS chờ D1. Đã kiểm lại R1 (`timer-store.ts:159`) và R3 (`AuthGate.tsx:34, 201`) trong code |
 | A2 | Version, ký release, guard config, R8 | 3 | NOT STARTED | Chờ D3 cho upload key |
 | A3 | Deep link + cold start | 3 | NOT STARTED | Hạ tầng hàng đợi bền đã có (B4) |
 | A4 | Lifecycle, renderer crash, process death, edge-to-edge | 4 | NOT STARTED | |
@@ -58,3 +61,6 @@ Trạng thái dùng như tracker Phase 4: `NOT STARTED`, `IN PROGRESS`, `BLOCKED
 
 | ID | Task | Mô tả | Severity | Trạng thái |
 |---|---|---|---|---|
+| P5-M2-B01 | G1 / D9 | R1: Testament Timer trên Android không bao giờ hoàn thành, nên contract BROKEN. Lỗi có từ trước trên production Android | High | OPEN, chờ D9 |
+| P5-M2-B02 | G1 / W5 | R3: thiếu Google config thì nút Google trên Android mở OAuth web, ra trình duyệt ngoài, app không đăng nhập | Medium | OPEN |
+| P5-M2-B03 | G2 / D7 | R5: Home Android hiện "Connect Apple Health" với nút Set up không có tác dụng | Medium | OPEN, gộp W3 |

@@ -57,8 +57,9 @@ Không thuộc M2: Health Connect, đếm bước, notification, FCM, foreground
 | D4 | Google Cloud: Android OAuth client cho `com.honoured.app` với SHA-1 debug + upload (+ Play signing sau này); `GOOGLE_WEB_CLIENT_ID` trong `.env` | Jimmy/khách | Kiểm Google Sign-In trên Android | |
 | D5 | 2 tài khoản test Honoured (email/password) để kiểm đăng nhập, đổi tài khoản, đăng xuất. Không gửi mật khẩu qua chat; nhập trên máy | Jimmy | B5, G3, G4 | |
 | D6 | **Tài khoản Apple trên Android.** Production có 2 user chỉ dùng Apple. Web chỉ hiện "Sign in with Apple" trên iOS, nên họ không vào được trên Android | **Đã chốt 04/11 (Jimmy): EXCLUDED** | Parity matrix | Không làm Sign in with Apple trên Android. Ghi deviation trong parity matrix. Cách để user Apple dùng Android: trên iPhone dùng "Link Google" (`Auth.tsx`, intent `link`) hoặc đặt mật khẩu, rồi đăng nhập Android bằng Google/email. G3 kiểm lại luồng này |
-| D7 | Copy "iPhone app" trên Android (`Available in the iPhone app`, `Results are verified by the Honoured iPhone app.`, nhãn Home "iPhone app") cho tới khi M3/M4 có Health Connect | Khách | G2 | Đổi theo capability, ví dụ "Coming to Android" / "Verified by the Honoured app on iPhone". Copy chờ khách duyệt |
+| D7 | Copy iPhone / Apple Health mà Android thấy, cho tới khi M3/M4 có Health Connect. Danh sách đúng (bảng parity §6, 14 dòng): Settings › Notifications và Word Tracker "Available in the iPhone app", thẻ "Connect Apple Health" ở Home, ghi chú Apple Health dưới Icon. `NON_NATIVE_NOTE` và nhãn Home "iPhone app" **không** hiện trên Android | Khách | G2 | Đổi theo capability, ví dụ "Coming to Android". Copy chờ khách duyệt |
 | D8 | Icon target revision trên Android. Web chỉ cho revise khi `capabilities.iconRevisions.supported`; lý do là card iOS cũ. Android không có card nên bật được an toàn | **Đã chốt 04/11 (Jimmy): INCLUDED** | G1 | Android báo `iconRevisions { protocolVersion: 1, supported: true }` và trả `ICON_REVISIONS_SYNCED { synced: true }` (không có cache card). Web không cần sửa. G3 kiểm sửa target theo thứ và ký lại trên Android. Khi M5 có notification/card Android: phải dùng target của từng ngày (`icon_days.target_text`) |
+| D9 | Testament Timer trên Android: `timer-store.ts:159` thoát khi `hasNativeBridge()` và chờ native gửi `TIMER_COMPLETED`; Android không có timer nên contract dùng timer sẽ BROKEN (lỗi có sẵn trên production Android) | Jimmy | G1 | Đề xuất phương án A: web chỉ giao timer cho native khi platform là iOS, hoặc khi có `capabilities.testamentTimer.supported`. Android M2 không báo capability này nên web tự hoàn thành khi app mở. M4 thay bằng engine nền. Gửi cùng G1 (+1–2 credit) |
 
 ## 4. Thiết kế
 
@@ -178,6 +179,9 @@ Gửi **một** `send_message` sau khi phía native đã chạy được trên e
 | W1b | `native-session-refresh.ts`: đổi `nativePlatform() !== "ios"` thành iOS, hoặc Android có capability như W1a. Refresh vẫn chờ capability trước khi dùng token của trang | Như W1a |
 | W2 | Nhận `CONTRACT_LINK_OPENED`, dùng chung đường xử lý với `LIVE_ACTIVITY_OPENED` | Chỉ khi có event |
 | W3 | Copy Android cho các chỗ "iPhone app" theo D7; gate theo capability `healthConnect` thay vì `nativePlatform() === "ios"` (`health-settings.ts`, `icon-days.ts` `NON_NATIVE_NOTE`, Home, Settings) | Theo quyết định D7 |
+| W5 | `AuthGate.tsx:34`: chỉ dùng OAuth web cho nút Google khi `nativePlatform() === null`; shell không có capability Google thì ẩn nút | Platform + capability |
+| W6 | (chờ khách) Contract / Icon đo bằng Health tạo trên Android: cảnh báo, chặn hay chỉ ghi chú, cho tới M3/M4 (bảng parity R2) | Capability `healthConnect` |
+| W7 | (nếu D9 = A) `timer-store.ts`: thay `hasNativeBridge()` bằng helper "native giữ timer" (iOS hoặc `testamentTimer.supported`) | Platform + capability |
 | W4 | Test: iOS gửi đúng như trước (snapshot); Android không capability → không gửi token; Android có capability → qua `HonouredAuth`; refresh trên Android đi native; app Android cũ; browser | — |
 
 ## 5. Task và giờ

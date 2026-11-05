@@ -1,0 +1,53 @@
+# Lovable Cloud production, public schema, md5(pg_get_functiondef(oid)), read-only query via Lovable MCP 05/11/2026
+# 50 functions; bump_contracts_counter from the list does not exist on production.
+proname	args	md5
+contracts_icon_days		dbc8968992cb54558dd4f097d16ed221
+contracts_icon_guard		b29e8ef41fc29f0d55c48092acf7c5f3
+contracts_icon_reserve		12c767142a1a6db3a58e7e1380872a94
+contracts_word_guard		0d051e3b6e01453c49fa7d141bef375b
+expire_icon_days		a7af4714cfc80ef41f37bddd9fcfd576
+get_access_state		a7757aa2193e8b364231168aed6955be
+get_contracts_signed_count		996e65117512d117374da41fc43372a4
+goal_diagnostics_timeline	p_from date, p_to date	b9e231ddd75d93939c52975003031cc6
+handle_new_user		da81315d40c8513399df757368bfb178
+has_entitlement	want text	dbe7389bb64f4f7d420022b95df65af1
+icon_copy_affirmation	p_session_number integer	715efe069db48d63e5fc20d67f8eb309
+icon_copy_deadline	p_deadline timestamp with time zone, p_timezone text	369624b5d376972024cdb8541af8de66
+icon_cut	p_text text, p_limit integer	270d4554ecb9959c7bd42fe5c4fc3497
+icon_days_to_measure		889fc89d903a480a38839166c0bf3c91
+icon_push_classify	p_status integer, p_reason text	ffbffb2edb49fd7f2d439dcc0fdc3ffd
+icon_push_cleanup		3ee9a601472ef09542911e60aaf9ffe9
+icon_push_collect	p_now timestamp with time zone	73ef4d59e199f17f95df719ecda979ed
+icon_push_drop_token	p_token text	1324c76a624768c8324d643f861b8d5c
+icon_push_facts	p_job jsonb	ec9b2ae4012553c2945e80c6f0de8b58
+icon_push_jobs	p_now timestamp with time zone, p_window interval	407c6a09205931926726918aad4f149f
+icon_push_plan	p_job jsonb, p_now bigint, p_topics text[], p_environments text[]	55affed11a2c83a739a92c067f583783
+icon_push_reason	p_content text	72ee98640a56f72aeda580dfc45e2a3d
+icon_push_record	p_contract_id uuid, p_day date, p_slot text, p_channel text, p_status text, p_apns_status integer, p_apns_reason text	f20b181784aa78731ade937da763b54c
+icon_push_request_token	p_now timestamp with time zone	d46e3e7dafff975498bd3eea2de15225
+icon_push_secret_ok	p_secret text	b33f55b38674aa1e958f684c3ae31486
+icon_push_selftest		3e5a0441f4d7da5788de6cef5f64b1f1
+icon_push_tick	p_now timestamp with time zone	c485a91e53cd39146e3b4e605d1dfe4b
+icon_reserved_days	p_user_id uuid	b75268fdc38710c0bfeffd29ce2f44c4
+icon_revisions_immutable		aaa8d362ce4f89601261e219c7864e31
+icon_schedule	p_start_day date, p_end_day date, p_weekdays smallint[], p_deadline_time time without time zone, p_timezone text, p_signed_at timestamp with time zone	9470cc5ecd55ca783f577a38af569b44
+icon_target_split	p_target text, OUT value text, OUT unit text	71288fb5b03fbdd93edd6e4f282396df
+increment_contracts_signed		aadfacb8164cf7711840243a6727654f
+profiles_marketing_guard		70c90ee1ddd1abee8a0d530f4db2da73
+purge_goal_diagnostics	older_than interval	11d36bc8312c6ec3165c93b40d28d9f5
+record_goal_diagnostics	rows jsonb	8d2bbcb452454b79e3bd8b139a6bc081
+record_icon_measurements	rows jsonb	4363134aa2127eddbc6affb21256d825
+record_signup_marketing_opt_in	p_opt_in boolean, p_source text	2ec7552dfc916d1e6831aee15c3874cd
+record_word_reading	p_contract_id uuid, p_source_id text, p_count integer, p_read_at timestamp with time zone, p_revision text, p_modified_at timestamp with time zone	77ed09fa03b8ee58d8a9622de9982d27
+register_push_token	p_installation_id uuid, p_kind text, p_token text, p_environment text, p_topic text, p_os_version text, p_live_activities_enabled boolean, p_contract_client_id text, p_icon_day date	895cf2e160be49a48894fd7119a5b6b2
+restore_account		9f773c28d7717b46241e29447171c7df
+revise_icon_target	p_contract_id uuid, p_request_id uuid, p_target numeric, p_signature_path text	aca7ea9cee15c372aa2f0c9b9787f280
+revise_icon_targets	p_contract_id uuid, p_request_id uuid, p_targets jsonb, p_signature_path text	b7484ec78c2f35bccd2f77847fbf8713
+self_report_icon_day	p_contract_id uuid, p_day date, p_honoured boolean	95feb36678457d17636baf234bf7f096
+set_marketing_opt_in	p_opt_in boolean	d94a37d82927dc47c6946eed331a20ab
+set_reset_timezone	tz text	9a27a0c14b685aea85a9cc096b952665
+start_session		d12f72d0e4dc77eac912b2b231e90ec6
+unregister_push_tokens	p_installation_id uuid	a4ba5eff5c03c26bdf39ab1b56d40ff5
+update_updated_at_column		3210625d1c794f6db7b3c3defc5984dd
+upsert_health_daily	rows jsonb	637a8fc80aad723318fb91d038bab1ee
+upsert_health_samples	batch jsonb	b1ce0bc0d945cb7bebda6ac53852336e
