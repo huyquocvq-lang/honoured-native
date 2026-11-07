@@ -686,7 +686,7 @@ The web app handles it like `LIVE_ACTIVITY_OPENED`: wait for auth and the contra
 
 ## Back button (Android, Phase 5 M2)
 
-On the system Back gesture or button the Android shell evaluates `window.__honouredBack()` in the app's own page. If it returns exactly `true`, the page closed something (a dialog, a sheet, a sub-screen, or went back to the Home tab) and Back is done. Otherwise the shell uses WebView history if there is any, and finally moves the app to the background like the Home button. It never finishes the activity, so an unsigned contract or a running timer screen survives. The page defines the hook only inside the Android shell; a page without it simply gets the background behaviour.
+On the system Back gesture or button the Android shell evaluates `window.__honouredBack()` in the app's own page. If it returns exactly `true`, the page closed something (a dialog, a sheet, a sub-screen, or went back to the Home tab) and Back is done. If it returns anything else, the shell moves the app to the background like the Home button, with everything kept; the page returns `false` on purpose while there is unsaved input (a touched, unsigned contract draft, an unsaved Journal edit) or while something must not be closed (a save, purchase or deletion in progress). Only a page without the hook (an older web build) gets WebView history first. If the page does not answer within 1.5 s (a stuck script) the app also goes to the background. The shell never finishes the activity. The page defines the hook only inside the Android shell.
 
 ## Downloads (Android, Phase 5 M2)
 
