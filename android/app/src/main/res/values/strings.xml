@@ -10,4 +10,10 @@
     <string name="webview_outdated_title">Update Android System WebView</string>
     <string name="webview_outdated_body">Honoured needs a newer version of Android System WebView. Update it from Google Play, then open Honoured again.</string>
     <string name="webview_outdated_action">Update</string>
+    <string name="download_saved">Saved.</string>
+    <string name="download_failed">Could not save the file.</string>
+    <string name="microphone_blocked_title">Microphone is off</string>
+    <string name="microphone_blocked_body">To record your voice, allow the microphone for Honoured in Settings.</string>
+    <string name="microphone_blocked_settings">Open Settings</string>
+    <string name="microphone_blocked_dismiss">Not now</string>
 </resources>

@@ -38,6 +38,8 @@ class SessionTransportTest {
         // Needs the origin-scoped transport and a WebView that can run the web app.
         assumeTrue(WebViewFeature.isFeatureSupported(WebViewFeature.WEB_MESSAGE_LISTENER))
         assumeTrue(WebViewSupport.isSupported(context))
+        // A real signed-in page would hand its own session over on NATIVE_READY.
+        InstrumentationRegistry.getInstrumentation().runOnMainSync { android.webkit.WebStorage.getInstance().deleteAllData() }
         services.store.clear()
         scenario = ActivityScenario.launch(MainActivity::class.java)
         // The page has loaded and the bridge objects are injected.

@@ -37,8 +37,13 @@ import com.honoured.app.auth.AuthBridge
 import com.honoured.app.billing.SubscriptionService
 import com.honoured.app.bridge.Capabilities
 import com.honoured.app.bridge.NativeBridge
+import com.honoured.app.auth.TrustedWebOrigin
 import com.honoured.app.deeplink.ContractDeepLink
+import com.honoured.app.download.DownloadSaver
 import com.honoured.app.permissions.PermissionCoordinator
+import com.honoured.app.permissions.PermissionGate
+import androidx.appcompat.app.AlertDialog
+import androidx.webkit.ScriptHandler
 import com.honoured.app.session.SessionServices
 import java.util.UUID
 
@@ -52,6 +57,8 @@ class MainActivity : AppCompatActivity() {
     private lateinit var authBridge: AuthBridge
     private lateinit var session: SessionServices
     private lateinit var permissions: PermissionCoordinator
+    private lateinit var downloads: DownloadSaver
+    private var downloadScript: ScriptHandler? = null
 
     /** Microphone requests of the current page still waiting for an answer. */
     private val pendingMicrophoneRequests = mutableSetOf<PermissionRequest>()
@@ -96,6 +103,7 @@ class MainActivity : AppCompatActivity() {
         )
         // Registers an activity-result launcher, so it must exist before STARTED.
         permissions = PermissionCoordinator(this)
+        downloads = DownloadSaver(this, TrustedWebOrigin.from(AppConfig.WEB_APP_URL))
 
         SubscriptionService.configureIfPossible(this)
 
@@ -134,10 +142,33 @@ class MainActivity : AppCompatActivity() {
         if (savedInstanceState == null) routeDeepLink(intent)
 
         onBackPressedDispatcher.addCallback(this, object : OnBackPressedCallback(true) {
-            override fun handleOnBackPressed() {
-                if (webView.canGoBack()) webView.goBack() else finish()
-            }
+            override fun handleOnBackPressed() = handleBack()
         })
+    }
+
+    /**
+     * Back first asks the page to close whatever is on top (a dialog, a sheet,
+     * a sub-screen) through `window.__honouredBack()`, which returns true when
+     * it did. Otherwise WebView history, and finally the app goes to the
+     * background like the Home button — never finish(), which would throw away
+     * an unsigned contract or an open timer screen. A page without the hook
+     * (older web) gets the background behaviour.
+     */
+    private fun handleBack() {
+        val view = webView
+        val onApp = !mainFrameFailed && runCatching { Uri.parse(view.url).host }.getOrNull() == AppConfig.WEB_APP_HOST
+        if (!onApp) {
+            if (view.canGoBack()) view.goBack() else moveTaskToBack(true)
+            return
+        }
+        view.evaluateJavascript(BACK_SCRIPT) { result ->
+            if (view !== webView) return@evaluateJavascript
+            when {
+                result == "true" -> Unit
+                view.canGoBack() -> view.goBack()
+                else -> moveTaskToBack(true)
+            }
+        }
     }
 
     override fun onNewIntent(intent: Intent) {
@@ -197,6 +228,7 @@ class MainActivity : AppCompatActivity() {
         }
         webViewContainer.addView(view)
         webView = view
+        downloadScript = downloads.install(view)
         authBridge = AuthBridge(this, view, lifecycleScope, session).also { it.install() }
         bridge = NativeBridge(this, view, session) {
             Capabilities.build(authBridge.capability(), authBridge.isSessionSupported)
@@ -212,6 +244,8 @@ class MainActivity : AppCompatActivity() {
         runCatching { authBridge.destroy() }
         runCatching { bridge.destroy() }
         val old = webView
+        downloads.uninstall(old, downloadScript)
+        downloadScript = null
         runCatching { old.removeJavascriptInterface("HonouredNative") }
         webViewContainer.removeView(old)
         runCatching { old.destroy() }
@@ -291,6 +325,16 @@ class MainActivity : AppCompatActivity() {
         }
     }
 
+    private fun showMicrophoneBlocked() {
+        if (isFinishing || isDestroyed) return
+        AlertDialog.Builder(this)
+            .setTitle(R.string.microphone_blocked_title)
+            .setMessage(R.string.microphone_blocked_body)
+            .setPositiveButton(R.string.microphone_blocked_settings) { _, _ -> permissions.openAppSettings() }
+            .setNegativeButton(R.string.microphone_blocked_dismiss, null)
+            .show()
+    }
+
     @VisibleForTesting
     fun isShowingError(): Boolean = errorView.visibility == View.VISIBLE
 
@@ -332,6 +376,12 @@ class MainActivity : AppCompatActivity() {
         private const val RENDERER_CRASH_WINDOW_MS = 60_000L
         private const val MAX_RENDERER_LOSSES = 3
 
+        /** Android's own answer to a blocked permission comes back without any UI, well under this. */
+        private const val INSTANT_DENIAL_MS = 400L
+
+        private const val BACK_SCRIPT =
+            "(function(){try{return typeof window.__honouredBack==='function'&&window.__honouredBack()===true}catch(e){return false}})()"
+
         /** Instrumentation only: runs on each new WebView before its first load. */
         @VisibleForTesting
         @JvmStatic
@@ -350,11 +400,21 @@ class MainActivity : AppCompatActivity() {
                     return@runOnUiThread
                 }
                 pendingMicrophoneRequests += request
+                val askedAt = SystemClock.elapsedRealtime()
                 permissions.request(Manifest.permission.RECORD_AUDIO) { granted ->
                     // Cancelled by the page, or its WebView was replaced meanwhile.
                     if (!pendingMicrophoneRequests.remove(request)) return@request
-                    if (granted) request.grant(arrayOf(PermissionRequest.RESOURCE_AUDIO_CAPTURE))
-                    else request.deny()
+                    if (granted) {
+                        request.grant(arrayOf(PermissionRequest.RESOURCE_AUDIO_CAPTURE))
+                        return@request
+                    }
+                    request.deny()
+                    // "Don't allow" was chosen for good: Android answered without
+                    // showing anything, so only Settings can turn it back on.
+                    val instant = SystemClock.elapsedRealtime() - askedAt < INSTANT_DENIAL_MS
+                    if (instant && permissions.status(Manifest.permission.RECORD_AUDIO) == PermissionGate.Status.BLOCKED) {
+                        showMicrophoneBlocked()
+                    }
                 }
             }
         }

@@ -676,13 +676,21 @@ Presentation problems are statuses, not errors. `ERROR` (with the `requestId`) i
 
 ## Contract deep link (Android, Phase 5 M2)
 
-Android registers `honoured://contract/<percent-encoded id>?day=<YYYY-MM-DD>`, the same shape as the iOS Live Activity link (an iOS `occurrence=<uuid>` is accepted and ignored). Anything malformed — another host, extra or repeated query keys, a day that is not a real date, a control character or more than 128 characters in the id — is dropped without opening anything special.
+Android registers `honoured://contract/<percent-encoded id>?day=<YYYY-MM-DD>`, where `<id>` is the web app's contract id (`contracts.client_id`, the same id `TRACK_CONTRACT` carries on iOS), not the database row id. It is the same shape as the iOS Live Activity link (an iOS `occurrence=<uuid>` is accepted and ignored). Anything malformed — another host, extra or repeated query keys, a day that is not a real date, a control character or more than 128 characters in the id — is dropped without opening anything special.
 
 | Native → Web | Notes |
 |---|---|
 | `CONTRACT_LINK_OPENED { eventId, contractId, healthDay? }` | The app was opened from a contract link, on a cold start or while running. Durable (survives a relaunch), delivered once after the page's first message, never replayed on a recreation or a launch from Recents. Navigation only: no auth data ever goes into the link or the event. |
 
 The web app handles it like `LIVE_ACTIVITY_OPENED`: wait for auth and the contract store, dedupe by `eventId`, open the contract only if it is an active contract of the signed-in account, otherwise go Home. Verified (https) App Links come in M5.
+
+## Back button (Android, Phase 5 M2)
+
+On the system Back gesture or button the Android shell evaluates `window.__honouredBack()` in the app's own page. If it returns exactly `true`, the page closed something (a dialog, a sheet, a sub-screen, or went back to the Home tab) and Back is done. Otherwise the shell uses WebView history if there is any, and finally moves the app to the background like the Home button. It never finishes the activity, so an unsigned contract or a running timer screen survives. The page defines the hook only inside the Android shell; a page without it simply gets the background behaviour.
+
+## Downloads (Android, Phase 5 M2)
+
+WebView ignores `<a download>`. The shell injects a document-start script into the app's own origin only. In the capture phase of a click on an `<a download>` whose `href` is a `blob:` or `data:` URL, the script fetches the bytes (before the page revokes the URL), and posts `{ type: "SAVE_FILE", fileName, mimeType, base64 }` (at most 10 MB) on a separate origin-scoped listener, `HonouredFiles`. The shell then opens the system "Save to" screen with the suggested name; nothing is written unless the person picks a place, and a short "Saved." / "Could not save the file." follows. The web app needs no change: Settings › Export my history works as it is.
 
 ## v2 — Landscape signing (iOS)
 

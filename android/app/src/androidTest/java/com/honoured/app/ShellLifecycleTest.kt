@@ -126,6 +126,50 @@ class ShellLifecycleTest {
         assertTrue("web content starts below the status bar ($webTop >= $top)", webTop >= top)
     }
 
+    @Test fun backAsksThePageFirstAndNeverFinishes() {
+        scenario = ActivityScenario.launch(MainActivity::class.java)
+        waitForPage()
+        // A page that closes something on Back keeps the app in front.
+        jsString("window.__backs = 0; window.__honouredBack = function () { window.__backs++; return true; }; 'ok'")
+        onActivity { it.onBackPressedDispatcher.onBackPressed() }
+        waitFor(5) { jsString("String(window.__backs)") == "1" }
+        assertEquals(androidx.lifecycle.Lifecycle.State.RESUMED, scenario!!.state)
+        // Nothing left to close: the app goes to the background, but is not destroyed.
+        jsString("window.__honouredBack = function () { return false; }; 'ok'")
+        onActivity { it.onBackPressedDispatcher.onBackPressed() }
+        waitFor(10) { scenario!!.state == androidx.lifecycle.Lifecycle.State.CREATED }
+        assertFalse(onActivity { it.isFinishing })
+    }
+
+    @Test fun aBlobDownloadOpensTheSystemSaveScreen() {
+        val instrumentation = InstrumentationRegistry.getInstrumentation()
+        var saveIntent: Intent? = null
+        // Answers the system "Save to" screen with Cancel instead of showing it.
+        val monitor = object : android.app.Instrumentation.ActivityMonitor() {
+            override fun onStartActivity(intent: Intent): android.app.Instrumentation.ActivityResult? {
+                if (intent.action != Intent.ACTION_CREATE_DOCUMENT) return null
+                saveIntent = intent
+                return android.app.Instrumentation.ActivityResult(android.app.Activity.RESULT_CANCELED, null)
+            }
+        }
+        instrumentation.addMonitor(monitor)
+        try {
+            scenario = ActivityScenario.launch(MainActivity::class.java)
+            waitForPage()
+            // Exactly what Settings > Export my history does, including the immediate revoke.
+            jsString(
+                "(function(){var b=new Blob(['{}'],{type:'application/json'});var u=URL.createObjectURL(b);" +
+                    "var a=document.createElement('a');a.href=u;a.download='honoured-export-test.json';" +
+                    "document.body.appendChild(a);a.click();a.remove();URL.revokeObjectURL(u);return 'ok';})()"
+            )
+            waitFor(10) { saveIntent != null }
+            assertEquals("honoured-export-test.json", saveIntent!!.getStringExtra(Intent.EXTRA_TITLE))
+            assertEquals("application/json", saveIntent!!.type)
+        } finally {
+            instrumentation.removeMonitor(monitor)
+        }
+    }
+
     // ---- helpers ----
 
     private fun waitForPage() = waitFor(60) {
