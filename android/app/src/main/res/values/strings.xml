@@ -7,4 +7,7 @@
     <string name="error_timeout">The connection timed out.</string>
     <string name="error_renderer">The page stopped unexpectedly.</string>
     <string name="error_retry">Try again</string>
+    <string name="webview_outdated_title">Update Android System WebView</string>
+    <string name="webview_outdated_body">Honoured needs a newer version of Android System WebView. Update it from Google Play, then open Honoured again.</string>
+    <string name="webview_outdated_action">Update</string>
 </resources>

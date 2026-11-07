@@ -115,6 +115,13 @@ class MainActivity : AppCompatActivity() {
 
         findViewById<Button>(R.id.retryButton).setOnClickListener { retry() }
 
+        // A WebView too old to parse the web app would only show a black page.
+        val provider = WebViewSupport.provider(this)
+        if (!WebViewSupport.isSupported(provider?.major)) {
+            showOutdatedWebView(provider)
+            return
+        }
+
         // After process death (or a recreation outside configChanges) the saved
         // WebView state is not trusted: the page keeps its own state in
         // localStorage and the native session lives in the encrypted store, so
@@ -257,6 +264,35 @@ class MainActivity : AppCompatActivity() {
         loadingIndicator.visibility = View.GONE
         errorView.visibility = View.GONE
     }
+
+    /** Asks for a WebView update instead of loading a page this WebView cannot run. */
+    private fun showOutdatedWebView(provider: WebViewSupport.Provider?) {
+        isLoading = false
+        mainFrameFailed = true
+        loadingIndicator.visibility = View.GONE
+        errorView.visibility = View.VISIBLE
+        findViewById<TextView>(R.id.errorTitle).setText(R.string.webview_outdated_title)
+        errorMessage.setText(R.string.webview_outdated_body)
+        val packageName = provider?.packageName ?: "com.google.android.webview"
+        findViewById<Button>(R.id.retryButton).apply {
+            setText(R.string.webview_outdated_action)
+            setOnClickListener {
+                val market = Intent(Intent.ACTION_VIEW, Uri.parse("market://details?id=$packageName"))
+                val web = Intent(Intent.ACTION_VIEW, Uri.parse("https://play.google.com/store/apps/details?id=$packageName"))
+                try {
+                    startActivity(market)
+                } catch (e: ActivityNotFoundException) {
+                    try {
+                        startActivity(web)
+                    } catch (e: ActivityNotFoundException) {
+                    }
+                }
+            }
+        }
+    }
+
+    @VisibleForTesting
+    fun isShowingError(): Boolean = errorView.visibility == View.VISIBLE
 
     private fun showError(detail: String) {
         isLoading = false

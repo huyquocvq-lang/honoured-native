@@ -1,11 +1,12 @@
 package com.honoured.app.bridge
 
-import android.webkit.WebView
 import androidx.test.core.app.ActivityScenario
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.platform.app.InstrumentationRegistry
 import com.honoured.app.MainActivity
-import com.honoured.app.R
+import com.honoured.app.WebViewSupport
+import androidx.webkit.WebViewFeature
+import org.junit.Assume.assumeTrue
 import com.honoured.app.session.SessionServices
 import org.json.JSONArray
 import org.json.JSONObject
@@ -33,6 +34,10 @@ class SessionTransportTest {
     private val services = SessionServices.get(InstrumentationRegistry.getInstrumentation().targetContext)
 
     @Before fun setUp() {
+        val context = InstrumentationRegistry.getInstrumentation().targetContext
+        // Needs the origin-scoped transport and a WebView that can run the web app.
+        assumeTrue(WebViewFeature.isFeatureSupported(WebViewFeature.WEB_MESSAGE_LISTENER))
+        assumeTrue(WebViewSupport.isSupported(context))
         services.store.clear()
         scenario = ActivityScenario.launch(MainActivity::class.java)
         // The page has loaded and the bridge objects are injected.
@@ -50,6 +55,7 @@ class SessionTransportTest {
     }
 
     @After fun tearDown() {
+        if (!::scenario.isInitialized) return
         services.store.clear()
         scenario.close()
     }

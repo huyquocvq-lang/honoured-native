@@ -2,7 +2,6 @@ package com.honoured.app
 
 import android.content.Intent
 import android.net.Uri
-import android.webkit.WebView
 import androidx.test.core.app.ActivityScenario
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.platform.app.InstrumentationRegistry
@@ -37,6 +36,7 @@ class ShellLifecycleTest {
 
     @Before fun setUp() {
         assumeTrue(WebViewFeature.isFeatureSupported(WebViewFeature.DOCUMENT_START_SCRIPT))
+        assumeTrue(WebViewSupport.isSupported(context))
         services.events.clear()
         MainActivity.webViewCreatedHook = { view ->
             WebViewCompat.addDocumentStartJavaScript(
