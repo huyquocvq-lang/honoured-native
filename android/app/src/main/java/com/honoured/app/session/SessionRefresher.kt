@@ -26,7 +26,10 @@ class SessionRefresher(
 ) {
     sealed class WebOutcome {
         /** Supabase's token response, already stored. Handed to the page unchanged. */
-        data class Refreshed(val response: JSONObject) : WebOutcome()
+        class Refreshed(val response: JSONObject) : WebOutcome() {
+            /** The response carries tokens: never print it. */
+            override fun toString(): String = "Refreshed(<redacted>)"
+        }
         /** The page refreshes for itself, as it would outside the app. */
         data class Declined(val reason: String) : WebOutcome()
         /** Offline or a server error: retry later. Never answered with the page's own token. */
@@ -37,6 +40,13 @@ class SessionRefresher(
 
     private val lock = Mutex()
     private var running: Pair<String, Deferred<RefreshResult>>? = null
+
+    /**
+     * The last finished refresh, keyed by the refresh token it spent. A caller
+     * that read the session just before that refresh stored its result gets
+     * the same result instead of spending the old token a second time.
+     */
+    private var lastCompleted: Pair<String, RefreshResult>? = null
 
     /** A refresh the page handed over. Blocking IO: call on an IO dispatcher. */
     suspend fun refreshForWeb(userId: String): WebOutcome {
@@ -68,25 +78,36 @@ class SessionRefresher(
         return refresh(current).session
     }
 
-    /** Refreshes [current] once, however many callers ask meanwhile, and stores the result. */
+    /**
+     * Refreshes [current] once, however many callers ask meanwhile, and stores
+     * the result. Like the iOS actor, "spend the token, store the result" is
+     * one step: it runs inside the shared task, so every caller of one refresh
+     * sees the same outcome and none of them can start a second refresh on the
+     * token the first one just spent.
+     */
     private suspend fun refresh(current: NativeAuthSession): RefreshResult {
         val task = lock.withLock {
+            lastCompleted?.takeIf { it.first == current.refreshToken }?.let { return it.second }
             running?.takeIf { it.first == current.refreshToken }?.second
-                ?: scope.async { transport.refresh(current) }.also { running = current.refreshToken to it }
+                ?: scope.async {
+                    val result = transport.refresh(current)
+                    // The page may have signed out, switched account or stored a
+                    // newer session while the request was in flight: only the
+                    // session this refresh started from may be replaced.
+                    if (!store.replaceIf(current, result.session)) throw RefreshError.Superseded()
+                    lock.withLock { lastCompleted = current.refreshToken to result }
+                    result
+                }.also { running = current.refreshToken to it }
         }
         try {
-            val result = task.await()
-            // Another caller sharing this refresh may have stored it already.
-            if (store.load()?.refreshToken == result.session.refreshToken) return result
-            // The page may have signed out, switched account or stored a newer
-            // session while the request was in flight: only the session this
-            // refresh started from may be replaced.
-            if (!store.replaceIf(current, result.session)) throw RefreshError.Superseded()
-            return result
+            return task.await()
         } finally {
             lock.withLock { if (running?.second === task) running = null }
         }
     }
+
+    /** Sign-out or another account: nothing of the previous session may be handed out again. */
+    suspend fun forget() = lock.withLock { lastCompleted = null }
 }
 
 /** What native does with a refresh the page hands over. Same rules as iOS `WebRefreshPolicy`. */

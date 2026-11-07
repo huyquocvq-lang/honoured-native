@@ -54,7 +54,10 @@ class NativeBridge(
     private fun flushStoredNow() {
         val stored = runCatching { session.events.drain() }.getOrDefault(emptyList())
         if (stored.isEmpty()) return
-        webView.post { stored.forEach { send(it.type, it.payload) } }
+        // Through the queue, not straight to send(): if the page navigated or
+        // the WebView was replaced meanwhile, the events wait for the next page
+        // instead of being dispatched into nothing.
+        webView.post { stored.forEach { events.broadcast(it.type, it.payload, it.createdAt) } }
     }
 
     fun destroy() {

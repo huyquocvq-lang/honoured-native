@@ -36,7 +36,7 @@ class PermissionCoordinator(private val activity: ComponentActivity) {
 
     fun status(permission: String): PermissionGate.Status = gate.status(permission)
 
-    fun request(permission: String, onResult: (Boolean) -> Unit) = gate.request(permission, onResult)
+    fun request(permission: String, onResult: (PermissionGate.Outcome) -> Unit) = gate.request(permission, onResult)
 
     /** Only from an explicit tap: Android's page for this app, where blocked permissions are turned back on. */
     fun openAppSettings(): Boolean = try {

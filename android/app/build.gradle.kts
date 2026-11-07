@@ -58,7 +58,9 @@ val uploadKeyReady = listOf(uploadStoreFile, uploadStorePassword, uploadKeyAlias
 
 /** Everything a store build needs; empty when a release may be built. */
 fun releaseProblems(): List<String> = buildList {
-    if (!uploadKeyReady) {
+    // Android Studio's "Generate Signed Bundle / APK" injects its own key.
+    val injectedKey = project.hasProperty("android.injected.signing.store.file")
+    if (!uploadKeyReady && !injectedKey) {
         add(
             "upload key: set HONOURED_UPLOAD_STORE_FILE (an existing keystore), HONOURED_UPLOAD_STORE_PASSWORD, " +
                 "HONOURED_UPLOAD_KEY_ALIAS and HONOURED_UPLOAD_KEY_PASSWORD in android/local.properties or the environment",
@@ -139,11 +141,13 @@ android {
 
 // A store build never goes out unsigned, with a test entitlement, or without
 // its configuration. Debug and smoke builds are not affected.
+val releaseArtifactTasks = setOf(
+    "assembleRelease", "bundleRelease", "packageRelease",
+    "packageReleaseBundle", "signReleaseBundle", "packageReleaseUniversalApk",
+)
 gradle.taskGraph.whenReady {
-    val releaseTasks = allTasks.filter { task ->
-        task.project == project && task.name.endsWith("Release") &&
-            listOf("assemble", "bundle", "package", "sign").any { task.name.startsWith(it) }
-    }
+    // Every task that produces a release APK/AAB, whichever one was asked for.
+    val releaseTasks = allTasks.filter { task -> task.project == project && task.name in releaseArtifactTasks }
     if (releaseTasks.isEmpty()) return@whenReady
     val problems = releaseProblems()
     if (problems.isNotEmpty()) {

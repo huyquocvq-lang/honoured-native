@@ -19,7 +19,15 @@ class WebViewGateTest {
         val context = InstrumentationRegistry.getInstrumentation().targetContext
         val supported = WebViewSupport.isSupported(context)
         ActivityScenario.launch(MainActivity::class.java).use { scenario ->
-            Thread.sleep(if (supported) 8000 else 2000)
+            // Until the page has loaded (or the update screen is up), not a fixed sleep.
+            val deadline = System.currentTimeMillis() + 60_000
+            var settled = false
+            while (!settled && System.currentTimeMillis() < deadline) {
+                scenario.onActivity { a ->
+                    settled = a.findViewById<android.view.View>(R.id.loadingIndicator).visibility != android.view.View.VISIBLE
+                }
+                if (!settled) Thread.sleep(250)
+            }
             scenario.onActivity { activity ->
                 if (supported) {
                     assertFalse("the app loads", activity.isShowingError())

@@ -60,6 +60,12 @@ class ContractDeepLinkTest {
     }
 
     @Test
+    fun keepsCharactersOutsideTheBasicPlane() {
+        assertEquals("go🙂", parse("honoured://contract/go🙂")?.contractId)
+        assertEquals("go🙂", parse("honoured://contract/go%F0%9F%99%82")?.contractId)
+    }
+
+    @Test
     fun rejectsBadIds() {
         assertNull(parse("honoured://contract/%20%20"))
         assertNull(parse("honoured://contract/a%0Ab"))

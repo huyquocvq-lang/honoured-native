@@ -105,9 +105,13 @@ object ContractDeepLink {
                 bytes.write(hi * 16 + lo)
                 i += 3
             } else {
-                val encoded = c.toString().toByteArray(Charsets.UTF_8)
+                // Whole code points, so a character outside the BMP (an emoji)
+                // is encoded as itself; a lone surrogate rejects the link.
+                val cp = value.codePointAt(i)
+                if (Character.isSurrogate(c) && Character.charCount(cp) == 1) return null
+                val encoded = String(Character.toChars(cp)).toByteArray(Charsets.UTF_8)
                 bytes.write(encoded, 0, encoded.size)
-                i += 1
+                i += Character.charCount(cp)
             }
         }
         return try {

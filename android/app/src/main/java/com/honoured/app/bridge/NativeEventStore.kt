@@ -81,17 +81,26 @@ class NativeEventStore(private val file: File, private val limit: Int = LIMIT) {
         /** Events the person would notice losing (iOS keeps the same kind on disk). */
         val DURABLE_TYPES = setOf("NOTIFICATION_OPENED", "CONTRACT_LINK_OPENED", "GOAL_REACHED", "TIMER_COMPLETED")
 
-        private val SECRET_KEYS = setOf("accesstoken", "refreshtoken", "access_token", "refresh_token", "idtoken", "session", "password")
+        /** Compared after lower-casing and dropping `_` / `-`. */
+        private val SECRET_KEYS = setOf(
+            "accesstoken", "refreshtoken", "idtoken", "providertoken", "providerrefreshtoken",
+            "token", "session", "password", "secret", "authorization",
+        )
 
         fun containsSecret(json: JSONObject): Boolean {
             val keys = json.keys()
             while (keys.hasNext()) {
                 val key = keys.next()
-                if (key.lowercase() in SECRET_KEYS) return true
-                val value = json.opt(key)
-                if (value is JSONObject && containsSecret(value)) return true
+                if (key.lowercase().replace("_", "").replace("-", "") in SECRET_KEYS) return true
+                if (valueContainsSecret(json.opt(key))) return true
             }
             return false
+        }
+
+        private fun valueContainsSecret(value: Any?): Boolean = when (value) {
+            is JSONObject -> containsSecret(value)
+            is JSONArray -> (0 until value.length()).any { valueContainsSecret(value.opt(it)) }
+            else -> false
         }
     }
 }

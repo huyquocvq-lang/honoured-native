@@ -11,6 +11,17 @@ import java.nio.file.Files
 class NativeEventStoreTest {
     private val file = File(Files.createTempDirectory("events").toFile(), "honoured/native-events.json")
 
+    @Test fun secretsAreFoundUnderAnySpellingAndInsideArrays() {
+        listOf(
+            JSONObject().put("id_token", "x"),
+            JSONObject().put("provider_refresh_token", "x"),
+            JSONObject().put("Provider-Token", "x"),
+            JSONObject().put("items", org.json.JSONArray().put(JSONObject().put("refreshToken", "x"))),
+            JSONObject().put("nested", JSONObject().put("list", org.json.JSONArray().put(org.json.JSONArray().put(JSONObject().put("session", "x"))))),
+        ).forEach { assertTrue(it.toString(), NativeEventStore.containsSecret(it)) }
+        assertFalse(NativeEventStore.containsSecret(JSONObject().put("eventId", "e").put("contractId", "c").put("healthDay", "2026-11-07")))
+    }
+
     @Test fun keepsOnlyDurableTypesAndNeverTokens() {
         val store = NativeEventStore(file)
         assertTrue(runCatching { store.append("ACCESS_STATUS", JSONObject()) }.isFailure)

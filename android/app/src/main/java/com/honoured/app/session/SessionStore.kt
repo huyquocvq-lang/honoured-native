@@ -47,9 +47,12 @@ class SessionStore(private val file: File, private val cipher: SessionCipher) {
     }
 
     fun clear() = synchronized(lock) {
+        // Delete first: if that fails the store must keep reporting the session
+        // that is still on disk, not "none" until the next launch brings it back.
+        if (file.exists() && !file.delete()) throw IllegalStateException("Could not delete the stored session")
         cached = null
         loaded = true
-        if (file.exists() && !file.delete()) throw IllegalStateException("Could not delete the stored session")
+        lastReadWasUnreadable = false
     }
 
     private fun loadLocked(): NativeAuthSession? {

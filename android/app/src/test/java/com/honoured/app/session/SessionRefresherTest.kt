@@ -59,6 +59,34 @@ class SessionRefresherTest {
         assertEquals("r1", store.load()!!.refreshToken)
     }
 
+    @Test fun concurrentCallersOnRealThreadsShareOneRefreshAndOneOutcome() {
+        // runTest is single-threaded; the app refreshes on Dispatchers.IO.
+        repeat(20) {
+            val store = SessionStore(File(Fixtures.tempDir(), "session.bin"), FakeCipher())
+            store.save(Fixtures.session(refresh = "r-start"))
+            val spent = java.util.concurrent.atomic.AtomicInteger()
+            val transport = RefreshTransport { current ->
+                spent.incrementAndGet()
+                Thread.sleep(20)
+                RefreshResponse.parse(current, 200, Fixtures.response(current.userId, "a1", "r1").toString(), 0.0)
+            }
+            val scope = kotlinx.coroutines.CoroutineScope(kotlinx.coroutines.SupervisorJob() + kotlinx.coroutines.Dispatchers.IO)
+            val refresher = SessionRefresher(store, transport, scope)
+            val outcomes = kotlinx.coroutines.runBlocking {
+                (1..8).map { async(kotlinx.coroutines.Dispatchers.IO) { refresher.refreshForWeb("user-a") } }.awaitAll()
+            }
+            assertEquals("one network refresh", 1, spent.get())
+            outcomes.forEach { assertTrue("every caller gets the refreshed session, got $it", it is SessionRefresher.WebOutcome.Refreshed) }
+            assertEquals("r1", store.load()!!.refreshToken)
+            scope.coroutineContext[kotlinx.coroutines.Job]!!.cancel()
+        }
+    }
+
+    @Test fun aRefreshedOutcomeNeverPrintsTokens() {
+        val outcome = SessionRefresher.WebOutcome.Refreshed(Fixtures.response("user-a", "secret-access", "secret-refresh"))
+        assertTrue(!outcome.toString().contains("secret"))
+    }
+
     @Test fun eachRefreshSpendsTheNewestStoredToken() = runTest {
         store.save(Fixtures.session(refresh = "r-start"))
         val transport = FakeTransport()

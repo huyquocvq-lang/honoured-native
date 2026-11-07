@@ -4,6 +4,7 @@ import android.annotation.SuppressLint
 import android.app.Activity
 import android.content.Intent
 import android.net.Uri
+import android.provider.DocumentsContract
 import android.webkit.WebView
 import android.widget.Toast
 import androidx.activity.ComponentActivity
@@ -62,15 +63,24 @@ class DownloadSaver(private val activity: ComponentActivity, private val origin:
     private fun onMessage(message: WebMessageCompat, sourceOrigin: Uri, isMainFrame: Boolean) {
         val trusted = origin ?: return
         if (!isMainFrame || !trusted.matches(sourceOrigin.scheme, sourceOrigin.host, sourceOrigin.port)) return
-        val request = SaveRequest.parse(message.data) ?: return
         // One save screen at a time; a second tap while it is open is dropped.
-        if (pending != null) return
-        pending = request
-        runCatching { launcher.launch(request) }.onFailure {
-            pending = null
-            toast(R.string.download_failed)
+        if (pending != null || parsing) return
+        val raw = message.data ?: return
+        parsing = true
+        activity.lifecycleScope.launch {
+            // Up to 10 MB of base64: decode off the main thread.
+            val request = withContext(Dispatchers.Default) { SaveRequest.parse(raw) }
+            parsing = false
+            if (request == null || pending != null) return@launch
+            pending = request
+            runCatching { launcher.launch(request) }.onFailure {
+                pending = null
+                toast(R.string.download_failed)
+            }
         }
     }
+
+    private var parsing = false
 
     private fun onPicked(uri: Uri?) {
         val request = pending ?: return
@@ -78,9 +88,12 @@ class DownloadSaver(private val activity: ComponentActivity, private val origin:
         if (uri == null) return // the person cancelled
         activity.lifecycleScope.launch {
             val ok = withContext(Dispatchers.IO) {
-                runCatching {
+                val written = runCatching {
                     activity.contentResolver.openOutputStream(uri, "wt")?.use { it.write(request.bytes) } != null
                 }.getOrDefault(false)
+                // The picker already created an empty file: do not leave it behind.
+                if (!written) runCatching { DocumentsContract.deleteDocument(activity.contentResolver, uri) }
+                written
             }
             toast(if (ok) R.string.download_saved else R.string.download_failed)
         }

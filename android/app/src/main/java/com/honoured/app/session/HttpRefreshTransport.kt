@@ -26,8 +26,8 @@ class HttpRefreshTransport(
         val connection = url.openConnection() as HttpURLConnection
         try {
             connection.requestMethod = "POST"
-            connection.connectTimeout = TIMEOUT_MS
-            connection.readTimeout = TIMEOUT_MS
+            connection.connectTimeout = CONNECT_TIMEOUT_MS
+            connection.readTimeout = READ_TIMEOUT_MS
             connection.doOutput = true
             connection.useCaches = false
             connection.setRequestProperty("Content-Type", "application/json")
@@ -44,6 +44,9 @@ class HttpRefreshTransport(
     }
 
     private companion object {
-        const val TIMEOUT_MS = 15_000
+        // Worst case 25 s, inside the page's 30 s wait for REFRESH_AUTH_SESSION on
+        // Android, so the page never gives up while native is still refreshing.
+        const val CONNECT_TIMEOUT_MS = 10_000
+        const val READ_TIMEOUT_MS = 15_000
     }
 }

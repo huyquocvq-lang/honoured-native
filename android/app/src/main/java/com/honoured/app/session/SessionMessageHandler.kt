@@ -37,16 +37,29 @@ class SessionMessageHandler(
             ?: return reply("ERROR", error("invalid_auth_session", "Invalid auth session"))
         onOwnerChanged(session.userId)
         mutations.enqueue {
+            var switching = false
             try {
-                val previous = store.load()?.userId
-                if (previous != null && previous != session.userId) {
+                val stored = store.load()
+                // The previous owner is unknown when the stored copy could not be read.
+                switching = (stored != null && stored.userId != session.userId) || store.lastReadWasUnreadable
+                if (switching) {
                     // First, so a failure further on cannot leave the previous
                     // account's state for the next one.
+                    refresher.forget()
                     registry.clearAll()
+                }
+                if (SessionFreshness.keepStored(stored, session)) {
+                    // Same person, and native already holds a later session (it
+                    // refreshed, and the reply never reached this page). Storing
+                    // the older one would make native spend a rotated token.
+                    reply(ACCEPTED, JSONObject().put("userId", session.userId))
+                    return@enqueue
                 }
                 store.save(session)
                 reply(ACCEPTED, JSONObject().put("userId", session.userId))
             } catch (e: Exception) {
+                // Never leave the previous account's session behind a failed switch.
+                if (switching) runCatching { store.clear() }
                 reply("ERROR", error("auth_session_store_failed", "The session could not be stored"))
             }
         }
@@ -56,6 +69,7 @@ class SessionMessageHandler(
         onOwnerChanged(null)
         mutations.enqueue {
             try {
+                refresher.forget()
                 store.clear()
                 registry.clearAll()
                 reply(CLEARED, JSONObject())
@@ -93,4 +107,19 @@ class SessionMessageHandler(
         /** Token-carrying messages: trusted transport only. */
         val MESSAGE_TYPES = setOf(SET, CLEAR, REFRESH)
     }
+}
+
+/** Which of two sessions of the same person is the later one. */
+object SessionFreshness {
+    /**
+     * True when [stored] belongs to the same user as [incoming], carries a
+     * different refresh token and expires later: it was issued after the
+     * incoming one, so the incoming one is stale. Supabase sets expires_at at
+     * issue time, so a later expiry means a later session.
+     */
+    fun keepStored(stored: NativeAuthSession?, incoming: NativeAuthSession): Boolean =
+        stored != null &&
+            stored.userId == incoming.userId &&
+            stored.refreshToken != incoming.refreshToken &&
+            stored.expiresAt > incoming.expiresAt
 }

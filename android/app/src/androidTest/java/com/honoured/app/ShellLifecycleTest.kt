@@ -92,10 +92,11 @@ class ShellLifecycleTest {
         scenario = ActivityScenario.launch(linkIntent("honoured://contract/once"))
         waitForPage()
         waitForEvents("CONTRACT_LINK_OPENED", 1)
+        jsString("window.__beforeRecreate = 1; 'ok'")
         scenario!!.recreate()
         waitForPage()
         // A new document (fresh load, not restoreState) that never hears the old link again.
-        assertEquals("true", jsString("String(window.__events !== undefined)"))
+        assertEquals("undefined", jsString("String(typeof window.__beforeRecreate)"))
         Thread.sleep(1500)
         assertTrue(events("CONTRACT_LINK_OPENED").isEmpty())
         assertTrue(events("NATIVE_READY").isNotEmpty())

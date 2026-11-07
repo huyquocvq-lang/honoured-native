@@ -4,6 +4,7 @@ import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Test
+import com.honoured.app.permissions.PermissionGate.Outcome
 
 class PermissionGateTest {
     private val mic = "android.permission.RECORD_AUDIO"
@@ -27,30 +28,31 @@ class PermissionGateTest {
     @Test
     fun grantedAnswersAtOnceWithoutAPrompt() {
         granted += mic
-        val results = mutableListOf<Boolean>()
+        val results = mutableListOf<Outcome>()
         gate.request(mic) { results += it }
-        assertEquals(listOf(true), results)
+        assertEquals(listOf(Outcome.GRANTED), results)
         assertTrue(launched.isEmpty())
         assertEquals(PermissionGate.Status.GRANTED, gate.status(mic))
     }
 
     @Test
     fun oneSystemPromptAtATime() {
-        val first = mutableListOf<Boolean>()
-        val second = mutableListOf<Boolean>()
+        val first = mutableListOf<Outcome>()
+        val second = mutableListOf<Outcome>()
         gate.request(mic) { first += it }
         gate.request("android.permission.POST_NOTIFICATIONS") { second += it }
         assertEquals(listOf(mic), launched)
-        assertEquals(listOf(false), second)
+        // Busy, not refused: the caller must not read it as "blocked".
+        assertEquals(listOf(Outcome.BUSY), second)
         assertTrue(first.isEmpty())
         assertTrue(gate.isPrompting)
 
         gate.onSystemResult(true)
-        assertEquals(listOf(true), first)
+        assertEquals(listOf(Outcome.GRANTED), first)
         assertFalse(gate.isPrompting)
         // A late or duplicate system answer reaches nobody.
         gate.onSystemResult(false)
-        assertEquals(listOf(true), first)
+        assertEquals(listOf(Outcome.GRANTED), first)
     }
 
     @Test
@@ -63,7 +65,7 @@ class PermissionGateTest {
         rationale -= mic // "Don't ask again"
         assertEquals(PermissionGate.Status.BLOCKED, gate.status(mic))
         // Still asks: Android answers false at once without UI when blocked.
-        val again = mutableListOf<Boolean>()
+        val again = mutableListOf<Outcome>()
         gate.request(mic) { again += it }
         assertEquals(2, launched.size)
     }
@@ -71,18 +73,18 @@ class PermissionGateTest {
     @Test
     fun aLaunchFailureAnswersFalseAndFreesTheGate() {
         launchThrows = true
-        val results = mutableListOf<Boolean>()
+        val results = mutableListOf<Outcome>()
         gate.request(mic) { results += it }
-        assertEquals(listOf(false), results)
+        assertEquals(listOf(Outcome.DENIED), results)
         assertFalse(gate.isPrompting)
     }
 
     @Test
     fun cancelAnswersThePendingCallerOnce() {
-        val results = mutableListOf<Boolean>()
+        val results = mutableListOf<Outcome>()
         gate.request(mic) { results += it }
         gate.cancel()
         gate.cancel()
-        assertEquals(listOf(false), results)
+        assertEquals(listOf(Outcome.DENIED), results)
     }
 }

@@ -12,9 +12,10 @@ import java.nio.file.Files
 /** Reversible stand-in for the Keystore cipher in JVM tests. */
 class FakeCipher : SessionCipher {
     var broken = false
+    var failEncrypt = false
     var resets = 0
 
-    override fun encrypt(plain: ByteArray): ByteArray = MAGIC + plain.map { (it.toInt() xor 0x5A).toByte() }.toByteArray()
+    override fun encrypt(plain: ByteArray): ByteArray = if (failEncrypt) throw IllegalStateException("keystore busy") else MAGIC + plain.map { (it.toInt() xor 0x5A).toByte() }.toByteArray()
 
     override fun decrypt(blob: ByteArray): ByteArray {
         if (broken) throw IllegalStateException("key gone")

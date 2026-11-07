@@ -60,6 +60,8 @@ class MainActivity : AppCompatActivity() {
     private lateinit var downloads: DownloadSaver
     private var downloadScript: ScriptHandler? = null
 
+    private var microphoneDialog: AlertDialog? = null
+
     /** Microphone requests of the current page still waiting for an answer. */
     private val pendingMicrophoneRequests = mutableSetOf<PermissionRequest>()
 
@@ -161,14 +163,33 @@ class MainActivity : AppCompatActivity() {
             if (view.canGoBack()) view.goBack() else moveTaskToBack(true)
             return
         }
+        backPending = true
+        timeoutHandler.removeCallbacks(backFallback)
+        // A page whose script is stuck never answers: Back must still work.
+        timeoutHandler.postDelayed(backFallback, BACK_TIMEOUT_MS)
         view.evaluateJavascript(BACK_SCRIPT) { result ->
-            if (view !== webView) return@evaluateJavascript
-            when {
-                result == "true" -> Unit
-                view.canGoBack() -> view.goBack()
-                else -> moveTaskToBack(true)
+            if (!backPending) return@evaluateJavascript
+            backPending = false
+            timeoutHandler.removeCallbacks(backFallback)
+            if (view !== webView || isFinishing || isDestroyed) return@evaluateJavascript
+            when (result) {
+                "\"handled\"" -> Unit
+                // The page owns Back and had nothing to close (or something
+                // must not be closed now, like an unsigned draft): keep it all
+                // and go to the background. History would undo page state.
+                "\"unhandled\"" -> moveTaskToBack(true)
+                // An older page without the hook.
+                else -> if (view.canGoBack()) view.goBack() else moveTaskToBack(true)
             }
         }
+    }
+
+    private var backPending = false
+
+    private val backFallback = Runnable {
+        if (!backPending) return@Runnable
+        backPending = false
+        if (!isFinishing && !isDestroyed) moveTaskToBack(true)
     }
 
     override fun onNewIntent(intent: Intent) {
@@ -259,7 +280,9 @@ class MainActivity : AppCompatActivity() {
      */
     private fun recoverFromRendererLoss(didCrash: Boolean) {
         val now = SystemClock.elapsedRealtime()
-        rendererLosses.addLast(now)
+        // Only real crashes count towards the loop limit: the system killing a
+        // background renderer to free memory is normal and just reloads.
+        if (didCrash) rendererLosses.addLast(now)
         while (rendererLosses.isNotEmpty() && now - rendererLosses.first() > RENDERER_CRASH_WINDOW_MS) {
             rendererLosses.removeFirst()
         }
@@ -327,11 +350,13 @@ class MainActivity : AppCompatActivity() {
 
     private fun showMicrophoneBlocked() {
         if (isFinishing || isDestroyed) return
-        AlertDialog.Builder(this)
+        if (microphoneDialog?.isShowing == true) return
+        microphoneDialog = AlertDialog.Builder(this)
             .setTitle(R.string.microphone_blocked_title)
             .setMessage(R.string.microphone_blocked_body)
             .setPositiveButton(R.string.microphone_blocked_settings) { _, _ -> permissions.openAppSettings() }
             .setNegativeButton(R.string.microphone_blocked_dismiss, null)
+            .setOnDismissListener { microphoneDialog = null }
             .show()
     }
 
@@ -364,8 +389,15 @@ class MainActivity : AppCompatActivity() {
 
     override fun onDestroy() {
         timeoutHandler.removeCallbacks(loadTimeout)
-        pendingMicrophoneRequests.forEach { runCatching { it.deny() } }
+        timeoutHandler.removeCallbacks(backFallback)
+        // Answer each pending request exactly once, then let the gate's own
+        // cancel find nothing left to answer.
+        val pending = pendingMicrophoneRequests.toList()
+        pendingMicrophoneRequests.clear()
+        pending.forEach { runCatching { it.deny() } }
         permissions.destroy()
+        microphoneDialog?.dismiss()
+        microphoneDialog = null
         tearDownWebView()
         super.onDestroy()
     }
@@ -379,8 +411,12 @@ class MainActivity : AppCompatActivity() {
         /** Android's own answer to a blocked permission comes back without any UI, well under this. */
         private const val INSTANT_DENIAL_MS = 400L
 
+        private const val BACK_TIMEOUT_MS = 1_500L
+
+        /** "handled", "unhandled", or "missing" for a page without the hook. */
         private const val BACK_SCRIPT =
-            "(function(){try{return typeof window.__honouredBack==='function'&&window.__honouredBack()===true}catch(e){return false}})()"
+            "(function(){try{if(typeof window.__honouredBack!=='function')return 'missing';" +
+                "return window.__honouredBack()===true?'handled':'unhandled'}catch(e){return 'unhandled'}})()"
 
         /** Instrumentation only: runs on each new WebView before its first load. */
         @VisibleForTesting
@@ -401,18 +437,22 @@ class MainActivity : AppCompatActivity() {
                 }
                 pendingMicrophoneRequests += request
                 val askedAt = SystemClock.elapsedRealtime()
-                permissions.request(Manifest.permission.RECORD_AUDIO) { granted ->
+                permissions.request(Manifest.permission.RECORD_AUDIO) { outcome ->
                     // Cancelled by the page, or its WebView was replaced meanwhile.
                     if (!pendingMicrophoneRequests.remove(request)) return@request
-                    if (granted) {
-                        request.grant(arrayOf(PermissionRequest.RESOURCE_AUDIO_CAPTURE))
+                    // A request answers once; Chromium throws on a second answer.
+                    if (outcome == PermissionGate.Outcome.GRANTED) {
+                        runCatching { request.grant(arrayOf(PermissionRequest.RESOURCE_AUDIO_CAPTURE)) }
                         return@request
                     }
-                    request.deny()
+                    runCatching { request.deny() }
                     // "Don't allow" was chosen for good: Android answered without
-                    // showing anything, so only Settings can turn it back on.
+                    // showing anything, so only Settings can turn it back on. A
+                    // BUSY answer (another prompt was open) is not that.
                     val instant = SystemClock.elapsedRealtime() - askedAt < INSTANT_DENIAL_MS
-                    if (instant && permissions.status(Manifest.permission.RECORD_AUDIO) == PermissionGate.Status.BLOCKED) {
+                    if (outcome == PermissionGate.Outcome.DENIED && instant &&
+                        permissions.status(Manifest.permission.RECORD_AUDIO) == PermissionGate.Status.BLOCKED
+                    ) {
                         showMicrophoneBlocked()
                     }
                 }

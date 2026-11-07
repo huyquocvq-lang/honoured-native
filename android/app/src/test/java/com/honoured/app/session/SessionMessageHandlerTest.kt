@@ -11,7 +11,9 @@ import org.junit.Test
 import java.io.File
 
 class SessionMessageHandlerTest {
-    private val store = SessionStore(File(Fixtures.tempDir(), "session.bin"), FakeCipher())
+    private val cipher = FakeCipher()
+    private val storeFile = File(Fixtures.tempDir(), "session.bin")
+    private val store = SessionStore(storeFile, cipher)
     private val replies = mutableListOf<Pair<String, JSONObject>>()
     private val owners = mutableListOf<String?>()
     private val log = mutableListOf<String>()
@@ -83,6 +85,43 @@ class SessionMessageHandlerTest {
         assertEquals(listOf("clear(stored=user-a)"), log)
         assertEquals("user-b", store.load()!!.userId)
         assertEquals(listOf<String?>("user-a", "user-b"), owners)
+    }
+
+    @Test fun aStaleSessionForTheSamePersonNeverReplacesALaterOne() = runTest {
+        val h = handler()
+        // Native refreshed (r-later, later expiry) but the reply never reached the
+        // page, which reloads and hands over its older session again.
+        h.handle("SET_AUTH_SESSION", set("user-a", "r-later").put("expiresAt", 2_000_003_600), reply)
+        h.handle("SET_AUTH_SESSION", set("user-a", "r-earlier").put("expiresAt", 2_000_000_000), reply)
+        settle()
+        assertEquals("r-later", store.load()!!.refreshToken)
+        assertEquals(listOf("AUTH_SESSION_ACCEPTED", "AUTH_SESSION_ACCEPTED"), replies.map { it.first })
+        // A genuinely newer session (later expiry) is stored.
+        h.handle("SET_AUTH_SESSION", set("user-a", "r-newest").put("expiresAt", 2_000_007_200), reply)
+        settle()
+        assertEquals("r-newest", store.load()!!.refreshToken)
+        assertTrue(log.isEmpty())
+    }
+
+    @Test fun aFailedSaveWhileSwitchingLeavesNoPreviousSessionBehind() = runTest {
+        val h = handler()
+        h.handle("SET_AUTH_SESSION", set("user-a"), reply)
+        settle()
+        cipher.failEncrypt = true
+        h.handle("SET_AUTH_SESSION", set("user-b"), reply)
+        settle()
+        assertEquals("ERROR", replies.last().first)
+        assertNull("user-a's session must not survive a failed switch", store.load())
+        assertEquals(listOf("clear(stored=user-a)"), log)
+    }
+
+    @Test fun anUnreadableStoredSessionClearsAccountStateFirst() = runTest {
+        storeFile.writeBytes(byteArrayOf(1, 2, 3)) // corrupt: the previous owner is unknown
+        val h = handler()
+        h.handle("SET_AUTH_SESSION", set("user-b"), reply)
+        settle()
+        assertEquals(listOf("clear(stored=null)"), log)
+        assertEquals("user-b", store.load()!!.userId)
     }
 
     @Test fun clearWipesTheSessionAndAccountState() = runTest {
