@@ -5,5 +5,6 @@
     <string name="error_title">Can’t reach Honoured</string>
     <string name="error_body">Check your connection and try again.</string>
     <string name="error_timeout">The connection timed out.</string>
+    <string name="error_renderer">The page stopped unexpectedly.</string>
     <string name="error_retry">Try again</string>
 </resources>

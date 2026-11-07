@@ -37,6 +37,41 @@ if (revenueCatEntitlementId.isNotEmpty()) {
     )
 }
 
+// Tracked version: bump VERSION_CODE for every upload to Play.
+val versionProperties = loadProperties(rootProject.file("version.properties"))
+val appVersionName: String = versionProperties.getProperty("VERSION_NAME")?.trim().orEmpty()
+    .ifEmpty { throw GradleException("android/version.properties: VERSION_NAME is missing") }
+val appVersionCode: Int = versionProperties.getProperty("VERSION_CODE")?.trim()?.toIntOrNull()
+    ?: throw GradleException("android/version.properties: VERSION_CODE is missing or not a number")
+
+// Upload key for store builds. Never in the repository: android/local.properties
+// (gitignored) or the environment, e.g. on a CI runner.
+fun secret(name: String): String =
+    (localProperties.getProperty(name) ?: System.getenv(name) ?: "").trim()
+
+val uploadStoreFile = secret("HONOURED_UPLOAD_STORE_FILE")
+val uploadStorePassword = secret("HONOURED_UPLOAD_STORE_PASSWORD")
+val uploadKeyAlias = secret("HONOURED_UPLOAD_KEY_ALIAS")
+val uploadKeyPassword = secret("HONOURED_UPLOAD_KEY_PASSWORD")
+val uploadKeyReady = listOf(uploadStoreFile, uploadStorePassword, uploadKeyAlias, uploadKeyPassword)
+    .all { it.isNotEmpty() } && file(uploadStoreFile).isFile
+
+/** Everything a store build needs; empty when a release may be built. */
+fun releaseProblems(): List<String> = buildList {
+    if (!uploadKeyReady) {
+        add(
+            "upload key: set HONOURED_UPLOAD_STORE_FILE (an existing keystore), HONOURED_UPLOAD_STORE_PASSWORD, " +
+                "HONOURED_UPLOAD_KEY_ALIAS and HONOURED_UPLOAD_KEY_PASSWORD in android/local.properties or the environment",
+        )
+    }
+    if (revenueCatEntitlementId.isNotEmpty()) add("REVENUECAT_ENTITLEMENT_ID must be empty for a store build")
+    if (!honouredWebAppUrl.startsWith("https://")) add("HONOURED_WEB_APP_URL must be an https:// URL")
+    if (revenueCatApiKey.isEmpty()) add("REVENUECAT_ANDROID_API_KEY is empty")
+    if (googleWebClientId.isEmpty()) add("GOOGLE_WEB_CLIENT_ID is empty")
+    if (!supabaseUrl.startsWith("https://")) add("SUPABASE_URL must be an https:// URL")
+    if (supabaseAnonKey.isEmpty()) add("SUPABASE_ANON_KEY is empty")
+}
+
 android {
     namespace = "com.honoured.app"
     compileSdk = 35
@@ -45,15 +80,47 @@ android {
         applicationId = "com.honoured.app"
         minSdk = 26
         targetSdk = 35
-        versionCode = 1
-        versionName = "1.0.0"
+        versionCode = appVersionCode
+        versionName = appVersionName
         buildConfigField("String", "REVENUECAT_ANDROID_API_KEY", "\"$revenueCatApiKey\"")
         buildConfigField("String", "HONOURED_WEB_APP_URL", "\"$honouredWebAppUrl\"")
         buildConfigField("String", "REVENUECAT_ENTITLEMENT_ID", "\"$revenueCatEntitlementId\"")
         buildConfigField("String", "GOOGLE_WEB_CLIENT_ID", "\"$googleWebClientId\"")
         buildConfigField("String", "SUPABASE_URL", "\"$supabaseUrl\"")
         buildConfigField("String", "SUPABASE_ANON_KEY", "\"$supabaseAnonKey\"")
+        // Smoke builds only: lets chrome://inspect reach the WebView of an R8 build.
+        buildConfigField("boolean", "WEBVIEW_DEBUGGING", "false")
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
+    }
+
+    signingConfigs {
+        if (uploadKeyReady) {
+            create("release") {
+                storeFile = file(uploadStoreFile)
+                storePassword = uploadStorePassword
+                keyAlias = uploadKeyAlias
+                keyPassword = uploadKeyPassword
+            }
+        }
+    }
+
+    buildTypes {
+        release {
+            isMinifyEnabled = true
+            isShrinkResources = true
+            proguardFiles(getDefaultProguardFile("proguard-android-optimize.txt"), "proguard-rules.pro")
+            // Null without an upload key; the release guard below refuses the build first.
+            signingConfig = signingConfigs.findByName("release")
+        }
+        // The release build (R8, shrinking, same package and config) signed with
+        // the debug key, to smoke-test on a device or emulator. Play refuses
+        // debug-signed uploads, so it can never reach the store by mistake.
+        create("smoke") {
+            initWith(getByName("release"))
+            signingConfig = signingConfigs.getByName("debug")
+            matchingFallbacks += "release"
+            buildConfigField("boolean", "WEBVIEW_DEBUGGING", "true")
+        }
     }
 
     buildFeatures {
@@ -67,6 +134,20 @@ android {
 
     kotlinOptions {
         jvmTarget = "17"
+    }
+}
+
+// A store build never goes out unsigned, with a test entitlement, or without
+// its configuration. Debug and smoke builds are not affected.
+gradle.taskGraph.whenReady {
+    val releaseTasks = allTasks.filter { task ->
+        task.project == project && task.name.endsWith("Release") &&
+            listOf("assemble", "bundle", "package", "sign").any { task.name.startsWith(it) }
+    }
+    if (releaseTasks.isEmpty()) return@whenReady
+    val problems = releaseProblems()
+    if (problems.isNotEmpty()) {
+        throw GradleException("Refusing to build a store release:\n - " + problems.joinToString("\n - "))
     }
 }
 

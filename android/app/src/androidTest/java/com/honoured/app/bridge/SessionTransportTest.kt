@@ -128,7 +128,7 @@ class SessionTransportTest {
         val latch = CountDownLatch(1)
         var result = "null"
         scenario.onActivity { activity ->
-            activity.findViewById<WebView>(R.id.webView).evaluateJavascript(script) { value ->
+            activity.currentWebView().evaluateJavascript(script) { value ->
                 result = value ?: "null"
                 latch.countDown()
             }

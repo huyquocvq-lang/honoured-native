@@ -1,11 +1,13 @@
 <?xml version="1.0" encoding="utf-8"?>
 <FrameLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:id="@+id/root"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
     android:background="@color/honoured_background">
 
-    <WebView
-        android:id="@+id/webView"
+    <!-- The WebView is created in code, so a crashed renderer can be replaced. -->
+    <FrameLayout
+        android:id="@+id/webViewContainer"
         android:layout_width="match_parent"
         android:layout_height="match_parent" />
 

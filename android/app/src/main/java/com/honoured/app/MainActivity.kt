@@ -3,52 +3,69 @@ package com.honoured.app
 import android.Manifest
 import android.content.ActivityNotFoundException
 import android.content.Intent
-import android.content.pm.PackageManager
 import android.graphics.Color
 import android.net.Uri
 import android.os.Bundle
 import android.os.Handler
 import android.os.Looper
+import android.os.SystemClock
+import android.util.Log
 import android.view.View
 import android.view.ViewGroup
+import android.webkit.PermissionRequest
+import android.webkit.RenderProcessGoneDetail
+import android.webkit.WebChromeClient
 import android.webkit.WebResourceError
 import android.webkit.WebResourceRequest
 import android.webkit.WebResourceResponse
-import android.webkit.PermissionRequest
 import android.webkit.WebSettings
 import android.webkit.WebView
-import android.webkit.WebChromeClient
 import android.webkit.WebViewClient
 import android.widget.Button
+import android.widget.FrameLayout
 import android.widget.ProgressBar
 import android.widget.TextView
 import androidx.activity.OnBackPressedCallback
-import androidx.activity.result.contract.ActivityResultContracts
-import androidx.core.content.ContextCompat
+import androidx.activity.SystemBarStyle
+import androidx.activity.enableEdgeToEdge
+import androidx.annotation.VisibleForTesting
 import androidx.appcompat.app.AppCompatActivity
+import androidx.core.view.ViewCompat
+import androidx.core.view.WindowInsetsCompat
 import androidx.lifecycle.lifecycleScope
 import com.honoured.app.auth.AuthBridge
 import com.honoured.app.billing.SubscriptionService
 import com.honoured.app.bridge.Capabilities
 import com.honoured.app.bridge.NativeBridge
+import com.honoured.app.deeplink.ContractDeepLink
+import com.honoured.app.permissions.PermissionCoordinator
 import com.honoured.app.session.SessionServices
+import java.util.UUID
 
 class MainActivity : AppCompatActivity() {
+    private lateinit var webViewContainer: FrameLayout
     private lateinit var webView: WebView
     private lateinit var loadingIndicator: ProgressBar
     private lateinit var errorView: View
     private lateinit var errorMessage: TextView
     private lateinit var bridge: NativeBridge
     private lateinit var authBridge: AuthBridge
-    private var pendingMicrophoneRequest: PermissionRequest? = null
-    private val microphonePermission = registerForActivityResult(
-        ActivityResultContracts.RequestPermission()
-    ) { granted ->
-        val request = pendingMicrophoneRequest
-        pendingMicrophoneRequest = null
-        if (granted) request?.grant(arrayOf(PermissionRequest.RESOURCE_AUDIO_CAPTURE))
-        else request?.deny()
-    }
+    private lateinit var session: SessionServices
+    private lateinit var permissions: PermissionCoordinator
+
+    /** Microphone requests of the current page still waiting for an answer. */
+    private val pendingMicrophoneRequests = mutableSetOf<PermissionRequest>()
+
+    /** Renderer losses in the last [RENDERER_CRASH_WINDOW_MS], to stop a crash loop. */
+    private val rendererLosses = ArrayDeque<Long>()
+
+    /** Bumped each time a WebView is built (first launch, renderer recovery). */
+    @VisibleForTesting
+    var webViewGeneration = 0
+        private set
+
+    @VisibleForTesting
+    fun currentWebView(): WebView = webView
 
     /**
      * Set when the main frame fails so [WebViewClient.onPageFinished], which still
@@ -71,20 +88,91 @@ class MainActivity : AppCompatActivity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        // Android 15 draws every targetSdk 35 app edge to edge; do the same on
+        // older versions and keep the page out from under the bars ourselves.
+        enableEdgeToEdge(
+            statusBarStyle = SystemBarStyle.dark(Color.TRANSPARENT),
+            navigationBarStyle = SystemBarStyle.dark(Color.TRANSPARENT),
+        )
+        // Registers an activity-result launcher, so it must exist before STARTED.
+        permissions = PermissionCoordinator(this)
 
         SubscriptionService.configureIfPossible(this)
 
-        if (BuildConfig.DEBUG) {
+        if (BuildConfig.DEBUG || BuildConfig.WEBVIEW_DEBUGGING) {
             WebView.setWebContentsDebuggingEnabled(true)
         }
 
         setContentView(R.layout.activity_main)
-        webView = findViewById(R.id.webView)
+        applySystemBarInsets(findViewById(R.id.root))
+        webViewContainer = findViewById(R.id.webViewContainer)
         loadingIndicator = findViewById(R.id.loadingIndicator)
         errorView = findViewById(R.id.errorView)
         errorMessage = findViewById(R.id.errorMessage)
 
-        webView.apply {
+        session = SessionServices.get(this)
+        buildWebView()
+
+        findViewById<Button>(R.id.retryButton).setOnClickListener { retry() }
+
+        // After process death (or a recreation outside configChanges) the saved
+        // WebView state is not trusted: the page keeps its own state in
+        // localStorage and the native session lives in the encrypted store, so
+        // a fresh load is both simpler and correct. Pending links wait in the
+        // durable event store until the new page speaks.
+        load()
+
+        // A link that started this activity. Not on a recreation (it was handled
+        // the first time) and not from Recents (that replays the old intent).
+        if (savedInstanceState == null) routeDeepLink(intent)
+
+        onBackPressedDispatcher.addCallback(this, object : OnBackPressedCallback(true) {
+            override fun handleOnBackPressed() {
+                if (webView.canGoBack()) webView.goBack() else finish()
+            }
+        })
+    }
+
+    override fun onNewIntent(intent: Intent) {
+        super.onNewIntent(intent)
+        // getIntent() stays the launch intent: nothing reads it after onCreate.
+        routeDeepLink(intent)
+    }
+
+    /**
+     * `honoured://contract/<id>?day=<YYYY-MM-DD>` becomes a durable
+     * `CONTRACT_LINK_OPENED`, delivered once the page is ready. A malformed
+     * link is dropped. Navigation only: the page decides what the id means.
+     */
+    private fun routeDeepLink(intent: Intent?) {
+        if (intent?.action != Intent.ACTION_VIEW) return
+        if (intent.flags and Intent.FLAG_ACTIVITY_LAUNCHED_FROM_HISTORY != 0) return
+        val target = ContractDeepLink.parse(intent.dataString) ?: return
+        bridge.broadcastDurable(
+            "CONTRACT_LINK_OPENED",
+            ContractDeepLink.eventPayload(target, UUID.randomUUID().toString()),
+        )
+    }
+
+    /** Pads the content out from under the status, navigation and cutout areas, and above the keyboard. */
+    private fun applySystemBarInsets(root: View) {
+        ViewCompat.setOnApplyWindowInsetsListener(root) { view, insets ->
+            val bars = insets.getInsets(
+                WindowInsetsCompat.Type.systemBars() or WindowInsetsCompat.Type.displayCutout()
+            )
+            val ime = insets.getInsets(WindowInsetsCompat.Type.ime())
+            view.setPadding(bars.left, bars.top, bars.right, maxOf(bars.bottom, ime.bottom))
+            WindowInsetsCompat.CONSUMED
+        }
+    }
+
+    /** Creates the WebView and both bridges. The secure auth transport is installed before any load. */
+    private fun buildWebView() {
+        val view = WebView(this).apply {
+            layoutParams = FrameLayout.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT,
+                ViewGroup.LayoutParams.MATCH_PARENT,
+            )
             setBackgroundColor(Color.BLACK)
             settings.javaScriptEnabled = true
             settings.domStorageEnabled = true
@@ -98,60 +186,55 @@ class MainActivity : AppCompatActivity() {
             // a tap on the audio element, which WebView otherwise blocks.
             settings.mediaPlaybackRequiresUserGesture = false
             webViewClient = HonouredWebViewClient()
-            webChromeClient = object : WebChromeClient() {
-                override fun onPermissionRequest(request: PermissionRequest) {
-                    runOnUiThread {
-                        val trustedOrigin = request.origin.host == AppConfig.WEB_APP_HOST
-                        val audioOnly = request.resources.contentEquals(
-                            arrayOf(PermissionRequest.RESOURCE_AUDIO_CAPTURE)
-                        )
-                        if (!trustedOrigin || !audioOnly) {
-                            request.deny()
-                            return@runOnUiThread
-                        }
-                        if (ContextCompat.checkSelfPermission(
-                                this@MainActivity,
-                                Manifest.permission.RECORD_AUDIO
-                            ) == PackageManager.PERMISSION_GRANTED
-                        ) {
-                            request.grant(arrayOf(PermissionRequest.RESOURCE_AUDIO_CAPTURE))
-                        } else {
-                            pendingMicrophoneRequest?.deny()
-                            pendingMicrophoneRequest = request
-                            microphonePermission.launch(Manifest.permission.RECORD_AUDIO)
-                        }
-                    }
-                }
-
-                override fun onPermissionRequestCanceled(request: PermissionRequest) {
-                    if (pendingMicrophoneRequest == request) pendingMicrophoneRequest = null
-                }
-            }
+            webChromeClient = HonouredChromeClient()
         }
-
-        // The secure auth transport must be installed before the first load so
-        // HonouredAuth is injected into the page.
-        val session = SessionServices.get(this)
-        authBridge = AuthBridge(this, webView, lifecycleScope, session).also { it.install() }
-        bridge = NativeBridge(this, webView, session) {
+        webViewContainer.addView(view)
+        webView = view
+        authBridge = AuthBridge(this, view, lifecycleScope, session).also { it.install() }
+        bridge = NativeBridge(this, view, session) {
             Capabilities.build(authBridge.capability(), authBridge.isSessionSupported)
         }
-        webView.addJavascriptInterface(bridge, "HonouredNative")
+        view.addJavascriptInterface(bridge, "HonouredNative")
+        webViewGeneration++
+        webViewCreatedHook?.invoke(view)
+    }
 
-        findViewById<Button>(R.id.retryButton).setOnClickListener { load() }
+    /** Detaches and destroys the current WebView and its bridges. Safe on a WebView whose renderer is gone. */
+    private fun tearDownWebView() {
+        pendingMicrophoneRequests.clear()
+        runCatching { authBridge.destroy() }
+        runCatching { bridge.destroy() }
+        val old = webView
+        runCatching { old.removeJavascriptInterface("HonouredNative") }
+        webViewContainer.removeView(old)
+        runCatching { old.destroy() }
+    }
 
-        if (savedInstanceState == null) {
-            load()
-        } else {
-            showLoading()
-            webView.restoreState(savedInstanceState)
+    /**
+     * The renderer crashed or was killed to free memory. The WebView is dead
+     * and must never be touched again: replace it and load the app from the
+     * start, so the shell itself survives. A renderer that keeps dying ends on
+     * the error screen instead of a crash loop.
+     */
+    private fun recoverFromRendererLoss(didCrash: Boolean) {
+        val now = SystemClock.elapsedRealtime()
+        rendererLosses.addLast(now)
+        while (rendererLosses.isNotEmpty() && now - rendererLosses.first() > RENDERER_CRASH_WINDOW_MS) {
+            rendererLosses.removeFirst()
         }
+        Log.w(TAG, "WebView renderer gone (crashed=$didCrash), rebuilding")
+        tearDownWebView()
+        buildWebView()
+        if (rendererLosses.size > MAX_RENDERER_LOSSES) {
+            showError(getString(R.string.error_renderer))
+        } else {
+            load()
+        }
+    }
 
-        onBackPressedDispatcher.addCallback(this, object : OnBackPressedCallback(true) {
-            override fun handleOnBackPressed() {
-                if (webView.canGoBack()) webView.goBack() else finish()
-            }
-        })
+    private fun retry() {
+        rendererLosses.clear()
+        load()
     }
 
     private fun load() {
@@ -199,40 +282,74 @@ class MainActivity : AppCompatActivity() {
         webView.onResume()
     }
 
-    override fun onSaveInstanceState(outState: Bundle) {
-        webView.saveState(outState)
-        super.onSaveInstanceState(outState)
-    }
-
     override fun onDestroy() {
         timeoutHandler.removeCallbacks(loadTimeout)
-        pendingMicrophoneRequest?.deny()
-        pendingMicrophoneRequest = null
-        authBridge.destroy()
-        bridge.destroy()
-        webView.removeJavascriptInterface("HonouredNative")
-        (webView.parent as? ViewGroup)?.removeView(webView)
-        webView.destroy()
+        pendingMicrophoneRequests.forEach { runCatching { it.deny() } }
+        permissions.destroy()
+        tearDownWebView()
         super.onDestroy()
     }
 
-    private companion object {
-        const val LOAD_TIMEOUT_MS = 30_000L
+    companion object {
+        private const val TAG = "Honoured"
+        private const val LOAD_TIMEOUT_MS = 30_000L
+        private const val RENDERER_CRASH_WINDOW_MS = 60_000L
+        private const val MAX_RENDERER_LOSSES = 3
+
+        /** Instrumentation only: runs on each new WebView before its first load. */
+        @VisibleForTesting
+        @JvmStatic
+        var webViewCreatedHook: ((WebView) -> Unit)? = null
+    }
+
+    private inner class HonouredChromeClient : WebChromeClient() {
+        override fun onPermissionRequest(request: PermissionRequest) {
+            runOnUiThread {
+                val trustedOrigin = request.origin.host == AppConfig.WEB_APP_HOST
+                val audioOnly = request.resources.contentEquals(
+                    arrayOf(PermissionRequest.RESOURCE_AUDIO_CAPTURE)
+                )
+                if (!trustedOrigin || !audioOnly) {
+                    request.deny()
+                    return@runOnUiThread
+                }
+                pendingMicrophoneRequests += request
+                permissions.request(Manifest.permission.RECORD_AUDIO) { granted ->
+                    // Cancelled by the page, or its WebView was replaced meanwhile.
+                    if (!pendingMicrophoneRequests.remove(request)) return@request
+                    if (granted) request.grant(arrayOf(PermissionRequest.RESOURCE_AUDIO_CAPTURE))
+                    else request.deny()
+                }
+            }
+        }
+
+        override fun onPermissionRequestCanceled(request: PermissionRequest) {
+            runOnUiThread { pendingMicrophoneRequests.remove(request) }
+        }
     }
 
     private inner class HonouredWebViewClient : WebViewClient() {
         override fun onPageFinished(view: WebView, url: String) {
-            if (mainFrameFailed) return
+            if (view !== webView || mainFrameFailed) return
 
             showContent()
             bridge.send("NATIVE_READY", bridge.readyPayload())
         }
 
         override fun onPageStarted(view: WebView, url: String?, favicon: android.graphics.Bitmap?) {
+            if (view !== webView) return
             // A new main-frame document: no Google result or session reply may
             // reach the old one, and broadcasts wait for the new one.
             authBridge.documentWillChange()
             bridge.pageWillChange()
+        }
+
+        override fun onRenderProcessGone(view: WebView, detail: RenderProcessGoneDetail): Boolean {
+            // Returning true keeps the app alive; an older WebView is already gone.
+            if (view === webView && !isFinishing && !isDestroyed) {
+                recoverFromRendererLoss(detail.didCrash())
+            }
+            return true
         }
 
         override fun onReceivedError(
@@ -240,7 +357,7 @@ class MainActivity : AppCompatActivity() {
             request: WebResourceRequest,
             error: WebResourceError
         ) {
-            if (!request.isForMainFrame) return
+            if (view !== webView || !request.isForMainFrame) return
             showError("${error.description} (${error.errorCode})")
         }
 
@@ -249,7 +366,7 @@ class MainActivity : AppCompatActivity() {
             request: WebResourceRequest,
             errorResponse: WebResourceResponse
         ) {
-            if (!request.isForMainFrame) return
+            if (view !== webView || !request.isForMainFrame) return
             showError("HTTP ${errorResponse.statusCode}")
         }
 

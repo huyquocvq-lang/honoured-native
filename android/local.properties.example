@@ -1,0 +1,21 @@
+# Copy to android/local.properties (gitignored). Values here override the
+# repository-root .env for this machine only. Never commit real values.
+
+sdk.dir=/Users/<you>/Library/Android/sdk
+
+# Web app the shell loads (https).
+HONOURED_WEB_APP_URL=
+
+# Public client configuration.
+REVENUECAT_ANDROID_API_KEY=
+# Leave empty for store builds (production entitlement honoured_plus).
+REVENUECAT_ENTITLEMENT_ID=
+GOOGLE_WEB_CLIENT_ID=
+SUPABASE_URL=
+SUPABASE_ANON_KEY=
+
+# Upload key for bundleRelease. The keystore lives outside the repository.
+HONOURED_UPLOAD_STORE_FILE=
+HONOURED_UPLOAD_STORE_PASSWORD=
+HONOURED_UPLOAD_KEY_ALIAS=
+HONOURED_UPLOAD_KEY_PASSWORD=
