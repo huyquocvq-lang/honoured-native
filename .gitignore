@@ -49,3 +49,4 @@ android/.kotlin/
 # Signing keys never go in the repo (Phase 5 M2, A2).
 *.jks
 *.keystore
+android/signing/

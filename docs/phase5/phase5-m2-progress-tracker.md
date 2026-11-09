@@ -1,6 +1,6 @@
 # Phase 5 M2 — Android foundation, native session và web parity: Progress Tracker
 
-Updated: 07/11/2026
+Updated: 09/11/2026
 
 Plan: `phase5-m2-android-foundation-plan.vi.md`. Branch: `feat/android-m2` (chưa push).
 Trạng thái dùng như tracker Phase 4: `NOT STARTED`, `IN PROGRESS`, `BLOCKED`, `CODE DONE`, `READY FOR JIMMY`, `JIMMY TESTING`, `DONE`.
@@ -9,23 +9,29 @@ Trạng thái dùng như tracker Phase 4: `NOT STARTED`, `IN PROGRESS`, `BLOCKED
 
 | Milestone | Giờ | Trạng thái | Điều kiện đóng |
 |---|---:|---|---|
-| M2 — Android foundation, native session, web parity | 44 | IN PROGRESS | Checklist §8 của plan; demo trên máy Android thật; baseline đã chốt (D1) |
+| M2 — Android foundation, native session, web parity | 44 | DONE 09/11/2026 | Jimmy xác nhận toàn bộ web changes đã publish, đã test trên máy Android thật và chấp nhận đóng M2 |
 
 ## Quyết định
 
 | ID | Nội dung | Trạng thái |
 |---|---|---|
-| D1 | Jimmy PASS bản iOS chuẩn (1.0.9 (4) hay (5)) | CHỜ JIMMY |
-| D2 | Máy Android thật (Pixel / Galaxy A06 5G) | CHỜ JIMMY/KHÁCH |
-| D3 | Package `com.honoured.app`, Play Console, upload key | CHỜ KHÁCH |
-| D4 | Android OAuth client + `GOOGLE_WEB_CLIENT_ID` | CHỜ JIMMY/KHÁCH |
+| D1 | Jimmy PASS baseline dùng để đóng M2 | CHỐT 09/11: Jimmy chấp nhận đóng M2 |
+| D2 | Máy Android thật (Pixel / Galaxy A06 5G) | PASS 09/11: Jimmy xác nhận đã test máy thật; không tự bổ sung model/evidence chưa được cung cấp |
+| D3 | Package Android, Play Console, upload key | M2 DONE: local package/signing đã cấu hình; Play submission thuộc M5 |
+| D4 | Android OAuth client + `GOOGLE_WEB_CLIENT_ID` | M2 DONE: config đã có và Jimmy xác nhận bản máy thật đã test |
 | D5 | 2 tài khoản test | CHỐT 07/11: Jimmy đồng ý ("Làm hết M2"). Tạo bằng chính màn đăng ký trên Android: `huyquoc.vq+honoured-android-1@gmail.com` (user `91834e18…`) và `-2` (`d4e1df92…`); mật khẩu trong Keychain `honoured-android-test-1/2`, không in ra. Marketing opt-in = false. Xoá được sau M5 |
 | D6 | Sign in with Apple trên Android | CHỐT 04/11: EXCLUDED (dùng Link Google / đặt mật khẩu trên iPhone) |
-| D7 | Copy "iPhone app" trên Android | CHỜ KHÁCH |
+| D7 | Copy "iPhone app" trên Android | CLOSED 09/11: dùng nội dung trong bản web đã publish và được Jimmy chấp nhận trên máy thật |
 | D8 | Revise target trên Android | CHỐT 04/11: INCLUDED (kéo theo chế độ target theo thứ khi tạo Icon, `Contract.tsx:1139, 1254`) |
 | D9 | Testament Timer trên Android (R1): web chờ `TIMER_COMPLETED` mà Android không gửi, nên contract dùng timer sẽ BROKEN | CHỐT 05/11: phương án A (Jimmy đồng ý). Đã nằm trong Lovable `727722d8`: `nativeOwnsTimer()` = iOS hoặc `testamentTimer.supported` |
 | W5 | Nút Google trên Android rơi vào OAuth web khi không có capability (R3) | Đã nằm trong Lovable `727722d8`: `showGoogleButton(platform, usable)`, OAuth web chỉ cho trình duyệt thường |
-| W6 | Contract / Icon đo bằng Health tạo trên Android chưa xác minh được tới M3/M4 (R2) | CHỜ KHÁCH: cảnh báo, chặn hay chỉ ghi chú |
+| W6 | Contract / Icon đo bằng Health tạo trên Android chưa xác minh được tới M3/M4 (R2) | CLOSED FOR M2: giới hạn được chấp nhận; phần xác minh Health vẫn thuộc M3/M4 |
+
+## Xác nhận đóng M2
+
+- 09/11/2026: Jimmy xác nhận toàn bộ thay đổi web của M2 đã publish và bản Android đã được test trên máy thật.
+- Jimmy yêu cầu đánh dấu milestone `DONE`; xác nhận này đóng exit gate publish và physical-device acceptance.
+- Không bổ sung deployment SHA, model máy hoặc evidence chưa được cung cấp. Các dòng evidence chi tiết bên dưới vẫn giữ nguyên lịch sử kiểm tra trước lúc nghiệm thu.
 
 ## Task
 
@@ -43,8 +49,8 @@ Trạng thái dùng như tracker Phase 4: `NOT STARTED`, `IN PROGRESS`, `BLOCKED
 | B5 | Dọn dữ liệu khi đăng xuất / đổi tài khoản | 2 | CODE DONE | `session/SerialMutationQueue.kt` (`AccountScopedRegistry`), `GoogleAuthState.sessionOwnerChanged` |
 | B6 | Test bridge / phiên | 1 | CODE DONE | Unit `testDebugUnitTest` 49/49 pass (38 test mới: store, refresher, handler, event queue, capability, owner change). Instrumentation `connectedDebugAndroidTest` trên emulator API 35 (WebView 124): 6/6 pass. Gồm Keystore thật (round trip, IV ngẫu nhiên, sửa 1 byte bị phát hiện, mất khoá thì quên phiên); production web thật: `HonouredNative` từ chối SET/REFRESH với `insecure_transport` và không lưu gì; `HonouredAuth` nhận SET (ACCEPTED không có token), từ chối refresh cho user khác (`other_user`), refresh bằng token giả tới Supabase thật bị trả về `invalid_session` và giữ nguyên phiên đang lưu, CLEAR xoá phiên. Logcat không chứa token test |
 | G1 | Adapter web + gate capability (Lovable) | 3 | PUBLISHED 05/11 | Lovable `727722d8` (8.9 credit), publish 05/11 (Jimmy duyệt), deployment `81a78bcd`, bundle `routes-DmE-ESGB.js` → `routes-Ckka2yNr.js` + `index-7eB0IeUw.js` (có `trusted-auth-v1`, `CONTRACT_LINK_OPENED`, `testamentTimer`). Smoke WebKit: 200, không lỗi console. Gồm W1 (SET/CLEAR/REFRESH chỉ qua `HonouredAuth` khi `androidSessionHandOff()`), W2 (`CONTRACT_LINK_OPENED`), W5, D9. Vitest 898/898 ở UTC; ở Asia/Saigon và Los Angeles chỉ fail P5-B02 (có từ trước). `tsc` sạch. Test cũ chạy trên code mới: 5 fail, cả 5 là test giả lập shell Android dự kiến đổi hành vi (token/timer qua kênh cũ) hoặc mock thiếu export mới. A/B bridge (script `50-ab-bridge.mjs`, mock Supabase): **iOS** cùng tập message, cùng kênh, cùng payload key so với production; thứ tự chỉ lệch ở `GET_TIMER_STATE` thứ hai, lệch cả giữa hai lần chạy production nên là do timing; refresh vẫn qua native. **Android cũ**: không còn SET/CLEAR/timer, trang tự refresh, ẩn Google khi chưa cấu hình. **Android mới**: SET/CLEAR/REFRESH chỉ qua `HonouredAuth`, trang không tự dùng refresh token |
-| G2 | Copy / trạng thái Health trên Android | 2 | IN PROGRESS (Lovable `8bf3e879`, chưa publish) | Phần không đụng copy gửi Lovable 07/11 (`082c1f8e`): Android không có `healthConnect.supported` thì health state = `unsupported` (không còn Set up chết, không gửi health request), và hook `window.__honouredBack()` cho nút Back. Sau review OCR: `8bf3e879` (xem mục Review). Phần copy chờ D7 |
-| G3 | Kiểm parity trên WebView | 2 | IN PROGRESS (emulator xong; còn máy thật D2) | Trên emulator: R6 Export: lỗi thật ("Export saved." nhưng không có file) → đã sửa ở shell (`download/DownloadSaver.kt`), file JSON lưu vào Downloads qua màn "Save to" của hệ thống, nội dung đúng. R8 micro: từ chối 2 lần → lần 3 hiện "Microphone is off" + Open Settings → mở đúng trang app. R9 Back: lỗi thật (thoát và **huỷ** activity, mất bản nháp contract) → shell không còn `finish()`, hỏi `window.__honouredBack()` rồi `moveTaskToBack`; relaunch HOT, giữ tab. Composer Icon trên Android: chọn thứ, kỳ, nhắc sáng/tối, "Different target on some days" (D8) hiển thị đúng; chưa ký Icon / Revise target được vì trial hết phiên (mở lại 14/11). R5: Home Android hiện "Connect Apple Health" + Set up chết → G2. R7 (ghi âm Android phát trên iPhone): cần iPhone |
+| G2 | Copy / trạng thái Health trên Android | 2 | DONE 09/11 | Lovable `8bf3e879` đã được Jimmy xác nhận publish; trạng thái/copy Android đã được chấp nhận khi test máy thật. Evidence trước publish: Android không có `healthConnect.supported` thì health state = `unsupported`, không gửi health request; hook `window.__honouredBack()` cho nút Back |
+| G3 | Kiểm parity trên WebView | 2 | DONE 09/11 | Emulator evidence đã ghi cho Export, micro, Back, Icon composer và Health state. Jimmy xác nhận đã test bản hoàn chỉnh trên máy Android thật và chấp nhận parity để đóng M2; không tự bổ sung model/ảnh/video chưa được cung cấp |
 | G4 | Test Lovable / browser / WebView | 4 | DONE (emulator) | E2E 07/11 trên emulator API 35 với production `727722d8` và 2 tài khoản test (script `scratch/hon/emu/*.mjs`, CDP + adb, mật khẩu đọc từ Keychain): **đăng ký** trên Android → `AUTH_SESSION_ACCEPTED`, `session.bin` được tạo; **đăng nhập** bằng mật khẩu → như trên; **refresh** (cho access token hết hạn rồi reload): trang KHÔNG gọi `/auth/v1/token`, native refresh, token xoay, `session.bin` ghi lại; DB: 1 session, chuỗi token 1 revoked + 1 active, không có reuse; **đăng xuất** → `POST /logout`, `session.bin` + `native-events.json` bị xoá; **đổi tài khoản** (1 → 2 → 1): refresh của user mới vẫn qua native, Home không lẫn dữ liệu; **Testament Timer** (D9): contract 1 phút, bấm Start, 60 s sau "Honoured · 09:06", DB `status = honoured`, không có `START_TIMER`; **deep link** `honoured://contract/<client_id>`: warm và cold đều mở Standing Contract, contract đã Honoured hoặc của account khác → Home; **app Android cũ (main, code 1) + web mới**: nút Google ẩn, trang tự refresh (`POST /token`), không có `session.bin`; **nâng cấp cũ → mới khi đang đăng nhập**: web gửi phiên sang native một lần, refresh sau đó qua native, DB: 1 session, 3 token, 1 active. Chưa test được: Google (D4), máy thật (D2), mua gói (M5) |
 
 ## Nhật ký
@@ -81,12 +87,12 @@ Kiểm: Android unit 78/78; instrumentation API 35 15/15; web `8bf3e879` vitest 
 
 | ID | Task | Mô tả | Severity | Trạng thái |
 |---|---|---|---|---|
-| P5-M2-B01 | G1 / D9 | R1: Testament Timer trên Android không bao giờ hoàn thành, nên contract BROKEN. Lỗi có từ trước trên production Android | High | FIXED, PUBLISHED 05/11 (`727722d8`), chờ test trên máy |
-| P5-M2-B02 | G1 / W5 | R3: thiếu Google config thì nút Google trên Android mở OAuth web, ra trình duyệt ngoài, app không đăng nhập | Medium | FIXED, PUBLISHED 05/11 (`727722d8`), chờ test trên máy |
-| P5-M2-B03 | G2 / D7 | R5: Home Android hiện "Connect Apple Health" với nút Set up không có tác dụng | Medium | OPEN, gộp W3 |
+| P5-M2-B01 | G1 / D9 | R1: Testament Timer trên Android không bao giờ hoàn thành, nên contract BROKEN. Lỗi có từ trước trên production Android | High | DONE: fixed, published 05/11 (`727722d8`), Jimmy xác nhận test máy thật 09/11 |
+| P5-M2-B02 | G1 / W5 | R3: thiếu Google config thì nút Google trên Android mở OAuth web, ra trình duyệt ngoài, app không đăng nhập | Medium | DONE: fixed, published 05/11 (`727722d8`), Jimmy xác nhận test máy thật 09/11 |
+| P5-M2-B03 | G2 / D7 | R5: Home Android hiện "Connect Apple Health" với nút Set up không có tác dụng | Medium | DONE: fix trong web `8bf3e879`, Jimmy xác nhận đã publish và test máy thật 09/11 |
 | P5-M2-B04 | A5 | WebView cũ (API 26 không Play, WebView 58): web production lỗi cú pháp (`Unexpected token ?`), app chỉ hiện màn đen. Có từ trước | Medium | FIXED trong shell: gate WebView ≥ 111. Copy "Update Android System WebView" / nút "Update" chờ khách duyệt (cùng D7) |
 | P5-M2-B05 | G3 / R6 | Export my history trên Android báo "Export saved." nhưng không có file. Có từ trước | Medium | FIXED ở shell (`DownloadSaver`), đã test emulator + instrumentation |
 | P5-M2-B06 | G3 / R9 | Nút Back trên Android thoát và huỷ activity: mất bản nháp contract / dialog. Có từ trước | Medium | FIXED ở shell (không `finish()`); phần đóng sheet/dialog chờ web `__honouredBack` (G2) |
 | P5-M2-B07 | G3 / R8 | Micro bị từ chối hẳn thì không có đường mở lại trong app | Low | FIXED ở shell: dialog "Microphone is off" → Open Settings. Copy chờ D7 |
-| P5-M2-B08 | Review / R-H1 | Trang Android tự refresh khi `NATIVE_READY` đến sau 4 s (có trên production từ G1) | High | FIXED trong Lovable `8bf3e879`, chờ publish |
-| P5-M2-B09 | Review / R-M6 | Settings gọi hook sau `return` sớm (G2, chưa từng publish) | Medium | FIXED trong `8bf3e879` |
+| P5-M2-B08 | Review / R-H1 | Trang Android tự refresh khi `NATIVE_READY` đến sau 4 s (có trên production từ G1) | High | DONE: fixed trong Lovable `8bf3e879`, Jimmy xác nhận đã publish và test máy thật 09/11 |
+| P5-M2-B09 | Review / R-M6 | Settings gọi hook sau `return` sớm (G2, chưa từng publish) | Medium | DONE: fixed trong `8bf3e879`, Jimmy xác nhận đã publish 09/11 |

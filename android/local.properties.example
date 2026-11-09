@@ -3,6 +3,9 @@
 
 sdk.dir=/Users/<you>/Library/Android/sdk
 
+# Installed/Play package. This does not change the Kotlin source namespace.
+ANDROID_APPLICATION_ID=com.honoured.app
+
 # Web app the shell loads (https).
 HONOURED_WEB_APP_URL=
 
@@ -14,7 +17,9 @@ GOOGLE_WEB_CLIENT_ID=
 SUPABASE_URL=
 SUPABASE_ANON_KEY=
 
-# Upload key for bundleRelease. The keystore lives outside the repository.
+# Optional upload-key overrides for bundleRelease. Normally sync-env.sh creates
+# android/signing/signing.properties, so these may remain empty. CI can also
+# provide them as environment variables.
 HONOURED_UPLOAD_STORE_FILE=
 HONOURED_UPLOAD_STORE_PASSWORD=
 HONOURED_UPLOAD_KEY_ALIAS=

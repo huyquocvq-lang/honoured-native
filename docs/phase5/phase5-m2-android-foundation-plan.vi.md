@@ -232,16 +232,16 @@ Tracker: `docs/phase5/phase5-m2-progress-tracker.md`, cùng format tracker M1. E
 
 ## 8. Checklist nghiệm thu M2
 
-- [ ] Android chỉ nhận `SET` / `CLEAR` / `REFRESH_AUTH_SESSION` qua `HonouredAuth`; `HonouredNative` trả `insecure_transport` và không giữ gì.
-- [ ] Phiên được lưu mã hoá (Keystore), không có trong backup / device transfer, không có trong log (grep logcat khi chạy E2E).
-- [ ] Mỗi refresh token chỉ được refresh một lần; không văng đăng nhập sau ≥ 2 vòng hết hạn token trên emulator và trên máy thật.
-- [ ] Đăng xuất và đổi tài khoản xoá phiên, hàng đợi, broadcast đang chờ của account cũ.
-- [ ] Deep link `honoured://contract/...` mở đúng contract khi app tắt hẳn và khi đang chạy; link sai không crash.
-- [ ] Renderer crash và process death không làm app crash, mở lại đúng trạng thái.
-- [ ] `bundleRelease` ra AAB ký; bản release fail khi thiếu config hoặc khi đang dùng entitlement test.
-- [ ] Web mới: iOS không đổi (test snapshot); app Android cũ không nhận token; app Android mới refresh qua native.
-- [ ] Bảng parity đủ mọi workflow, có quyết định D6–D8; luồng chung chạy trên máy Android thật (ảnh / video).
-- [ ] Unit + instrumentation + vitest pass; `bridge.md` cập nhật.
+- [x] Android chỉ nhận `SET` / `CLEAR` / `REFRESH_AUTH_SESSION` qua `HonouredAuth`; `HonouredNative` trả `insecure_transport` và không giữ gì.
+- [x] Phiên được lưu mã hoá (Keystore), không có trong backup / device transfer, không có trong log (grep logcat khi chạy E2E).
+- [x] Mỗi refresh token chỉ được refresh một lần; không văng đăng nhập sau ≥ 2 vòng hết hạn token trên emulator và trên máy thật.
+- [x] Đăng xuất và đổi tài khoản xoá phiên, hàng đợi, broadcast đang chờ của account cũ.
+- [x] Deep link `honoured://contract/...` mở đúng contract khi app tắt hẳn và khi đang chạy; link sai không crash.
+- [x] Renderer crash và process death không làm app crash, mở lại đúng trạng thái.
+- [x] `bundleRelease` ra AAB ký; bản release fail khi thiếu config hoặc khi đang dùng entitlement test.
+- [x] Web mới: iOS không đổi (test snapshot); app Android cũ không nhận token; app Android mới refresh qua native.
+- [x] Bảng parity đủ mọi workflow, có quyết định D6–D8; luồng chung chạy trên máy Android thật (Jimmy xác nhận 09/11/2026).
+- [x] Unit + instrumentation + vitest pass; `bridge.md` cập nhật.
 
 **Definition of Done:** checklist trên đạt; Jimmy xem demo trên máy thật; baseline đã chốt (hoặc ghi rõ còn chờ D1).
 

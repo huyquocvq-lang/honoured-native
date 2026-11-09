@@ -26,26 +26,34 @@ Then fill in:
 HONOURED_WEB_APP_URL=https://honour-your-word.lovable.app
 REVENUECAT_IOS_API_KEY=appl_xxxxxxxxxxxxxxxxx
 REVENUECAT_ANDROID_API_KEY=goog_xxxxxxxxxxxxxxxxx
+ANDROID_APPLICATION_ID=com.honoured.app
 IOS_BUNDLE_ID=com.honoured.app
 IOS_DEVELOPMENT_TEAM=XXXXXXXXXX
 ```
 
-- **Android** reads `.env` directly at Gradle configuration time and exposes the
-  values as `BuildConfig` fields. `android/local.properties` may override any
-  key for that machine only — it is read after `.env` and wins per key, so
-  overriding one value leaves the rest coming from `.env`:
+- **Android** receives `.env` values in a managed block in
+  `android/local.properties`; Gradle also retains direct `.env` loading as a
+  fallback. Android Studio's `sdk.dir` and unrelated local settings are
+  preserved whenever the sync runs:
 
   ```properties
   sdk.dir=/Users/you/Library/Android/sdk
-  REVENUECAT_ANDROID_API_KEY=goog_machine_specific_key
+  # BEGIN HONOURED SYNCED ENV
+  ANDROID_APPLICATION_ID=com.honoured.app
+  # ...generated values...
+  # END HONOURED SYNCED ENV
   ```
 
-  `local.properties` is gitignored too, and Android Studio manages `sdk.dir`
-  in it.
-- **iOS** cannot read `.env`, so `scripts/sync-env.sh` projects it into the
+  `local.properties` is gitignored, and Android Studio manages `sdk.dir` in
+  it. Edit `.env`, not the generated block. `ANDROID_APPLICATION_ID` controls the installed/Play package while
+  the Kotlin namespace remains `com.honoured.app`, so changing app identity
+  does not require moving or rewriting the source packages.
+- **iOS** cannot read `.env`, so the same script projects it into the
   gitignored `ios/Config.xcconfig`, which `ios/project.yml` applies to the
   target. `xcodegen generate` runs the script automatically via `preGenCommand`;
-  run it by hand after editing `.env` without regenerating:
+  run it by hand after editing `.env` without regenerating. The script also
+  creates `android/signing/` once when signing material is absent, then always
+  reuses that key:
 
 ```bash
 ./scripts/sync-env.sh

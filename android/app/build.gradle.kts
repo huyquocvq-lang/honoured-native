@@ -15,11 +15,16 @@ fun loadProperties(file: File): Properties = Properties().apply {
 
 val envProperties = loadProperties(rootProject.file("../.env"))
 val localProperties = loadProperties(rootProject.file("local.properties"))
+val signingProperties = loadProperties(rootProject.file("signing/signing.properties"))
 
 // local.properties wins: it is the narrower, Android-only scope.
 fun env(name: String): String =
     (localProperties.getProperty(name) ?: envProperties.getProperty(name) ?: "").trim()
 
+// The install/package identity may differ between the client's Play app and a
+// developer-owned test app. Keep the Kotlin namespace stable: source code and
+// generated BuildConfig/R classes live under com.honoured.app.
+val androidApplicationId = env("ANDROID_APPLICATION_ID").ifEmpty { "com.honoured.app" }
 val revenueCatApiKey = env("REVENUECAT_ANDROID_API_KEY")
 val honouredWebAppUrl = env("HONOURED_WEB_APP_URL")
 val revenueCatEntitlementId = env("REVENUECAT_ENTITLEMENT_ID")
@@ -44,10 +49,14 @@ val appVersionName: String = versionProperties.getProperty("VERSION_NAME")?.trim
 val appVersionCode: Int = versionProperties.getProperty("VERSION_CODE")?.trim()?.toIntOrNull()
     ?: throw GradleException("android/version.properties: VERSION_CODE is missing or not a number")
 
-// Upload key for store builds. Never in the repository: android/local.properties
-// (gitignored) or the environment, e.g. on a CI runner.
+// Upload key for store builds. The local setup script writes the gitignored
+// android/signing/signing.properties. local.properties and CI environment
+// variables remain supported as overrides.
 fun secret(name: String): String =
-    (localProperties.getProperty(name) ?: System.getenv(name) ?: "").trim()
+    (localProperties.getProperty(name)
+        ?: signingProperties.getProperty(name)
+        ?: System.getenv(name)
+        ?: "").trim()
 
 val uploadStoreFile = secret("HONOURED_UPLOAD_STORE_FILE")
 val uploadStorePassword = secret("HONOURED_UPLOAD_STORE_PASSWORD")
@@ -63,7 +72,8 @@ fun releaseProblems(): List<String> = buildList {
     if (!uploadKeyReady && !injectedKey) {
         add(
             "upload key: set HONOURED_UPLOAD_STORE_FILE (an existing keystore), HONOURED_UPLOAD_STORE_PASSWORD, " +
-                "HONOURED_UPLOAD_KEY_ALIAS and HONOURED_UPLOAD_KEY_PASSWORD in android/local.properties or the environment",
+                "HONOURED_UPLOAD_KEY_ALIAS and HONOURED_UPLOAD_KEY_PASSWORD in android/signing/signing.properties, " +
+                    "android/local.properties, or the environment",
         )
     }
     if (revenueCatEntitlementId.isNotEmpty()) add("REVENUECAT_ENTITLEMENT_ID must be empty for a store build")
@@ -79,7 +89,7 @@ android {
     compileSdk = 35
 
     defaultConfig {
-        applicationId = "com.honoured.app"
+        applicationId = androidApplicationId
         minSdk = 26
         targetSdk = 35
         versionCode = appVersionCode
@@ -107,6 +117,11 @@ android {
     }
 
     buildTypes {
+        debug {
+            // Local development uses the same stable key as release so Google
+            // OAuth only needs one local/upload certificate SHA-1.
+            if (uploadKeyReady) signingConfig = signingConfigs.getByName("release")
+        }
         release {
             isMinifyEnabled = true
             isShrinkResources = true
@@ -119,7 +134,11 @@ android {
         // debug-signed uploads, so it can never reach the store by mistake.
         create("smoke") {
             initWith(getByName("release"))
-            signingConfig = signingConfigs.getByName("debug")
+            signingConfig = if (uploadKeyReady) {
+                signingConfigs.getByName("release")
+            } else {
+                signingConfigs.getByName("debug")
+            }
             matchingFallbacks += "release"
             buildConfigField("boolean", "WEBVIEW_DEBUGGING", "true")
         }
